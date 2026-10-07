@@ -1,2 +1,31 @@
+# Python
 __pycache__/
 *.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Secrets and local credentials (nonsecret templates such as env.example stay tracked)
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+.claude/settings.local.json
+
+# Local data, logs, caches, and databases
+# (versioned manifests, split definitions, and audit evidence stay tracked)
+data/
+logs/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.parquet
+*.feather
+*.arrow
