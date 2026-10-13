@@ -18,7 +18,7 @@ Engineering conventions only. Project governance lives in PROJECT_BRIEF.md, CLAU
 
 ## Checks
 
-- `scripts/check.sh` runs lock verification, formatting, linting, type checking, and tests.
+- `scripts/check.sh` runs the secret scan (`scripts/scan_secrets.sh`), lock verification, formatting, linting, type checking, and tests.
 - It must pass before a commit. CI runs the same script.
 
 ## Code Style
@@ -57,6 +57,10 @@ Engineering conventions only. Project governance lives in PROJECT_BRIEF.md, CLAU
 - Never log `Secret`-bearing containers, environment mappings, or `os.environ`.
 - Never enable traceback features that capture local variables (for example pytest `--showlocals`) in an environment that holds secrets.
 - `env.example` lists variable names only, with empty values. Never create `.env` files in the repository.
+- Test fixtures that a secret scanner would detect are assembled at runtime from short, innocuous fragments, never committed as complete or long contiguous literals.
+- Scanner exceptions exist only for false positives already in Git history. Each is a commit-specific fingerprint (`commit:path:rule:line`) in `.betterleaksignore`, approved explicitly. Inline allow comments are disabled.
+- A finding in staged, unstaged, or untracked material has no exception mechanism. Remove it, rewrite it, or represent it differently before committing. Never work around a finding with three-part or path-wide fingerprints, inline allow comments, or configuration allowlists.
+- If a genuine false positive cannot reasonably be rewritten, stop and obtain an explicit, approved exception-policy decision before committing it.
 
 ## Time
 

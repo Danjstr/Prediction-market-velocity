@@ -1,0 +1,6 @@
+# Approved historical scanner exceptions: commit-specific fingerprints (commit:path:rule:line)
+# only. Each entry requires explicit approval.
+#
+# Fake password fixtures from the Step 2 logging-redaction tests in commit 6f4d657.
+6f4d6575409b182561bb74883b81738ce3a7b49d:tests/unit/test_log.py:generic-password:102
+6f4d6575409b182561bb74883b81738ce3a7b49d:tests/unit/test_log.py:generic-password:262

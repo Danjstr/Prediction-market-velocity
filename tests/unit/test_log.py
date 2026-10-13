@@ -17,6 +17,11 @@ from pmv.redaction import REDACTED, Secret
 LOGGER_NAME = "pmv.tests"
 
 
+def fake_value(number: int) -> str:
+    """Return an unmistakably fake secret value, assembled at runtime from short parts."""
+    return "-".join(("FAKE", "TEST", "VALUE", str(number)))
+
+
 class SensitiveObject:
     def __repr__(self) -> str:
         return "SENSITIVE"
@@ -99,13 +104,13 @@ def test_secrets_are_redacted_from_fields_and_context(stream: io.StringIO) -> No
             extra=fields(
                 endpoint="https://user:hunter2@example.com",
                 api_key="hunter3",
-                nested={"password": "hunter4"},
+                nested={"password": fake_value(4)},
                 wrapped=Secret("hunter5"),
                 note="token=hunter6",
             ),
         )
     output = stream.getvalue()
-    for secret in ("hunter1", "hunter2", "hunter3", "hunter4", "hunter5", "hunter6"):
+    for secret in ("hunter1", "hunter2", "hunter3", fake_value(4), "hunter5", "hunter6"):
         assert secret not in output
     (record,) = parse(stream)
     assert record["context"] == {"session_token": REDACTED}
@@ -259,10 +264,10 @@ def test_invalid_event_names_are_replaced(stream: io.StringIO, name: str) -> Non
 def test_message_arguments_and_free_text_are_never_rendered(stream: io.StringIO) -> None:
     logger = get_logger(LOGGER_NAME)
     logger.info("unit.event %s", "hunter2")
-    logger.info("unit.event %(password)s", {"password": "hunter3"})
+    logger.info("unit.event %(password)s", {"password": fake_value(3)})
     logger.info("connect password hunter4")
     output = stream.getvalue()
-    for secret in ("hunter2", "hunter3", "hunter4"):
+    for secret in ("hunter2", fake_value(3), "hunter4"):
         assert secret not in output
     records = parse(stream)
     assert [record["event"] for record in records] == ["log.invalid_event"] * 3

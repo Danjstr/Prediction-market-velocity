@@ -1,0 +1,16 @@
+# Betterleaks configuration for this repository, passed explicitly by scripts/scan_secrets.sh.
+# Review rules for changes: no path-wide exclusions, no broad regex allowlists, no baselines.
+# Exceptions are individual commit-specific fingerprints in .betterleaksignore, each added
+# with explicit approval.
+
+title = "prediction-market-velocity"
+betterleaksMinVersion = "1.9.0"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "pmv-scanner-canary"
+description = "Synthetic canary generated at runtime by scripts/scan_secrets.sh; never a real secret."
+regex = '''PMVCANARY_[0-9A-F]{32}'''
+keywords = ["PMVCANARY"]

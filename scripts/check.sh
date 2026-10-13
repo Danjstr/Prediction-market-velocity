@@ -3,6 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+scripts/scan_secrets.sh
 uv lock --check
 uv sync --locked
 uv run --locked ruff format --check .
