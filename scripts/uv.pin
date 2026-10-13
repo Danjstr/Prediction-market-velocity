@@ -1,0 +1,6 @@
+# Pinned uv release used by CI (scripts/install_uv.sh) and checked by scripts/check.sh.
+# Changing any value requires explicit approval.
+version=0.13.0
+archive=uv-x86_64-unknown-linux-gnu.tar.gz
+archive_sha256=1468ebd5a5541121837c5a2817b9972ba6090fa6caa3d142620850a47fb75154
+archive_size=17380567

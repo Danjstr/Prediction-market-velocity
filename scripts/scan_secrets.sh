@@ -117,6 +117,11 @@ interfaces="$(isolated /bin/sh -c 'tail -n +3 /proc/net/dev | cut -d: -f1 | tr -
     || malfunction "network isolation with unshare is unavailable"
 [[ "$interfaces" == "lo" ]] || malfunction "the isolated namespace has unexpected network interfaces"
 
+shallow="$(clean_git -C "$repo_root" rev-parse --is-shallow-repository)" \
+    || malfunction "cannot determine whether the repository is a shallow clone"
+[[ "$shallow" == "false" ]] \
+    || malfunction "the repository is a shallow clone; the history scan requires full history"
+
 # Read a redacted JSON report. Prints only rule IDs, files, lines, commits, and
 # fingerprints. Any malformed or unexpected report makes it exit nonzero.
 report_tool() {

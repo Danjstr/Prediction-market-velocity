@@ -1,0 +1,61 @@
+# Continuous integration: runs the same quality gate as local development
+# (scripts/check.sh) with the pinned uv and Betterleaks.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check:
+    name: Quality gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out full history
+        # On pull_request events GitHub sets GITHUB_REF to refs/pull/<number>/merge and
+        # GITHUB_SHA to the PR merge commit; fetch-depth: 0 fetches all history for all
+        # branches and tags, so the history scan covers both the base and the PR head.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+          check-latest: false
+
+      - name: Install pinned uv
+        run: |
+          scripts/install_uv.sh
+          printf '%s\n' "$HOME/.local/share/pmv-tools/uv/$(sed -n 's/^version=//p' scripts/uv.pin)" >> "$GITHUB_PATH"
+
+      - name: Install pinned Betterleaks
+        run: scripts/install_betterleaks.sh
+
+      - name: Allow the secret scan's network namespace
+        run: scripts/ci/prepare_runner_userns.sh
+
+      - name: Run the quality gate
+        run: ./scripts/check.sh
+
+      - name: Verify tracked files are unchanged
+        run: |
+          if ! git diff --quiet --exit-code || [[ -n "$(git status --porcelain)" ]]; then
+            git status --short
+            exit 1
+          fi
