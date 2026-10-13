@@ -97,12 +97,24 @@ class RawStorageConfig:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class ExperimentStorageConfig:
+    """Experiment tracking store. The root is unset unless configured explicitly."""
+
+    root: Path | None = None
+
+    def __post_init__(self) -> None:
+        if self.root is not None and not self.root.is_absolute():
+            raise ValueError("experiments.root must be an absolute path")
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AppConfig:
     environment: Environment
     logging: LoggingConfig
     source_path: Path
     source_sha256: str
     raw_storage: RawStorageConfig = field(default_factory=RawStorageConfig)
+    experiments: ExperimentStorageConfig = field(default_factory=ExperimentStorageConfig)
 
     def log_summary(self) -> dict[str, str]:
         """Return the fields that identify this configuration in logs.
@@ -156,7 +168,7 @@ def load_config(path: Path, expected_environment: Environment) -> AppConfig:
     where = str(path)
     _reject_secret_keys(document, where)
     _reject_unknown_keys(
-        document, {"schema_version", "environment", "logging", "raw_storage"}, where
+        document, {"schema_version", "environment", "logging", "raw_storage", "experiments"}, where
     )
 
     schema_version = _require_int(document, "schema_version", where)
@@ -182,6 +194,9 @@ def load_config(path: Path, expected_environment: Environment) -> AppConfig:
     raw_storage = RawStorageConfig()
     if "raw_storage" in document:
         raw_storage = _parse_raw_storage(_require_table(document, "raw_storage", where), where)
+    experiments = ExperimentStorageConfig()
+    if "experiments" in document:
+        experiments = _parse_experiments(_require_table(document, "experiments", where), where)
 
     return AppConfig(
         environment=environment,
@@ -189,7 +204,18 @@ def load_config(path: Path, expected_environment: Environment) -> AppConfig:
         source_path=path,
         source_sha256=hashlib.sha256(raw).hexdigest(),
         raw_storage=raw_storage,
+        experiments=experiments,
     )
+
+
+def _parse_experiments(table: Mapping[str, object], where: str) -> ExperimentStorageConfig:
+    table_where = f"{where} [experiments]"
+    _reject_unknown_keys(table, {"root"}, table_where)
+    root = _require_str(table, "root", table_where) if "root" in table else None
+    try:
+        return ExperimentStorageConfig(root=None if root is None else Path(root))
+    except ValueError as exc:
+        raise ConfigError(f"{table_where}: {exc}") from None
 
 
 def _parse_raw_storage(table: Mapping[str, object], where: str) -> RawStorageConfig:

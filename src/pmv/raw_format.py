@@ -12,14 +12,47 @@ allocation.
 """
 
 import hashlib
-import json
-import re
 import struct
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
-from typing import Final, Protocol, TypeGuard
+from typing import Final, Protocol
+
+from pmv.integrity import (
+    FormatError,
+    canonical_json,
+    format_timestamp,
+    is_sha256,
+    is_timestamp,
+    parse_canonical_json,
+    to_utc,
+)
+
+__all__ = [
+    "MAGIC",
+    "MAX_HEADER_BYTES",
+    "MAX_PAYLOAD_BYTES",
+    "PREFIX",
+    "ByteStream",
+    "EventFrame",
+    "EventType",
+    "Frame",
+    "FrameReader",
+    "ObjectSummary",
+    "OversizePayloadError",
+    "PayloadFrame",
+    "RawFormatError",
+    "canonical_json",
+    "encode_event_frame",
+    "encode_payload_frame",
+    "format_timestamp",
+    "is_sha256",
+    "is_timestamp",
+    "parse_canonical_json",
+    "summarize_object",
+    "to_utc",
+]
 
 MAGIC: Final = b"PMVRAW1\n"
 FORMAT_NAME: Final = "pmv.raw.frames"
@@ -29,9 +62,6 @@ MAX_HEADER_BYTES: Final = 65_536
 MAX_PAYLOAD_BYTES: Final = 67_108_864
 PREFIX: Final = struct.Struct(">IQ")
 
-_TIMESTAMP_FORMAT: Final = "%Y-%m-%dT%H:%M:%S.%fZ"
-_TIMESTAMP: Final = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z")
-_SHA256: Final = re.compile(r"[0-9a-f]{64}")
 _PAYLOAD_KEYS: Final = frozenset(
     {
         "frame_version",
@@ -53,8 +83,8 @@ class ByteStream(Protocol):
     def read(self, size: int = -1, /) -> bytes: ...
 
 
-class RawFormatError(Exception):
-    """A raw object, frame, or canonical JSON document is malformed."""
+# Raw-format errors are canonical-metadata format errors; the name is kept for callers.
+RawFormatError = FormatError
 
 
 class OversizePayloadError(RawFormatError):
@@ -74,72 +104,6 @@ class EventType(StrEnum):
 
 
 _EVENT_TYPE_VALUES: Final = frozenset(member.value for member in EventType)
-
-
-def to_utc(moment: datetime) -> datetime:
-    """Return ``moment`` in UTC. Naive datetimes are rejected."""
-    if not isinstance(moment, datetime):
-        raise TypeError("timestamps must be datetime objects")
-    if moment.tzinfo is None or moment.utcoffset() is None:
-        raise ValueError("timestamps must be timezone-aware")
-    return moment.astimezone(UTC)
-
-
-def format_timestamp(moment: datetime) -> str:
-    """Serialize as ``YYYY-MM-DDTHH:MM:SS.ffffffZ`` in UTC."""
-    text = to_utc(moment).strftime(_TIMESTAMP_FORMAT)
-    if _TIMESTAMP.fullmatch(text) is None:
-        raise ValueError("timestamp is outside the representable range")
-    return text
-
-
-def is_timestamp(value: object) -> TypeGuard[str]:
-    """Return whether ``value`` is a canonical PMV UTC timestamp string."""
-    if not isinstance(value, str) or _TIMESTAMP.fullmatch(value) is None:
-        return False
-    try:
-        datetime.strptime(value, _TIMESTAMP_FORMAT).replace(tzinfo=UTC)
-    except ValueError:
-        return False
-    return True
-
-
-def is_sha256(value: object) -> TypeGuard[str]:
-    """Return whether ``value`` is a lowercase 64-character SHA-256 hex string."""
-    return isinstance(value, str) and _SHA256.fullmatch(value) is not None
-
-
-def canonical_json(value: Mapping[str, object]) -> bytes:
-    """Encode as canonical ASCII JSON. Floats are not allowed in PMV raw metadata."""
-    _reject_floats(value)
-    return json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
-    ).encode("ascii")
-
-
-def parse_canonical_json(data: bytes) -> dict[str, object]:
-    """Parse a canonical JSON object, rejecting duplicates, floats, and noncanonical bytes.
-
-    Error messages never include the document's content.
-    """
-    try:
-        text = data.decode("ascii")
-    except UnicodeDecodeError:
-        raise RawFormatError("metadata is not ASCII") from None
-    try:
-        value = json.loads(
-            text,
-            object_pairs_hook=_without_duplicates,
-            parse_float=_reject_float_text,
-            parse_constant=_reject_float_text,
-        )
-    except (ValueError, RecursionError):
-        raise RawFormatError("metadata is not valid JSON") from None
-    if not isinstance(value, dict):
-        raise RawFormatError("metadata is not a JSON object")
-    if canonical_json(value) != data:
-        raise RawFormatError("metadata is not canonical JSON")
-    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -382,27 +346,3 @@ def _timestamp_field(header: Mapping[str, object], key: str, where: str) -> str:
     if not isinstance(value, str) or not is_timestamp(value):
         raise RawFormatError(f"{where}: invalid {key}")
     return value
-
-
-def _reject_floats(value: object) -> None:
-    if isinstance(value, float):
-        raise RawFormatError("floats are not allowed in PMV raw metadata")
-    if isinstance(value, Mapping):
-        for item in value.values():
-            _reject_floats(item)
-    elif isinstance(value, list | tuple):
-        for item in value:
-            _reject_floats(item)
-
-
-def _without_duplicates(pairs: list[tuple[str, object]]) -> dict[str, object]:
-    result: dict[str, object] = {}
-    for key, value in pairs:
-        if key in result:
-            raise RawFormatError("metadata has duplicate keys")
-        result[key] = value
-    return result
-
-
-def _reject_float_text(_text: str) -> object:
-    raise RawFormatError("floats are not allowed in PMV raw metadata")

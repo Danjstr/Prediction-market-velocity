@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pmv.experiment.ledger_checkpoint/1",
+  "title": "PMV experiment ledger checkpoint, version 1",
+  "description": "One line of research/experiment-ledger-checkpoints.v1.jsonl: an anchor (ledger_seq, entry_sha256) that the ledger must still contain. ledger_seq strictly increases from line to line. Checkpoints are appended by ExperimentStore.append_checkpoint() and never committed automatically; committing the file is an explicit operator action. Documentation only: the authoritative validators are pmv.experiment_ledger.parse_checkpoints and verify_checkpoints. Canonical bytes: sorted keys, no spaces, ASCII, no floats, one trailing newline. JSON booleans are never integers.",
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$",
+      "description": "UTC; must also be a real calendar time"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entry_sha256",
+    "ledger_seq",
+    "recorded_at",
+    "schema",
+    "schema_version"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pmv.experiment.ledger_checkpoint"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "ledger_seq": {
+      "$ref": "#/$defs/count"
+    },
+    "entry_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "recorded_at": {
+      "$ref": "#/$defs/timestamp"
+    }
+  }
+}

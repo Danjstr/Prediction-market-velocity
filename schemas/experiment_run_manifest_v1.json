@@ -1,0 +1,549 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pmv.experiment.run_manifest/1",
+  "title": "PMV experiment run manifest, version 1",
+  "description": "runs/<run_id>/manifest.json, written only for completed runs, before run_completed is appended. Non-circular: it is built only from the run's ledger prefix up to its last pre-terminal entry and contains nothing from run_completed; run_completed records its SHA-256, and ledger verification rebuilds it to check that hash. Documentation only: the authoritative builder is pmv.experiment_ledger.completion_manifest_bytes. Canonical bytes: sorted keys, no spaces, ASCII, no floats, one trailing newline. JSON booleans are never integers.",
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[0-9]{8}T[0-9]{6}\\.[0-9]{6}Z_[0-9a-f]{32}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "artifact_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}(\\.[a-z0-9]{1,8})?$"
+    },
+    "entrypoint": {
+      "type": "string",
+      "pattern": "^[a-z_][a-z0-9_]*(\\.[a-z_][a-z0-9_]*)*:[a-z_][a-z0-9_]*$"
+    },
+    "run_class": {
+      "enum": [
+        "exploratory",
+        "development",
+        "evidence_candidate"
+      ]
+    },
+    "split": {
+      "enum": [
+        "train",
+        "development",
+        "validation",
+        "inner_validation"
+      ],
+      "description": "protected_holdout is refused in Step 6 and never appears"
+    },
+    "metric_value": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "text"
+          ],
+          "properties": {
+            "type": {
+              "const": "integer"
+            },
+            "text": {
+              "type": "string",
+              "pattern": "^-?(0|[1-9][0-9]*)$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "text"
+          ],
+          "properties": {
+            "type": {
+              "const": "decimal"
+            },
+            "text": {
+              "type": "string",
+              "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?(e[+-]?[0-9]+)?$"
+            }
+          }
+        }
+      ]
+    },
+    "execution_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Closed identity object; execution_identity_sha256 is the SHA-256 of its canonical JSON line. Cross-field rules (pmv.experiment_spec.ExecutionIdentity): code_commit null => code_tree_dirty and dirty_tree_sha256 null; code_commit set => code_tree_dirty is a boolean; dirty_tree_sha256 is set exactly when code_tree_dirty is true.",
+      "required": [
+        "schema",
+        "schema_version",
+        "spec_sha256",
+        "code_commit",
+        "code_tree_dirty",
+        "dirty_tree_sha256",
+        "package_version",
+        "uv_lock_sha256",
+        "installed_environment_sha256",
+        "app_config_sha256",
+        "config_section_sha256",
+        "python_version",
+        "platform",
+        "entrypoint"
+      ],
+      "properties": {
+        "schema": {
+          "const": "pmv.experiment.execution_identity"
+        },
+        "schema_version": {
+          "const": 1
+        },
+        "spec_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "code_commit": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "code_tree_dirty": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "dirty_tree_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "package_version": {
+          "type": "string",
+          "pattern": "^[0-9][0-9A-Za-z.+-]{0,63}$"
+        },
+        "uv_lock_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "installed_environment_sha256": {
+          "const": null,
+          "description": "Option B: must be null in v1. No installed-environment fingerprint is approved, so no v1 run is evidence-eligible."
+        },
+        "app_config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "config_section_sha256": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "calibration",
+            "experiment",
+            "features",
+            "model",
+            "validation"
+          ],
+          "properties": {
+            "calibration": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "experiment": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "features": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "model": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "validation": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "python_version": {
+          "type": "string",
+          "pattern": "^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$"
+        },
+        "platform": {
+          "type": "string",
+          "pattern": "^[a-z0-9]{1,32}-[a-z0-9_]{1,32}$"
+        },
+        "entrypoint": {
+          "$ref": "#/$defs/entrypoint"
+        }
+      }
+    },
+    "run_artifact_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "run_id",
+        "artifact_name",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "const": "run_artifact"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "artifact_name": {
+          "$ref": "#/$defs/artifact_name"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "resolved_input": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "capture_id",
+            "manifest_sha256",
+            "capture_code_clean"
+          ],
+          "properties": {
+            "kind": {
+              "const": "raw_capture"
+            },
+            "capture_id": {
+              "$ref": "#/$defs/run_id"
+            },
+            "manifest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "capture_code_clean": {
+              "type": "boolean",
+              "description": "true only if the capture's code_commit is known and code_tree_dirty is false"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/run_artifact_input"
+        }
+      ]
+    },
+    "resolved_inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/resolved_input"
+      },
+      "uniqueItems": true,
+      "description": "In spec order; no reference repeats. A run_artifact input must name a registered artifact, with that exact hash, of a run completed earlier in the ledger."
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifacts",
+    "effective_run_class_at_start",
+    "evidence_eligible_at_start",
+    "execution_identity",
+    "execution_identity_sha256",
+    "inputs",
+    "last_preterminal_entry_sha256",
+    "ledger_seq_last_preterminal",
+    "ledger_seq_start",
+    "metrics",
+    "requested_run_class",
+    "run_id",
+    "schema",
+    "schema_version",
+    "spec_sha256",
+    "study_id",
+    "terminal_state",
+    "warnings"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pmv.experiment.run_manifest"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "$ref": "#/$defs/run_id"
+    },
+    "study_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "requested_run_class": {
+      "$ref": "#/$defs/run_class"
+    },
+    "effective_run_class_at_start": {
+      "$ref": "#/$defs/run_class"
+    },
+    "evidence_eligible_at_start": {
+      "const": false,
+      "description": "always false in v1 (Option B)"
+    },
+    "spec_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "execution_identity": {
+      "$ref": "#/$defs/execution_identity"
+    },
+    "execution_identity_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "inputs": {
+      "$ref": "#/$defs/resolved_inputs"
+    },
+    "ledger_seq_start": {
+      "$ref": "#/$defs/count",
+      "description": "ledger_seq of run_reserved"
+    },
+    "ledger_seq_last_preterminal": {
+      "$ref": "#/$defs/count",
+      "description": "ledger_seq of the run's last entry before run_completed"
+    },
+    "last_preterminal_entry_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "terminal_state": {
+      "const": "completed"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artifact_schema_id",
+          "artifact_schema_version",
+          "artifact_type",
+          "ledger_seq",
+          "media_type",
+          "name",
+          "sha256",
+          "size_bytes"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/$defs/artifact_name"
+          },
+          "artifact_type": {
+            "enum": [
+              "model",
+              "predictions",
+              "calibration",
+              "table",
+              "figure",
+              "report",
+              "log_summary"
+            ]
+          },
+          "media_type": {
+            "enum": [
+              "json",
+              "jsonl",
+              "csv",
+              "parquet",
+              "binary",
+              "png",
+              "svg",
+              "html"
+            ]
+          },
+          "size_bytes": {
+            "$ref": "#/$defs/count"
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "artifact_schema_id": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "artifact_schema_version": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/count"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ledger_seq": {
+            "$ref": "#/$defs/count"
+          }
+        }
+      },
+      "description": "in ledger order"
+    },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fold",
+          "ledger_seq",
+          "name",
+          "split",
+          "step",
+          "unit",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/$defs/identifier"
+          },
+          "split": {
+            "$ref": "#/$defs/split"
+          },
+          "value": {
+            "$ref": "#/$defs/metric_value"
+          },
+          "unit": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fold": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "step": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/count"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ledger_seq": {
+            "$ref": "#/$defs/count"
+          }
+        }
+      },
+      "description": "in ledger order"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "context",
+          "ledger_seq"
+        ],
+        "properties": {
+          "code": {
+            "enum": [
+              "nondeterministic_operation",
+              "convergence_warning",
+              "data_quality_issue",
+              "resource_limit",
+              "library_warning"
+            ]
+          },
+          "context": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ledger_seq": {
+            "$ref": "#/$defs/count"
+          }
+        }
+      },
+      "description": "in ledger order"
+    }
+  }
+}

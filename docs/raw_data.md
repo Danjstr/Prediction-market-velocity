@@ -73,6 +73,8 @@ Finalization order:
 
 Moves never fall back to a plain rename; if `RENAME_NOREPLACE` is unavailable the store fails closed. Opening the store probes `RENAME_NOREPLACE` and `flock` under the root.
 
+The store re-walks the configured root by path and compares the identity (`st_dev`, `st_ino`) of the root and each managed directory with those opened at startup: at capture start, before building and before and after the final move, around quarantine moves, during recovery, reconcile, and permission tightening, and around catalog and storage-event appends. A mismatch fails closed with "the raw storage root or a managed directory was moved or replaced".
+
 ## Recovery and reconciliation
 
 - `recover_incomplete()` opens each `.inprogress` entry without following symlinks and tries a non-blocking lock. Locked entries are active and untouched. If the name no longer refers to the locked directory, the entry is reported as moved concurrently and untouched. Orphans are quarantined: a closed-schema `quarantine.json` is written and synced (an existing valid record is kept), then the directory is moved with `RENAME_NOREPLACE` and both parents are synced. If the record cannot be written, the capture stays in `.inprogress`.

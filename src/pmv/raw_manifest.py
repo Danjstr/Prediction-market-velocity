@@ -31,13 +31,13 @@ SCHEMA_VERSION: Final = 1
 MAX_MANIFEST_BYTES: Final = 1_048_576
 OBJECT_NAME: Final = "records.pmvraw"
 IDENTIFIER: Final = re.compile(r"[a-z][a-z0-9_]{0,63}")
-CAPTURE_ID: Final = re.compile(r"\d{8}T\d{6}\.\d{6}Z_[0-9a-f]{32}")
+CAPTURE_ID: Final = re.compile(r"[0-9]{8}T[0-9]{6}\.[0-9]{6}Z_[0-9a-f]{32}")
 _COMMIT: Final = re.compile(r"[0-9a-f]{40}")
-_PYTHON_VERSION: Final = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}")
+_PYTHON_VERSION: Final = re.compile(r"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}")
 _PLATFORM: Final = re.compile(r"[a-z0-9]{1,32}-[a-z0-9_]{1,32}")
 _RELATIVE_PATH: Final = re.compile(
-    r"raw/v1/[a-z][a-z0-9_]{0,63}/[a-z][a-z0-9_]{0,63}/\d{4}/\d{2}/\d{2}/"
-    r"\d{8}T\d{6}\.\d{6}Z_[0-9a-f]{32}/records\.pmvraw"
+    r"raw/v1/[a-z][a-z0-9_]{0,63}/[a-z][a-z0-9_]{0,63}/[0-9]{4}/[0-9]{2}/[0-9]{2}/"
+    r"[0-9]{8}T[0-9]{6}\.[0-9]{6}Z_[0-9a-f]{32}/records\.pmvraw"
 )
 
 

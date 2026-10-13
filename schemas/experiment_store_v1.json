@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pmv.experiment.store/1",
+  "title": "PMV experiment store identity, version 1",
+  "description": "<root>/store.v1.json: the permanent, read-only (0400) identity of one experiment store, created once with the ledger of a pristine store and never changed. Ledger entry 0 (ledger_created) records the same store_id, and pending-repair marker names include it. Documentation only: the authoritative validator is pmv.experiments.ExperimentStore._read_store_id. Canonical bytes: sorted keys, no spaces, ASCII, no floats, one trailing newline. JSON booleans are never integers.",
+  "$defs": {
+    "store_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$",
+      "description": "permanent experiment-store identity (128 random bits)"
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "store_id"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pmv.experiment.store"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "store_id": {
+      "$ref": "#/$defs/store_id"
+    }
+  }
+}

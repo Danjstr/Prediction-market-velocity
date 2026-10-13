@@ -70,6 +70,13 @@ Engineering conventions only. Project governance lives in PROJECT_BRIEF.md, CLAU
 - Finalized captures are never modified in place; corrections create new captures.
 - Raw-storage metadata (manifests, frame headers, events, quarantine records) uses closed schemas with no free text, and logs carry only capture IDs, counts, sizes, hashes, and enumerated reasons.
 
+## Experiments
+
+- Every research run is recorded through the experiment store described in `docs/experiments.md`, outside Git. Its root is explicit configuration with no default.
+- Run specs, ledger entries, and manifests use closed schemas with no free text; logs carry only run IDs, counts, sizes, hashes, and enumerated codes, never artifact or spec contents.
+- Inputs are exact, hash-pinned raw captures or artifacts of completed runs. Dirty or unknown code makes a run exploratory and ineligible as evidence.
+- The authoritative ledger is append-only; nothing rewrites it except the operator-only torn-tail repair, which preserves the removed bytes first.
+
 ## Time
 
 - Every timestamp is timezone-aware UTC. Naive datetimes are lint errors.

@@ -21,7 +21,6 @@ write-once storage, and a free-space check cannot prevent the disk from filling.
 """
 
 import contextlib
-import ctypes
 import errno
 import fcntl
 import hashlib
@@ -39,8 +38,9 @@ from datetime import UTC, datetime
 from enum import Enum, StrEnum
 from pathlib import Path
 from types import TracebackType
-from typing import Final, cast
+from typing import Final
 
+from pmv import safe_fs
 from pmv.config import AppConfig, RawStorageConfig
 from pmv.log import fields, get_logger
 from pmv.raw_format import (
@@ -94,16 +94,10 @@ CATALOG_NAME: Final = "captures.v1.jsonl"
 EVENTS_NAME: Final = "storage-events.v1.jsonl"
 MAX_RECORD_BYTES: Final = 65_536
 
-_DIR_FLAGS: Final = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
-_NEW_FILE_FLAGS: Final = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC
-_READ_FLAGS: Final = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC
 _LEDGER_FLAGS: Final = os.O_RDWR | os.O_APPEND | os.O_NOFOLLOW | os.O_CLOEXEC
-_COMPONENT: Final = re.compile(r"[A-Za-z0-9._-]{1,255}")
-_RENAME_NOREPLACE: Final = 1
-_UNSUPPORTED_ERRNOS: Final = frozenset({errno.EINVAL, errno.ENOSYS, errno.EOPNOTSUPP})
-_DIGITS: Final = {4: re.compile(r"\d{4}"), 2: re.compile(r"\d{2}")}
+_DIGITS: Final = {4: re.compile(r"[0-9]{4}"), 2: re.compile(r"[0-9]{2}")}
 
-_RenameAt2 = Callable[[int, bytes, int, bytes, int], int]
+_RenameAt2 = safe_fs.RenameAt2
 
 
 class RawStorageError(Exception):
@@ -290,27 +284,23 @@ _EVENT_BODY_KEYS: Final = {
 _CHAIN_KEYS: Final = frozenset({"ledger_seq", "prev_entry_sha256", "entry_sha256"})
 
 
-# ----- renameat2(RENAME_NOREPLACE) -----
+# ----- filesystem primitives (pmv.safe_fs), mapped to raw-storage errors -----
+#
+# These module-level names are what the rest of this module calls, so tests can replace
+# them. Primitive errors become this module's error types with unchanged messages.
 
 
-def _load_renameat2() -> _RenameAt2 | None:
+@contextlib.contextmanager
+def _fs_errors() -> Iterator[None]:
     try:
-        libc = ctypes.CDLL("libc.so.6", use_errno=True)
-        function = libc.renameat2
-    except (OSError, AttributeError):
-        return None
-    function.argtypes = [
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_uint,
-    ]
-    function.restype = ctypes.c_int
-    return cast(_RenameAt2, function)
+        yield
+    except safe_fs.FsUnsupportedError as exc:
+        raise UnsupportedFilesystemError(str(exc)) from None
+    except safe_fs.FsIntegrityError as exc:
+        raise RawIntegrityError(str(exc)) from None
 
 
-_renameat2: _RenameAt2 | None = _load_renameat2()
+_renameat2: _RenameAt2 | None = safe_fs.RENAMEAT2
 
 
 def rename_noreplace(src_dir_fd: int, src_name: str, dst_dir_fd: int, dst_name: str) -> None:
@@ -320,108 +310,43 @@ def rename_noreplace(src_dir_fd: int, src_name: str, dst_dir_fd: int, dst_name: 
     filesystem cannot honor RENAME_NOREPLACE, and OSError (for example EXDEV) otherwise.
     There is no fallback to a plain rename.
     """
-    source = _component(src_name)
-    destination = _component(dst_name)
-    function = _renameat2
-    if function is None:
-        raise UnsupportedFilesystemError("renameat2 is not available")
-    if function(src_dir_fd, source, dst_dir_fd, destination, _RENAME_NOREPLACE) == 0:
-        return
-    error = ctypes.get_errno()
-    if error in _UNSUPPORTED_ERRNOS:
-        raise UnsupportedFilesystemError("RENAME_NOREPLACE is not supported here")
-    raise OSError(error, os.strerror(error))
-
-
-# ----- small filesystem helpers -----
+    with _fs_errors():
+        safe_fs.rename_noreplace(src_dir_fd, src_name, dst_dir_fd, dst_name, renameat2=_renameat2)
 
 
 def _component(name: str) -> bytes:
-    if not isinstance(name, str) or _COMPONENT.fullmatch(name) is None or name in {".", ".."}:
-        raise RawIntegrityError("unsafe path component")
-    return os.fsencode(name)
+    with _fs_errors():
+        return safe_fs.component(name)
 
 
 def _open_dir(parent_fd: int, name: str) -> int:
-    _component(name)
-    try:
-        return os.open(name, _DIR_FLAGS, dir_fd=parent_fd)
-    except OSError as exc:
-        if exc.errno in (errno.ELOOP, errno.ENOTDIR):
-            raise RawIntegrityError(f"managed path {name!r} is not a plain directory") from None
-        raise
+    with _fs_errors():
+        return safe_fs.open_dir(parent_fd, name)
 
 
 def _open_file(parent_fd: int, name: str) -> int:
-    _component(name)
-    try:
-        fd = os.open(name, _READ_FLAGS, dir_fd=parent_fd)
-    except OSError as exc:
-        if exc.errno == errno.ELOOP:
-            raise RawIntegrityError(f"managed file {name!r} is a symlink") from None
-        raise
-    if not stat.S_ISREG(os.fstat(fd).st_mode):
-        os.close(fd)
-        raise RawIntegrityError(f"managed file {name!r} is not a regular file")
-    return fd
+    with _fs_errors():
+        return safe_fs.open_file(parent_fd, name)
 
 
 def _check_dir(fd: int, device: int, uid: int, name: str) -> None:
-    status = os.fstat(fd)
-    if not stat.S_ISDIR(status.st_mode):
-        raise RawIntegrityError(f"managed path {name!r} is not a directory")
-    if status.st_dev != device:
-        raise RawIntegrityError(f"managed path {name!r} is not on the raw root's filesystem")
-    if status.st_uid != uid:
-        raise RawIntegrityError(f"managed path {name!r} is not owned by the current user")
-    if status.st_mode & 0o022:
-        raise RawIntegrityError(f"managed path {name!r} is writable by group or others")
+    with _fs_errors():
+        safe_fs.check_dir(fd, device, uid, name)
 
 
 def _ensure_dir(parent_fd: int, name: str, device: int, uid: int) -> int:
     """Open ``name`` under ``parent_fd``, creating it (0700, parent synced) if missing."""
-    created = False
-    try:
-        os.mkdir(name, 0o700, dir_fd=parent_fd)
-        created = True
-    except FileExistsError:
-        pass
-    fd = _open_dir(parent_fd, name)
-    try:
-        if created:
-            os.fchmod(fd, 0o700)
-        _check_dir(fd, device, uid, name)
-        if created:
-            os.fsync(parent_fd)
-    except BaseException:
-        os.close(fd)
-        raise
-    return fd
+    with _fs_errors():
+        return safe_fs.ensure_dir(parent_fd, name, device, uid)
 
 
 def _write_all(fd: int, data: bytes) -> None:
-    view = memoryview(data)
-    offset = 0
-    while offset < len(view):
-        written = os.write(fd, view[offset:])
-        if written <= 0:
-            raise OSError(errno.EIO, "write made no progress")
-        offset += written
+    safe_fs.write_all(fd, data)
 
 
 def _read_all(fd: int, limit: int) -> bytes:
-    size = os.fstat(fd).st_size
-    if size > limit:
-        raise RawIntegrityError("a managed metadata file is larger than its limit")
-    chunks: list[bytes] = []
-    remaining = size
-    while remaining:
-        chunk = os.read(fd, remaining)
-        if not chunk:
-            raise RawIntegrityError("a managed file changed while it was read")
-        chunks.append(chunk)
-        remaining -= len(chunk)
-    return b"".join(chunks)
+    with _fs_errors():
+        return safe_fs.read_all(fd, limit)
 
 
 def _read_small(parent_fd: int, name: str, limit: int) -> bytes:
@@ -434,7 +359,7 @@ def _read_small(parent_fd: int, name: str, limit: int) -> bytes:
 
 def _write_new_file(parent_fd: int, name: str, data: bytes) -> None:
     _component(name)
-    fd = os.open(name, _NEW_FILE_FLAGS, 0o600, dir_fd=parent_fd)
+    fd = os.open(name, safe_fs.NEW_FILE_FLAGS, 0o600, dir_fd=parent_fd)
     try:
         _write_all(fd, data)
         os.fsync(fd)
@@ -444,14 +369,7 @@ def _write_new_file(parent_fd: int, name: str, data: bytes) -> None:
 
 def _same_entry(parent_fd: int, name: str, identity: os.stat_result) -> bool:
     """Return whether ``name`` still names the directory whose identity was recorded."""
-    try:
-        status = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-    except FileNotFoundError:
-        return False
-    return stat.S_ISDIR(status.st_mode) and (status.st_dev, status.st_ino) == (
-        identity.st_dev,
-        identity.st_ino,
-    )
+    return safe_fs.same_entry(parent_fd, name, identity)
 
 
 def _summarize_file(parent_fd: int, name: str) -> ObjectSummary:
@@ -538,37 +456,13 @@ def _locked_append(
 
 
 def _pread_all(fd: int, size: int) -> bytes:
-    chunks: list[bytes] = []
-    offset = 0
-    while offset < size:
-        chunk = os.pread(fd, size - offset, offset)
-        if not chunk:
-            raise RawIntegrityError("a ledger changed while it was read")
-        chunks.append(chunk)
-        offset += len(chunk)
-    return b"".join(chunks)
+    with _fs_errors():
+        return safe_fs.pread_all(fd, size)
 
 
 def _append_exact(fd: int, data: bytes, size_before: int) -> None:
-    try:
-        written = _ledger_write(fd, data)
-        if written != len(data):
-            raise OSError(errno.EIO, "short write to a ledger")
-        os.fsync(fd)
-    except OSError:
-        _rollback(fd, size_before)
-        raise
-
-
-def _rollback(fd: int, size_before: int) -> None:
-    try:
-        _ledger_truncate(fd, size_before)
-        os.fsync(fd)
-    except OSError:
-        raise RawIntegrityError(
-            "a ledger append failed and could not be rolled back; the damaged bytes were left "
-            "in place"
-        ) from None
+    with _fs_errors():
+        safe_fs.append_exact(fd, data, size_before, write=_ledger_write, truncate=_ledger_truncate)
 
 
 def _ledger_lines(data: bytes, name: str) -> list[bytes]:
@@ -735,6 +629,11 @@ class RawCaptureStore:
             _check_dir(self._root_fd, self._device, self._uid, "raw storage root")
             for name in (RESERVATIONS, IN_PROGRESS, QUARANTINE, RAW, CATALOG):
                 self._fds[name] = _ensure_dir(self._root_fd, name, self._device, self._uid)
+            self._root_path = config.root
+            self._identities: dict[str, safe_fs.Identity] = {
+                "": safe_fs.identity(os.fstat(self._root_fd)),
+                **{name: safe_fs.identity(os.fstat(fd)) for name, fd in self._fds.items()},
+            }
             self._probe_capabilities()
         except BaseException:
             self.close()
@@ -764,6 +663,7 @@ class RawCaptureStore:
     def start_capture(self, source: SourceIdentity, started_at: datetime) -> "RawCapture":
         """Reserve a new capture ID and open an in-progress capture for ``source``."""
         warning, hard_stop = self._thresholds()
+        self._check_namespace(RESERVATIONS, IN_PROGRESS)
         free = self.free_bytes()
         if free <= hard_stop:
             _log.error("raw.disk_hard_stop", extra=fields(free_bytes=free, stage="start"))
@@ -794,7 +694,7 @@ class RawCaptureStore:
             if not _same_entry(in_progress, capture_id, identity):
                 raise RawIntegrityError("the new capture directory was moved; start aborted")
             self._fault("start.locked")
-            raw_fd = os.open(PARTIAL_NAME, _NEW_FILE_FLAGS, 0o600, dir_fd=capture_fd)
+            raw_fd = os.open(PARTIAL_NAME, safe_fs.NEW_FILE_FLAGS, 0o600, dir_fd=capture_fd)
             _write_all(raw_fd, MAGIC)
         except BaseException:
             if raw_fd >= 0:
@@ -835,6 +735,7 @@ class RawCaptureStore:
 
     def recover_incomplete(self) -> list[RecoveryResult]:
         """Quarantine orphaned in-progress captures; never touch active or moved ones."""
+        self._check_namespace(RESERVATIONS, IN_PROGRESS, QUARANTINE)
         results: list[RecoveryResult] = []
         in_progress = self._fds[IN_PROGRESS]
         for name in sorted(os.listdir(in_progress)):
@@ -862,6 +763,7 @@ class RawCaptureStore:
         Conflicting catalog entries are an integrity failure. Captures that fail
         verification are reported, never deleted or repaired.
         """
+        self._check_namespace(RAW, CATALOG)
         report = self.read_catalog()
         if report.conflicting_ids:
             raise RawIntegrityError("the catalog has conflicting entries for a capture ID")
@@ -926,7 +828,9 @@ class RawCaptureStore:
             )
             return _record({**body, "entry_sha256": digest})
 
+        self._check_namespace(CATALOG)
         _locked_append(self._fds[CATALOG], EVENTS_NAME, build, authoritative=True)
+        self._check_namespace(CATALOG)
         _log.info(
             "raw.storage_event_appended",
             extra=fields(capture_id=event.capture_id, event_type=event.event_type.value),
@@ -1127,6 +1031,7 @@ class RawCaptureStore:
         try:
             capture_fd = _open_dir(parent, capture_id)
             try:
+                self._check_namespace(RAW)
                 os.fchmod(capture_fd, 0o500)
                 os.fsync(capture_fd)
             finally:
@@ -1137,12 +1042,30 @@ class RawCaptureStore:
         _log.warning("raw.capture_mode_tightened", extra=fields(capture_id=manifest.capture_id))
 
     def _append_catalog(self, entry: CatalogEntry) -> None:
+        self._check_namespace(CATALOG)
         _locked_append(
             self._fds[CATALOG],
             CATALOG_NAME,
             lambda _existing: _record(entry.to_json()),
             authoritative=False,
         )
+        self._check_namespace(CATALOG)
+
+    def _check_namespace(self, *names: str) -> None:
+        """Re-walk the configured root; require it and ``names`` to be the directories in use.
+
+        A long-lived process holds directory handles opened at startup. If the root or a
+        managed directory was moved or replaced since, operations through those handles
+        would land in a detached tree, so any change fails closed.
+        """
+        message = "the raw storage root or a managed directory was moved or replaced"
+        for name in names:
+            try:
+                found = safe_fs.path_identities(self._root_path, [name])
+            except safe_fs.FsIntegrityError:
+                raise RawIntegrityError(message) from None
+            if found != [self._identities[""], self._identities[name]]:
+                raise RawIntegrityError(message)
 
     def _read_ledger(self, name: str) -> bytes:
         try:
@@ -1186,11 +1109,13 @@ class RawCaptureStore:
         self._fault("quarantine.record_written")
         in_progress = self._fds[IN_PROGRESS]
         quarantine = self._fds[QUARANTINE]
+        self._check_namespace(IN_PROGRESS, QUARANTINE)
         if not _same_entry(in_progress, capture_id, identity):
             raise RawIntegrityError("the capture directory was moved concurrently")
         rename_noreplace(in_progress, capture_id, quarantine, capture_id)
         os.fsync(quarantine)
         os.fsync(in_progress)
+        self._check_namespace(IN_PROGRESS, QUARANTINE)
         self._fault("quarantine.moved")
         _log.warning(
             "raw.capture_quarantined", extra=fields(capture_id=capture_id, reason=reason.value)
@@ -1262,7 +1187,7 @@ def _open_root(root: Path, repo_root: Path) -> int:
     if root_real.is_relative_to(repo_real) or repo_real.is_relative_to(root_real):
         raise RawStorageError("raw storage root must be outside the Git working tree")
     try:
-        return os.open(root, _DIR_FLAGS)
+        return os.open(root, safe_fs.DIR_FLAGS)
     except OSError as exc:
         if exc.errno in (errno.ELOOP, errno.ENOTDIR):
             raise RawIntegrityError("raw storage root is not a plain directory") from None
@@ -1615,16 +1540,19 @@ class RawCapture:
         store._fault("finalize.files_read_only")
         components = [LAYOUT_VERSION, self._source.source_id, self._source.feed_id]
         components.extend(_date_components(capture_id))
+        store._check_namespace(IN_PROGRESS, RAW)
         destination = store._open_final_parent(components, create=True)
         try:
             store._fault("finalize.destination_ready")
             in_progress = store._fds[IN_PROGRESS]
+            store._check_namespace(IN_PROGRESS, RAW)
             if not _same_entry(in_progress, capture_id, self._identity):
                 raise RawIntegrityError("the capture directory was moved concurrently")
             rename_noreplace(in_progress, capture_id, destination, capture_id)
             self._state = _State.FINALIZED
             os.fsync(destination)
             os.fsync(in_progress)
+            store._check_namespace(IN_PROGRESS, RAW)
             store._fault("finalize.moved")
             os.fchmod(capture_fd, 0o500)
             os.fsync(capture_fd)

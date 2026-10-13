@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pmv.experiment.run_spec/1",
+  "title": "PMV experiment run spec, version 1",
+  "description": "runs/<run_id>/run_spec.json, written once before run_started. spec_sha256 is the SHA-256 of these exact bytes, at most 1 MiB. Documentation only: the authoritative validator is pmv.experiment_spec.parse_run_spec, which also requires the bytes to equal the canonical re-encoding. Canonical bytes: sorted keys, no spaces, ASCII, no floats, one trailing newline. JSON booleans are never integers.",
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[0-9]{8}T[0-9]{6}\\.[0-9]{6}Z_[0-9a-f]{32}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "artifact_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}(\\.[a-z0-9]{1,8})?$"
+    },
+    "entrypoint": {
+      "type": "string",
+      "pattern": "^[a-z_][a-z0-9_]*(\\.[a-z_][a-z0-9_]*)*:[a-z_][a-z0-9_]*$"
+    },
+    "split": {
+      "enum": [
+        "train",
+        "development",
+        "validation",
+        "inner_validation"
+      ],
+      "description": "protected_holdout is refused in Step 6 and never appears"
+    },
+    "raw_capture_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "capture_id",
+        "manifest_sha256"
+      ],
+      "properties": {
+        "kind": {
+          "const": "raw_capture"
+        },
+        "capture_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "run_artifact_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "run_id",
+        "artifact_name",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "const": "run_artifact"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "artifact_name": {
+          "$ref": "#/$defs/artifact_name"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "study_id",
+    "entrypoint",
+    "sections",
+    "seeds",
+    "inputs",
+    "splits_accessed",
+    "informed_by",
+    "selection"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pmv.experiment.run_spec"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "study_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "entrypoint": {
+      "$ref": "#/$defs/entrypoint"
+    },
+    "sections": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "calibration",
+        "experiment",
+        "features",
+        "model",
+        "validation"
+      ],
+      "properties": {
+        "calibration": {
+          "oneOf": [
+            {
+              "type": "object",
+              "propertyNames": {
+                "$ref": "#/$defs/identifier"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A safe value object, or null. Safe values (pmv.experiment_spec.validate_safe_value): null, booleans, integers, strings that are identifiers, exact decimal text, canonical UTC timestamps, or SHA-256 digests and do not look like secret material, lists of safe values, and objects with identifier keys; nesting depth at most 8. No floats, free text, or paths."
+        },
+        "experiment": {
+          "oneOf": [
+            {
+              "type": "object",
+              "propertyNames": {
+                "$ref": "#/$defs/identifier"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A safe value object, or null. Safe values (pmv.experiment_spec.validate_safe_value): null, booleans, integers, strings that are identifiers, exact decimal text, canonical UTC timestamps, or SHA-256 digests and do not look like secret material, lists of safe values, and objects with identifier keys; nesting depth at most 8. No floats, free text, or paths."
+        },
+        "features": {
+          "oneOf": [
+            {
+              "type": "object",
+              "propertyNames": {
+                "$ref": "#/$defs/identifier"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A safe value object, or null. Safe values (pmv.experiment_spec.validate_safe_value): null, booleans, integers, strings that are identifiers, exact decimal text, canonical UTC timestamps, or SHA-256 digests and do not look like secret material, lists of safe values, and objects with identifier keys; nesting depth at most 8. No floats, free text, or paths."
+        },
+        "model": {
+          "oneOf": [
+            {
+              "type": "object",
+              "propertyNames": {
+                "$ref": "#/$defs/identifier"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A safe value object, or null. Safe values (pmv.experiment_spec.validate_safe_value): null, booleans, integers, strings that are identifiers, exact decimal text, canonical UTC timestamps, or SHA-256 digests and do not look like secret material, lists of safe values, and objects with identifier keys; nesting depth at most 8. No floats, free text, or paths."
+        },
+        "validation": {
+          "oneOf": [
+            {
+              "type": "object",
+              "propertyNames": {
+                "$ref": "#/$defs/identifier"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A safe value object, or null. Safe values (pmv.experiment_spec.validate_safe_value): null, booleans, integers, strings that are identifiers, exact decimal text, canonical UTC timestamps, or SHA-256 digests and do not look like secret material, lists of safe values, and objects with identifier keys; nesting depth at most 8. No floats, free text, or paths."
+        }
+      }
+    },
+    "seeds": {
+      "type": "array",
+      "description": "Sorted by domain; domains are unique.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "value"
+        ],
+        "properties": {
+          "domain": {
+            "$ref": "#/$defs/identifier"
+          },
+          "value": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 18446744073709551615
+          }
+        }
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/raw_capture_input"
+          },
+          {
+            "$ref": "#/$defs/run_artifact_input"
+          }
+        ]
+      },
+      "description": "Exact, hash-pinned references only; no reference repeats. Any other kind is refused."
+    },
+    "splits_accessed": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/split"
+      },
+      "uniqueItems": true,
+      "description": "sorted"
+    },
+    "informed_by": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/run_id"
+      },
+      "uniqueItems": true,
+      "description": "Sorted run IDs whose results informed this spec."
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "selection_round"
+      ],
+      "properties": {
+        "candidate_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "selection_round": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/count"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
