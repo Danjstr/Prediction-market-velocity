@@ -50,6 +50,8 @@ select = [
     "BLE",  # blind except
     "T20",  # print statements
     "PT",   # pytest style
+    "G",    # logging call formatting
+    "LOG",  # logging misuse
     "RUF",  # ruff-specific
 ]
 

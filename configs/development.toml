@@ -1,0 +1,6 @@
+# Development configuration. Never put secrets or credentials in configuration files.
+schema_version = 1
+environment = "development"
+
+[logging]
+level = "DEBUG"
