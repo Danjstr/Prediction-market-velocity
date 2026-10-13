@@ -106,3 +106,48 @@ def test_load_for_environment_uses_matching_file(tmp_path: Path) -> None:
 def test_log_summary_contains_only_allowlisted_fields(tmp_path: Path) -> None:
     config = load_config(write_config(tmp_path, VALID), Environment.TEST)
     assert set(config.log_summary()) == {"environment", "config_path", "config_sha256", "log_level"}
+
+
+def test_raw_storage_is_unset_when_the_section_is_absent(tmp_path: Path) -> None:
+    config = load_config(write_config(tmp_path, VALID), Environment.TEST)
+    raw = config.raw_storage
+    assert (raw.root, raw.warning_free_bytes, raw.hard_stop_free_bytes) == (None, None, None)
+    assert (raw.retention_class, raw.backup_policy_id) == (None, None)
+
+
+def test_shipped_configs_leave_raw_storage_policy_unset() -> None:
+    for path in sorted(REPO_CONFIG_DIR.glob("*.toml")):
+        raw = load_config(path, Environment(path.stem)).raw_storage
+        assert raw == type(raw)()
+
+
+def test_raw_storage_section_is_parsed_and_validated(tmp_path: Path) -> None:
+    section = (
+        '\n[raw_storage]\nroot = "/srv/pmv-raw"\nwarning_free_bytes = 2000\n'
+        'hard_stop_free_bytes = 1000\nretention_class = "keep_all"\n'
+    )
+    raw = load_config(write_config(tmp_path, VALID + section), Environment.TEST).raw_storage
+    assert raw.root == Path("/srv/pmv-raw")
+    assert (raw.warning_free_bytes, raw.hard_stop_free_bytes) == (2000, 1000)
+    assert raw.retention_class == "keep_all"
+    assert raw.backup_policy_id is None
+
+
+@pytest.mark.parametrize(
+    ("section", "message"),
+    [
+        ('root = "relative/raw"', "absolute"),
+        ("warning_free_bytes = 100\nhard_stop_free_bytes = 100", "must exceed"),
+        ("hard_stop_free_bytes = 0", "positive"),
+        ("hard_stop_free_bytes = true", "must be an integer"),
+        ('retention_class = "Keep All"', "lowercase identifier"),
+        ("extra = 1", "unknown key"),
+    ],
+)
+def test_invalid_raw_storage_values_fail_clearly(
+    tmp_path: Path, section: str, message: str
+) -> None:
+    with pytest.raises(ConfigError, match=message):
+        load_config(
+            write_config(tmp_path, VALID + "\n[raw_storage]\n" + section + "\n"), Environment.TEST
+        )

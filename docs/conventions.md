@@ -63,6 +63,13 @@ Engineering conventions only. Project governance lives in PROJECT_BRIEF.md, CLAU
 - A finding in staged, unstaged, or untracked material has no exception mechanism. Remove it, rewrite it, or represent it differently before committing. Never work around a finding with three-part or path-wide fingerprints, inline allow comments, or configuration allowlists.
 - If a genuine false positive cannot reasonably be rewritten, stop and obtain an explicit, approved exception-policy decision before committing it.
 
+## Raw Data
+
+- Raw captures live only in the external store described in `docs/raw_data.md`, never in Git. Its root, disk thresholds, retention class, and backup policy are explicit configuration with no defaults.
+- Payload bytes are preserved exactly and never parsed, normalized, deduplicated, or logged by the raw layer.
+- Finalized captures are never modified in place; corrections create new captures.
+- Raw-storage metadata (manifests, frame headers, events, quarantine records) uses closed schemas with no free text, and logs carry only capture IDs, counts, sizes, hashes, and enumerated reasons.
+
 ## Time
 
 - Every timestamp is timezone-aware UTC. Naive datetimes are lint errors.

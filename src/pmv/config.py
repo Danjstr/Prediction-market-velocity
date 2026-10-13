@@ -6,9 +6,11 @@ completely before any value is used.
 """
 
 import hashlib
+import json
+import re
 import tomllib
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from typing import Final
@@ -17,6 +19,7 @@ from pmv.redaction import is_secret_key
 
 CONFIG_SCHEMA_VERSION: Final = 1
 ENVIRONMENT_VARIABLE: Final = "PMV_ENV"
+_IDENTIFIER: Final = re.compile(r"[a-z][a-z0-9_]{0,63}")
 
 
 class ConfigError(Exception):
@@ -48,11 +51,58 @@ class LoggingConfig:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class RawStorageConfig:
+    """Raw capture storage policy. Every value is unset unless configured explicitly.
+
+    There is no default root and there are no default disk thresholds; capture operations
+    fail closed while the values they need are unset.
+    """
+
+    root: Path | None = None
+    warning_free_bytes: int | None = None
+    hard_stop_free_bytes: int | None = None
+    retention_class: str | None = None
+    backup_policy_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.root is not None and not self.root.is_absolute():
+            raise ValueError("raw_storage.root must be an absolute path")
+        for name in ("warning_free_bytes", "hard_stop_free_bytes"):
+            value = getattr(self, name)
+            if value is not None and (isinstance(value, bool) or not isinstance(value, int)):
+                raise ValueError(f"raw_storage.{name} must be an integer")
+            if value is not None and value <= 0:
+                raise ValueError(f"raw_storage.{name} must be positive")
+        warning, hard_stop = self.warning_free_bytes, self.hard_stop_free_bytes
+        if warning is not None and hard_stop is not None and warning <= hard_stop:
+            raise ValueError("raw_storage.warning_free_bytes must exceed hard_stop_free_bytes")
+        for name in ("retention_class", "backup_policy_id"):
+            value = getattr(self, name)
+            if value is not None and (
+                not isinstance(value, str) or not _IDENTIFIER.fullmatch(value)
+            ):
+                raise ValueError(f"raw_storage.{name} must be a lowercase identifier")
+
+    def canonical_sha256(self) -> str:
+        """Return the SHA-256 of the canonical JSON of these values (raw_config_sha256)."""
+        values = {
+            "backup_policy_id": self.backup_policy_id,
+            "hard_stop_free_bytes": self.hard_stop_free_bytes,
+            "retention_class": self.retention_class,
+            "root": None if self.root is None else str(self.root),
+            "warning_free_bytes": self.warning_free_bytes,
+        }
+        encoded = json.dumps(values, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+        return hashlib.sha256(encoded.encode("ascii")).hexdigest()
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AppConfig:
     environment: Environment
     logging: LoggingConfig
     source_path: Path
     source_sha256: str
+    raw_storage: RawStorageConfig = field(default_factory=RawStorageConfig)
 
     def log_summary(self) -> dict[str, str]:
         """Return the fields that identify this configuration in logs.
@@ -105,7 +155,9 @@ def load_config(path: Path, expected_environment: Environment) -> AppConfig:
 
     where = str(path)
     _reject_secret_keys(document, where)
-    _reject_unknown_keys(document, {"schema_version", "environment", "logging"}, where)
+    _reject_unknown_keys(
+        document, {"schema_version", "environment", "logging", "raw_storage"}, where
+    )
 
     schema_version = _require_int(document, "schema_version", where)
     if schema_version != CONFIG_SCHEMA_VERSION:
@@ -127,12 +179,51 @@ def load_config(path: Path, expected_environment: Environment) -> AppConfig:
     level_name = _require_str(logging_table, "level", logging_where)
     level = _parse_enum(LogLevel, level_name, f"{logging_where}: level")
 
+    raw_storage = RawStorageConfig()
+    if "raw_storage" in document:
+        raw_storage = _parse_raw_storage(_require_table(document, "raw_storage", where), where)
+
     return AppConfig(
         environment=environment,
         logging=LoggingConfig(level=level),
         source_path=path,
         source_sha256=hashlib.sha256(raw).hexdigest(),
+        raw_storage=raw_storage,
     )
+
+
+def _parse_raw_storage(table: Mapping[str, object], where: str) -> RawStorageConfig:
+    table_where = f"{where} [raw_storage]"
+    _reject_unknown_keys(
+        table,
+        {
+            "root",
+            "warning_free_bytes",
+            "hard_stop_free_bytes",
+            "retention_class",
+            "backup_policy_id",
+        },
+        table_where,
+    )
+    root = _require_str(table, "root", table_where) if "root" in table else None
+    try:
+        return RawStorageConfig(
+            root=None if root is None else Path(root),
+            warning_free_bytes=_optional_int(table, "warning_free_bytes", table_where),
+            hard_stop_free_bytes=_optional_int(table, "hard_stop_free_bytes", table_where),
+            retention_class=_optional_str(table, "retention_class", table_where),
+            backup_policy_id=_optional_str(table, "backup_policy_id", table_where),
+        )
+    except ValueError as exc:
+        raise ConfigError(f"{table_where}: {exc}") from None
+
+
+def _optional_int(table: Mapping[str, object], key: str, where: str) -> int | None:
+    return _require_int(table, key, where) if key in table else None
+
+
+def _optional_str(table: Mapping[str, object], key: str, where: str) -> str | None:
+    return _require_str(table, key, where) if key in table else None
 
 
 def _reject_secret_keys(value: object, where: str, trail: str = "") -> None:

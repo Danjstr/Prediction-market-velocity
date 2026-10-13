@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pmv.raw.manifest/1",
+  "title": "PMV raw capture manifest, version 1",
+  "description": "Documentation of the closed manifest schema. The authoritative validator is pmv.raw_manifest.parse_manifest, which also enforces canonical bytes (sorted keys, no spaces, ASCII, one trailing newline), the absence of floats, and cross-field consistency.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "capture_id", "status", "source", "object", "time", "observations", "provenance", "policy_at_capture"],
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"},
+    "capture_id": {"type": "string", "pattern": "^[0-9]{8}T[0-9]{6}\\.[0-9]{6}Z_[0-9a-f]{32}$"},
+    "timestamp": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"},
+    "optional_timestamp": {"oneOf": [{"$ref": "#/$defs/timestamp"}, {"type": "null"}]},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "count": {"type": "integer", "minimum": 0}
+  },
+  "properties": {
+    "schema": {"const": "pmv.raw.manifest"},
+    "schema_version": {"const": 1},
+    "capture_id": {"$ref": "#/$defs/capture_id"},
+    "status": {"const": "finalized"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "feed_id", "transport", "endpoint_id"],
+      "properties": {
+        "source_id": {"$ref": "#/$defs/identifier"},
+        "feed_id": {"$ref": "#/$defs/identifier"},
+        "transport": {"enum": ["websocket", "http"]},
+        "endpoint_id": {"$ref": "#/$defs/identifier"}
+      }
+    },
+    "object": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relative_path", "format", "format_version", "encoding", "compression", "size_bytes", "sha256", "record_count"],
+      "properties": {
+        "relative_path": {"type": "string", "pattern": "^raw/v1/[a-z][a-z0-9_]{0,63}/[a-z][a-z0-9_]{0,63}/[0-9]{4}/[0-9]{2}/[0-9]{2}/[0-9]{8}T[0-9]{6}\\.[0-9]{6}Z_[0-9a-f]{32}/records\\.pmvraw$"},
+        "format": {"const": "pmv.raw.frames"},
+        "format_version": {"const": 1},
+        "encoding": {"const": "binary"},
+        "compression": {"const": "none"},
+        "size_bytes": {"$ref": "#/$defs/count"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "record_count": {"$ref": "#/$defs/count"}
+      }
+    },
+    "time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capture_started_at", "capture_ended_at", "first_received_at", "last_received_at", "first_source_timestamp", "last_source_timestamp", "finalized_at", "monotonic_duration_ns"],
+      "properties": {
+        "capture_started_at": {"$ref": "#/$defs/timestamp"},
+        "capture_ended_at": {"$ref": "#/$defs/timestamp"},
+        "first_received_at": {"$ref": "#/$defs/optional_timestamp"},
+        "last_received_at": {"$ref": "#/$defs/optional_timestamp"},
+        "first_source_timestamp": {"$ref": "#/$defs/optional_timestamp"},
+        "last_source_timestamp": {"$ref": "#/$defs/optional_timestamp"},
+        "finalized_at": {"$ref": "#/$defs/timestamp"},
+        "monotonic_duration_ns": {"$ref": "#/$defs/count"}
+      }
+    },
+    "observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["payload_count", "event_count", "malformed_message_count", "reconnect_count", "gap_event_count", "rate_limit_event_count", "source_clock_regression_count", "local_clock_regression_count"],
+      "properties": {
+        "payload_count": {"$ref": "#/$defs/count"},
+        "event_count": {"$ref": "#/$defs/count"},
+        "malformed_message_count": {"$ref": "#/$defs/count"},
+        "reconnect_count": {"$ref": "#/$defs/count"},
+        "gap_event_count": {"$ref": "#/$defs/count"},
+        "rate_limit_event_count": {"$ref": "#/$defs/count"},
+        "source_clock_regression_count": {"$ref": "#/$defs/count"},
+        "local_clock_regression_count": {"$ref": "#/$defs/count"}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["software", "code_commit", "code_tree_dirty", "config_source_sha256", "raw_config_sha256", "environment", "python_version", "platform", "machine_label", "parents"],
+      "properties": {
+        "software": {"const": "pmv"},
+        "code_commit": {"oneOf": [{"type": "string", "pattern": "^[0-9a-f]{40}$"}, {"type": "null"}]},
+        "code_tree_dirty": {"type": ["boolean", "null"]},
+        "config_source_sha256": {"$ref": "#/$defs/sha256"},
+        "raw_config_sha256": {"$ref": "#/$defs/sha256"},
+        "environment": {"enum": ["development", "test", "shadow", "production"]},
+        "python_version": {"type": "string", "pattern": "^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$"},
+        "platform": {"type": "string", "pattern": "^[a-z0-9]{1,32}-[a-z0-9_]{1,32}$"},
+        "machine_label": {"oneOf": [{"$ref": "#/$defs/identifier"}, {"type": "null"}]},
+        "parents": {"type": "array", "items": {"$ref": "#/$defs/capture_id"}}
+      }
+    },
+    "policy_at_capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["retention_class", "backup_policy_id", "backup_status_at_finalization"],
+      "properties": {
+        "retention_class": {"oneOf": [{"$ref": "#/$defs/identifier"}, {"type": "null"}]},
+        "backup_policy_id": {"oneOf": [{"$ref": "#/$defs/identifier"}, {"type": "null"}]},
+        "backup_status_at_finalization": {"enum": ["not_configured", "pending"]}
+      }
+    }
+  }
+}
