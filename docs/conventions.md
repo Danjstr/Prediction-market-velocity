@@ -50,6 +50,14 @@ Engineering conventions only. Project governance lives in PROJECT_BRIEF.md, CLAU
 - Log specific identified fields. Never log whole objects, configuration objects, or request or response headers; log `AppConfig.log_summary()` instead of the configuration.
 - Wrap secret values in `pmv.redaction.Secret`.
 
+## Secrets
+
+- Secret inputs are declared in code with `SecretSpec("PMV_SECRET_<NAME>")` and loaded with `load_secrets(specs, source)`, where the source is passed explicitly, for example `os.environ`. They are never configuration values and never have defaults.
+- Values are wrapped in `Secret` when loaded and are never modified. Call `reveal()` only at the point of use, and never keep the revealed value in long-lived variables, attributes, logs, or exception messages.
+- Never log `Secret`-bearing containers, environment mappings, or `os.environ`.
+- Never enable traceback features that capture local variables (for example pytest `--showlocals`) in an environment that holds secrets.
+- `env.example` lists variable names only, with empty values. Never create `.env` files in the repository.
+
 ## Time
 
 - Every timestamp is timezone-aware UTC. Naive datetimes are lint errors.

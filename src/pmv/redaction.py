@@ -68,10 +68,11 @@ _SECRET_TEXT_PATTERNS: Final = (
     # 0x-prefixed 32-byte hex values, the form of wallet private keys.
     re.compile(r"\b0x[0-9a-fA-F]{64}\b"),
 )
-# ``name=value`` or ``name: value`` where the name looks secret.
-_SECRET_ASSIGNMENT: Final = re.compile(
-    r"(?i)\b([A-Za-z0-9_.-]*(?:password|passwd|secret|token|api[_-]?key|private[_-]?key"
-    r"|passphrase|credential)s?)([\"']?\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|[^\s,;&]+)"
+# ``name=value`` or ``name: value`` for any identifier. Whether the value is redacted is
+# decided only by ``is_secret_key``, the single classifier for secret-looking names.
+# A colon followed by ``//`` is a URL scheme, not an assignment.
+_ASSIGNMENT: Final = re.compile(
+    r"\b([A-Za-z_][A-Za-z0-9_.-]*)([\"']?\s*(?:=|:(?!//))\s*)(\"[^\"]*\"|'[^']*'|[^\s,;&]+)"
 )
 
 
@@ -111,4 +112,21 @@ def redact_text(text: str) -> str:
     """Replace recognizable secret values in free text with ``REDACTED``."""
     for pattern in _SECRET_TEXT_PATTERNS:
         text = pattern.sub(REDACTED, text)
-    return _SECRET_ASSIGNMENT.sub(lambda match: f"{match[1]}{match[2]}{REDACTED}", text)
+    return _redact_assignments(text)
+
+
+def _redact_assignments(text: str) -> str:
+    # After a non-secret name, scanning resumes inside its value, so an assignment
+    # nested in a value (for example a URL query string) is still examined.
+    pieces: list[str] = []
+    position = 0
+    while (match := _ASSIGNMENT.search(text, position)) is not None:
+        if is_secret_key(match[1]):
+            pieces.append(text[position : match.start(3)])
+            pieces.append(REDACTED)
+            position = match.end()
+        else:
+            pieces.append(text[position : match.end(2)])
+            position = match.end(2)
+    pieces.append(text[position:])
+    return "".join(pieces)

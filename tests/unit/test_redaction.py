@@ -61,6 +61,12 @@ def test_ordinary_names_are_not_detected(name: str) -> None:
         ("wallet 0x" + "ab" * 32, "ab" * 32),
         ("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl", "c2lnbmF0dXJl"),
         ("-----BEGIN PRIVATE KEY-----\nMIIEvQ\n-----END PRIVATE KEY-----", "MIIEvQ"),
+        ("PMV_SECRET_UNIT_ALPHA=FAKEVALUE123", "FAKEVALUE123"),
+        ('export PMV_SECRET_UNIT_ALPHA="FAKE VALUE"', "FAKE VALUE"),
+        ("auth_token_value: FAKEVALUE456", "FAKEVALUE456"),
+        ("apiKey=FAKEVALUE789", "FAKEVALUE789"),
+        ("privateKey: FAKEVALUE000", "FAKEVALUE000"),
+        ("endpoint=https://example.com/x?api_key=FAKEVALUE321", "FAKEVALUE321"),
     ],
 )
 def test_secret_values_in_text_are_redacted(text: str, secret: str) -> None:
@@ -75,6 +81,10 @@ def test_secret_values_in_text_are_redacted(text: str, secret: str) -> None:
         "config.loaded",
         "sha256 " + "ab" * 32,
         "token_id=12345",
+        "token_ids=1",
+        "tokenId: 7",
+        "tokenizer=wordpiece",
+        "https://example.com/x?limit=5&page=2",
         "basic statistics",
         "https://api.example.com/markets?limit=5",
     ],

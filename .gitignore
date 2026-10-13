@@ -11,10 +11,26 @@ venv/
 # Secrets and local credentials (nonsecret templates such as env.example stay tracked)
 .env
 .env.*
+*.env
+.envrc
 *.pem
 *.key
 *.p12
 *.pfx
+*.ppk
+id_rsa*
+id_ecdsa*
+id_ed25519*
+*.kdbx
+.netrc
+.pgpass
+credentials.json
+secrets.json
+secrets.toml
+secrets.yaml
+secrets.yml
+keystore/
+UTC--*
 secrets/
 .claude/settings.local.json
 
