@@ -941,6 +941,76 @@ def test_runtime_provenance_identifies_code_without_hostname(tmp_path: Path) -> 
     assert (outside.code_commit, outside.code_tree_dirty) == (None, None)
 
 
+def _scratch_git(repo: Path, *arguments: str) -> str:
+    environment = {
+        "PATH": "/usr/bin:/bin",
+        "HOME": str(repo.parent),
+        "LC_ALL": "C",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@example.invalid",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@example.invalid",
+    }
+    completed = subprocess.run(  # noqa: S603 - fixed test git invocation
+        ["/usr/bin/git", "-C", str(repo), *arguments],
+        env=environment,
+        capture_output=True,
+        check=True,
+    )
+    return completed.stdout.decode().strip()
+
+
+@pytest.fixture
+def scratch_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _scratch_git(repo, "init", "-q", "-b", "main")
+    (repo / "a.txt").write_text("a\n", encoding="ascii")
+    _scratch_git(repo, "add", "-A")
+    _scratch_git(repo, "commit", "-q", "-m", "a")
+    (repo / "b.txt").write_text("b\n", encoding="ascii")
+    _scratch_git(repo, "add", "-A")
+    _scratch_git(repo, "commit", "-q", "-m", "b")
+    return repo
+
+
+def test_f20_a_clean_scratch_repository_has_a_known_identity(scratch_repo: Path) -> None:
+    head = _scratch_git(scratch_repo, "rev-parse", "HEAD")
+    assert raw_storage._git_identity(scratch_repo) == (head, False)
+
+
+def test_f20_a_replace_ref_cannot_spoof_the_raw_capture_code_identity(
+    scratch_repo: Path,
+) -> None:
+    # Step 11 red-team finding 1: a replace ref made a dirty tree report as clean HEAD.
+    head = _scratch_git(scratch_repo, "rev-parse", "HEAD")
+    (scratch_repo / "evil.md").write_text("not in HEAD\n", encoding="ascii")
+    _scratch_git(scratch_repo, "add", "-A")
+    tree = _scratch_git(scratch_repo, "write-tree")
+    fake = _scratch_git(scratch_repo, "commit-tree", tree, "-p", head, "-m", "fake")
+    _scratch_git(scratch_repo, "replace", head, fake)
+    assert raw_storage._git_identity(scratch_repo) == (None, None)
+    _scratch_git(scratch_repo, "pack-refs", "--all")
+    assert raw_storage._git_identity(scratch_repo) == (None, None)
+    _scratch_git(scratch_repo, "replace", "-d", head)
+    assert raw_storage._git_identity(scratch_repo) == (head, True)
+
+
+def test_f20_grafts_and_shallow_history_make_the_raw_capture_identity_unknown(
+    scratch_repo: Path, tmp_path: Path
+) -> None:
+    grafts = scratch_repo / ".git" / "info" / "grafts"
+    grafts.parent.mkdir(exist_ok=True)
+    grafts.write_text(_scratch_git(scratch_repo, "rev-parse", "HEAD") + "\n", encoding="ascii")
+    assert raw_storage._git_identity(scratch_repo) == (None, None)
+    grafts.unlink()
+    shallow = tmp_path / "shallow"
+    _scratch_git(tmp_path, "clone", "-q", "--depth=1", f"file://{scratch_repo}", str(shallow))
+    assert raw_storage._git_identity(shallow) == (None, None)
+
+
 # ----- crash fault injection (a real child process killed at each boundary) -----
 
 CHILD = """

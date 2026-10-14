@@ -8,6 +8,7 @@ Engineering conventions only. Project governance lives in PROJECT_BRIEF.md, CLAU
 - Tests: `tests/unit/`, `tests/integration/`, `tests/replay/`, `tests/failure_injection/`.
 - Configuration files: `configs/`. Documentation: `docs/`. Developer scripts: `scripts/`.
 
+- Ignore patterns for local directories are anchored to the repository root (`/data/`, `/logs/`). Nothing under `src/`, `tests/`, `research/`, `docs/`, `scripts/`, `schemas/`, or `.claude/` may be ignored, apart from bytecode caches and the personal `.claude/settings.local.json`; `tests/unit/test_repository_layout.py` enforces this.
 ## Environment and Dependencies
 
 - Python 3.13 only, as pinned in `pyproject.toml` and `.python-version`.
@@ -69,6 +70,7 @@ Engineering conventions only. Project governance lives in PROJECT_BRIEF.md, CLAU
 - A finding in staged, unstaged, or untracked material has no exception mechanism. Remove it, rewrite it, or represent it differently before committing. Never work around a finding with three-part or path-wide fingerprints, inline allow comments, or configuration allowlists.
 - If a genuine false positive cannot reasonably be rewritten, stop and obtain an explicit, approved exception-policy decision before committing it.
 
+- Venue credentials (none exist yet) live only in the Claude-denied `~/pmv-credentials/`, are handed directly to a collector running outside Claude Code, and never enter the repository, logs, configuration, or agent context. Credential isolation must be in place before **any** venue credential exists, including a data-only one. If a venue requires broader-than-data permissions, stop for owner approval first (`docs/protected_information.md`).
 ## Raw Data
 
 - Raw captures live only in the external store described in `docs/raw_data.md`, never in Git. Its root, disk thresholds, retention class, and backup policy are explicit configuration with no defaults.
@@ -76,6 +78,7 @@ Engineering conventions only. Project governance lives in PROJECT_BRIEF.md, CLAU
 - Finalized captures are never modified in place; corrections create new captures.
 - Raw-storage metadata (manifests, frame headers, events, quarantine records) uses closed schemas with no free text, and logs carry only capture IDs, counts, sizes, hashes, and enumerated reasons.
 
+- In every non-test environment the raw store root must resolve inside `~/pmv-protected/raw`. Configuration loading and `check-config` enforce it (`docs/raw_data.md`).
 ## Experiments
 
 - Every research run is recorded through the experiment store described in `docs/experiments.md`, outside Git. Its root is explicit configuration with no default.

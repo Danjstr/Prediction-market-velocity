@@ -119,4 +119,7 @@ Immediately before truncating, repair re-walks the root, `ledger/`, `ledger/repa
 - An older copy of this store's own ledger (a prefix) is detectable only by a checkpoint. Truncation of complete entries is detectable only up to the latest checkpoint, and only committed checkpoints are independent of the working tree.
 - Crash tests kill real processes at each boundary; they demonstrate process-crash behavior, not host power loss.
 - No v1 run is evidence-eligible. A v2 run's environment fingerprint has the limits listed in `docs/reproducibility.md` (it does not cover the standard library, system libraries, kernel, or CPU).
+- **Code identity (Step 11 F-20).** Code identity never honors Git replace objects. A repository with any replace ref, an `info/grafts` file, or a shallow history yields an unknown identity, so the run is exploratory and ineligible.
+- **The ledger is not enough for a gate (Step 11 F-13).** A gate citing a run re-runs `verify_run` on that run and on every run that produced its inputs. Gate tooling verifies the run's files, not only the ledger.
+- **No real evidence yet.** No real v2 `evidence_candidate` may count as evidence until Step 11 F-19 (single evidence launcher: cached bytecode, working-directory shadowing) is resolved.
 - The store records what runs did; it cannot prove a run read only its declared inputs.

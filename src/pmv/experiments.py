@@ -263,6 +263,10 @@ def collect_git_identity(repo_root: Path) -> GitIdentity:
     by their raw bytes; symlinks are recorded by target and never followed; any other
     non-regular untracked object makes the identity unknown. Repository-local Git
     configuration and attributes still apply.
+
+    Git replace objects are never honored, and a repository with any replace ref, an
+    info/grafts file, or a shallow history yields UNKNOWN_GIT: those can make a recorded
+    commit name content other than what runs (Step 11 F-20).
     """
     environment = {
         "PATH": "/usr/bin:/bin",
@@ -270,6 +274,7 @@ def collect_git_identity(repo_root: Path) -> GitIdentity:
         "LC_ALL": "C",
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
     }
     base = [
         "/usr/bin/git",
@@ -292,6 +297,18 @@ def collect_git_identity(repo_root: Path) -> GitIdentity:
         return completed.stdout if completed.returncode == 0 else None
 
     head = git("rev-parse", "--verify", "HEAD")
+    replace_refs = git("for-each-ref", "--format=%(refname)", "refs/replace/")
+    shallow = git("rev-parse", "--is-shallow-repository")
+    common = git("rev-parse", "--path-format=absolute", "--git-common-dir")
+    if (
+        replace_refs is None
+        or replace_refs.strip()
+        or shallow is None
+        or shallow.strip() != b"false"
+        or common is None
+        or os.path.lexists(Path(os.fsdecode(common.strip())) / "info" / "grafts")
+    ):
+        return UNKNOWN_GIT
     status = git(
         "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none"
     )
@@ -672,6 +689,7 @@ class ExperimentStore:
                     "LC_ALL": "C",
                     "GIT_CONFIG_GLOBAL": os.devnull,
                     "GIT_CONFIG_NOSYSTEM": "1",
+                    "GIT_NO_REPLACE_OBJECTS": "1",
                 },
                 timeout=60,
                 check=False,

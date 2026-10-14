@@ -48,6 +48,13 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Final
 
+from pmv.config import (
+    UNKNOWN_ACCOUNT_HOME,
+    ConfigError,
+    Environment,
+    account_home,
+    load_config,
+)
 from pmv.integrity import format_timestamp, is_identifier, to_utc
 from pmv.log import fields, get_logger
 from pmv.protected_scope import (
@@ -70,11 +77,19 @@ from pmv.protected_scope import (
 
 _log = get_logger("pmv.data_access_guard")
 
-PROTECTED_ROOT: Final = Path.home() / "pmv-protected"
+PROTECTED_ROOT: Final = account_home() / "pmv-protected"
 PROTECTED_NAME: Final = "pmv-protected"
+CREDENTIALS_NAME: Final = "pmv-credentials"
 SETTINGS_PATH: Final = ".claude/settings.json"
 LOCAL_SETTINGS_PATH: Final = ".claude/settings.local.json"
-REQUIRED_DENIES: Final = ("Read(~/pmv-protected/**)", "Edit(~/pmv-protected/**)")
+REQUIRED_DENIES: Final = (
+    "Read(~/pmv-protected/**)",
+    "Edit(~/pmv-protected/**)",
+    # Venue credentials live only here, outside every agent session (Step 11 F-03).
+    "Read(~/pmv-credentials/**)",
+    "Edit(~/pmv-credentials/**)",
+)
+DENIED_LOCATIONS: Final = ("~/pmv-protected", "~/pmv-credentials")
 
 
 class RefusalReason(StrEnum):
@@ -322,9 +337,21 @@ def _overlaps(start: datetime, end: datetime, scope: Scope, lag_seconds: int) ->
 
 
 def check_path(path: Path, protected_root: Path = PROTECTED_ROOT) -> RefusalReason | None:
-    """Refuse any local path inside the protected location (lexically or after symlinks)."""
+    """Refuse any local path inside the protected location (lexically or after symlinks).
+
+    ``~`` means the account home from the password database, never ``HOME``, and every
+    path is refused when that home is unknown.
+    """
+    if protected_root.is_relative_to(UNKNOWN_ACCOUNT_HOME):
+        return RefusalReason.DIRECT_HOLDOUT_ACCESS_FORBIDDEN
     root = Path(os.path.realpath(protected_root))
-    lexical = Path(os.path.abspath(os.path.expanduser(path)))
+    text = os.fspath(path)
+    if text == "~" or text.startswith("~/"):
+        home = account_home()
+        if home == UNKNOWN_ACCOUNT_HOME:
+            return RefusalReason.DIRECT_HOLDOUT_ACCESS_FORBIDDEN
+        text = os.fspath(home) + text[1:]
+    lexical = Path(os.path.abspath(os.path.expanduser(text)))
     resolved = Path(os.path.realpath(lexical))
     for candidate in (lexical, resolved):
         if (
@@ -345,7 +372,7 @@ def check_config(repo: Path) -> list[str]:
     """
     problems: list[str] = []
     try:
-        settings = json.loads((repo / SETTINGS_PATH).read_text(encoding="utf-8"))
+        settings = json.loads(_read_regular_text(repo / SETTINGS_PATH))
     except (OSError, ValueError):
         return ["the project Claude settings are missing or not valid JSON"]
     if not isinstance(settings, dict):
@@ -363,16 +390,18 @@ def check_config(repo: Path) -> list[str]:
     filesystem = _section(sandbox, "filesystem", problems)
     for key in ("denyRead", "denyWrite"):
         listed = filesystem.get(key, [])
-        if not isinstance(listed, list) or "~/pmv-protected" not in listed:
-            problems.append(f"the sandbox {key} list must include the protected location")
+        for location in DENIED_LOCATIONS:
+            if not isinstance(listed, list) or location not in listed:
+                problems.append(f"the sandbox {key} list must include {location}")
     if "excludedCommands" in sandbox:
         problems.append("excludedCommands must not be used")
+    problems.extend(_committed_config_problems(repo))
     if _allows_protected(settings):
         problems.append("an allow entry names the protected location")
     local = repo / LOCAL_SETTINGS_PATH
-    if os.path.lexists(local) and not _is_null_device(local):
+    if os.path.lexists(local) and not _is_null_device(local) and not _is_empty_file(local):
         try:
-            overrides = json.loads(local.read_text(encoding="utf-8"))
+            overrides = json.loads(_read_regular_text(local))
         except (OSError, ValueError):
             problems.append("the local Claude settings are unreadable or not valid JSON")
         else:
@@ -381,6 +410,51 @@ def check_config(repo: Path) -> list[str]:
             if _allows_protected(overrides):
                 problems.append("a local allow entry names the protected location")
     return problems
+
+
+def _committed_config_problems(repo: Path) -> list[str]:
+    """Every configs/<environment>.toml must load; a non-test one must keep any raw store
+    root inside the protected raw location (Step 11 F-01; enforced by ``load_config``)."""
+    directory = repo / "configs"
+    if not directory.is_dir():
+        return []
+    problems: list[str] = []
+    for path in sorted(directory.glob("*.toml")):
+        try:
+            load_config(path, Environment(path.stem))
+        except (ValueError, ConfigError):
+            problems.append(
+                f"configs/{path.name} does not load, or places the raw store outside "
+                "~/pmv-protected/raw"
+            )
+    return problems
+
+
+def _read_regular_text(path: Path) -> str:
+    """Read a settings file that must (after symlinks) be a regular file, without blocking.
+
+    Opening a FIFO or device with O_NONBLOCK returns at once and the type check refuses
+    it, so a FIFO planted at a settings path fails closed instead of hanging the check.
+    """
+    descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC)
+    with os.fdopen(descriptor, "rb") as handle:
+        if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+            raise OSError(f"{path.name} is not a regular file")
+        return handle.read().decode("utf-8")
+
+
+def _is_empty_file(path: Path) -> bool:
+    """An exactly zero-byte regular file holds no override (Step 11 F-22).
+
+    Depending on the session, the Claude Code sandbox masks an absent settings file with a
+    zero-byte regular file instead of /dev/null. Only that exact shape is accepted: a
+    symlink, or any file with content, is still read and validated.
+    """
+    try:
+        status = os.stat(path, follow_symlinks=False)
+    except OSError:
+        return False
+    return stat.S_ISREG(status.st_mode) and status.st_size == 0
 
 
 def _is_null_device(path: Path) -> bool:
@@ -409,7 +483,11 @@ def _allows_protected(value: object, under_allow: bool = False) -> bool:
         )
     if isinstance(value, list):
         return any(_allows_protected(item, under_allow) for item in value)
-    return under_allow and isinstance(value, str) and PROTECTED_NAME in value
+    return (
+        under_allow
+        and isinstance(value, str)
+        and any(name in value for name in (PROTECTED_NAME, CREDENTIALS_NAME))
+    )
 
 
 def _window_from_json(value: object) -> Window:

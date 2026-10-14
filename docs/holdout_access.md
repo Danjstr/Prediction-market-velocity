@@ -1,6 +1,6 @@
 # Protected-Holdout Access Log (Phase 0 Step 8)
 
-Durable, tamper-evident evidence of every authorized or attempted interaction with the protected final holdout. Implementation: `src/pmv/holdout_record.py` (schema, chain, state machine, Markdown rendering) and `src/pmv/holdout_log.py` (tooling and command line). Schema document: `schemas/holdout_access_event_v1.json`. The Python validators are authoritative.
+Durable evidence of every authorized or attempted interaction with the protected final holdout. It is tamper-evident against accidental change by ordinary tools, through integrity checks over the ancestry of the current `HEAD`; it is not stronger without an off-host anchor (see "Tamper evidence and its limits"). Implementation: `src/pmv/holdout_record.py` (schema, chain, state machine, Markdown rendering) and `src/pmv/holdout_log.py` (tooling and command line). Schema document: `schemas/holdout_access_event_v1.json`. The Python validators are authoritative.
 
 Step 8 is logging and integrity only. It never opens, reads, creates, or reveals protected holdout data; it handles identities, hashes, counts, timestamps, roles, and enumerated values. Physical isolation and enforcement of the reveal boundary are Step 9.
 
@@ -20,7 +20,7 @@ Step 8 is logging and integrity only. It never opens, reads, creates, or reveals
 | `access_requested` | Exact candidate identity and its hash; requesting role | No |
 | `access_authorized` | Owner authorization of a request, backed by a committed, current Gate 6 PASS record | No |
 | `access_denied` | Owner denial of a request (closed reason) | No |
-| `access_started` | Durable pre-reveal intent, after re-verifying Gate 6, the Gate 7 preregistration, the plan, and the candidate | **Yes — permanently** |
+| `access_started` | Durable pre-reveal intent, after re-verifying Gate 6, the Gate 7 PASS record used as v1 plan approval (F-18), the plan, and the candidate | **Yes — permanently** |
 | `access_completed` / `access_failed` / `access_interrupted` | Closes a started access (no results or metrics, ever); each may carry a restricted evidence hash | Stays consumed |
 | `access_attempt_refused` | Any refused start or request, recorded before the error is raised | No |
 | `contamination_recorded` | Suspected or confirmed exposure (categories and roles, restricted evidence by hash) | **Yes** |
@@ -39,13 +39,17 @@ The identity is recomputed at authorization, at `access_started`, and by `assert
 
 ## Gate 6 and Gate 7
 
+**Gate 7 is the final holdout result: PASS, FAIL, or INCONCLUSIVE** (START_HERE Phase 7). Preregistration of the evaluation plan happens before the reveal and is not the Gate 7 result.
+
+**Known mismatch (Step 11 F-18).** The v1 tooling below requires a committed Gate 7 **PASS** record as the pre-reveal plan sign-off. This contradicts START_HERE's meaning of Gate 7: an untested candidate could read as "Gate 7 PASS", and the real result would have to supersede a PASS. It must be corrected before the Phase 7 reveal, by giving plan approval its own record and making Gate 7 the result only, linked to the closing access event. Until then, a Gate 7 PASS record in this lineage means "plan approved", never "candidate passed". The rendered `HOLDOUT_ACCESS_LOG.md` text "Gate 7 preregistration PASS record" (from `src/pmv/holdout_record.py`) is left unchanged on purpose: it is part of the byte-verified mirror of a governance file, so rewording it belongs to the same owner-approved F-18 fix.
+
 - `access_authorized` requires a committed Gate 6 **PASS** record that is the current head of its lineage, is scoped to the exact cycle and candidate, and cites the candidate's evaluation plan (kind `plan`, same path and hash); plus owner attestation.
 - Before `access_started` there must be a committed Gate 7 **PASS** record — the durable preregistration approval — that is the current head of its lineage, is scoped to the same cycle and candidate, cites the same evaluation plan, and (as every Step 7 v1 record) contains no protected-holdout evidence and carries owner attestation.
 - Immediately before `access_started` is accepted, both records, the plan, and the candidate identity are revalidated. Any superseded, modified, missing, or mismatched record refuses the start and appends `access_attempt_refused`. Step 8 does not define post-holdout Gate 7 result semantics.
 
 ## The protocol and the reveal precondition
 
-request → authorization (Gate 6) → Gate 7 preregistration → `access_started` → mirror consistent → Git commit → `assert_started_committed` → Step 9 reveal → closing event.
+request → authorization (Gate 6) → plan approval (v1: a Gate 7 PASS record, F-18) → `access_started` → mirror consistent → Git commit → `assert_started_committed` → Step 9 reveal → closing event.
 
 `python -m pmv.holdout_log assert-started-committed HAL-NNNN` (or `HoldoutLog.assert_started_committed`) reports ready only when: the ledger and mirror verify and agree; the `access_started` event exists and is open; the exact ledger and `HOLDOUT_ACCESS_LOG.md` bytes are in `HEAD` with working tree and index matching; the tree is clean; Gate 6 and Gate 7 are committed and current; and the candidate and runner identity still match. Step 9 must call it immediately before physical reveal. Step 8 itself never opens protected data.
 
@@ -63,7 +67,7 @@ One writer lock (on `research/holdout_access/`) covers: full ledger verification
 - **Local Git is not a complete external notarization mechanism.** A local hard reset, rebase, branch replacement, or other history replacement can erase the only local evidence of a committed event (including a committed `access_started`) if no independent copy or anchor exists; nothing inside the repository can detect that. Step 8 does not implement an external anchor.
 - **Prerequisite — BEFORE ANY REAL PROTECTED-HOLDOUT REVEAL IN PHASE 7:** the committed `access_started` state must also be anchored outside the sole local repository. The exact mechanism will be finalized before real Phase 7 access; acceptable designs include a protected private remote branch whose history must contain the start commit, or another independently controlled append-only or write-once anchor. The private remote backup required after Phase 0 and before Phase 1 may serve as part of this anchor only if its protection and reachability requirements are explicitly verified at that time; merely having an ordinary remote is not sufficient.
 - Every Step 7 gate record also pins the SHA-256 of `HOLDOUT_ACCESS_LOG.md`, so Gate 6 and Gate 7 records anchor the access-log head at their decision time, subject to the same local-history limit.
-- Until Step 9 physically enforces the boundary, Step 8 cannot prove that a person or external process did not bypass the protocol and inspect protected data. Any known or suspected bypass must be recorded with `contamination_recorded`, which consumes the holdout.
+- Step 8 cannot prove that a person or external process did not bypass the protocol and inspect protected data. Step 9's information embargo and Claude-denied locations reduce accidental exposure; they are not a security boundary against a malicious privileged process (`docs/protected_information.md`, threat model). No reveal tool exists yet: a reveal runner that calls `assert_started_committed` is part of the Phase 7 design (Step 11 F-18). Any known or suspected bypass must be recorded with `contamination_recorded`, which consumes the holdout.
 - Attestations are explicit operator assertions, not cryptographic proof of identity.
 - Clock skew that would record an event before its predecessor is refused.
 - After every rename (the new ledger at initialization and each `HOLDOUT_ACCESS_LOG.md` rewrite), the configured path is re-walked from the repository root and must lead to exactly the file that was written before success is reported; otherwise the write outcome is unknown and the writer latches.

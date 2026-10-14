@@ -557,38 +557,51 @@ def collect_runtime_provenance(
 
 
 def _git_identity(repo_root: Path) -> tuple[str | None, bool | None]:
-    """Return (commit, tree_dirty), or (None, None) if they cannot be determined safely."""
+    """Return (commit, tree_dirty), or (None, None) if they cannot be determined safely.
+
+    Git replace objects are never honored, and a repository with any replace ref, an
+    info/grafts file, or a shallow history yields (None, None): those can make a recorded
+    commit name content other than what runs (Step 11 F-20, as in collect_git_identity).
+    """
     environment = {
         "PATH": "/usr/bin:/bin",
         "HOME": "/nonexistent",
         "LC_ALL": "C",
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
     }
     base = ["/usr/bin/git", "-C", str(repo_root)]
-    try:
-        head = subprocess.run(  # noqa: S603 - fixed argument list, absolute path, clean environment
-            [*base, "rev-parse", "--verify", "HEAD"],
-            capture_output=True,
-            env=environment,
-            timeout=30,
-            check=False,
-        )
-        status = subprocess.run(  # noqa: S603 - fixed argument list, absolute path, clean environment
-            [*base, "status", "--porcelain", "--untracked-files=normal"],
-            capture_output=True,
-            env=environment,
-            timeout=30,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired):
+
+    def git(*arguments: str) -> bytes | None:
+        try:
+            completed = subprocess.run(  # noqa: S603 - fixed argument list, absolute path, clean environment
+                [*base, *arguments], capture_output=True, env=environment, timeout=30, check=False
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        return completed.stdout if completed.returncode == 0 else None
+
+    head = git("rev-parse", "--verify", "HEAD")
+    replace_refs = git("for-each-ref", "--format=%(refname)", "refs/replace/")
+    shallow = git("rev-parse", "--is-shallow-repository")
+    common = git("rev-parse", "--path-format=absolute", "--git-common-dir")
+    if (
+        replace_refs is None
+        or replace_refs.strip()
+        or shallow is None
+        or shallow.strip() != b"false"
+        or common is None
+        or os.path.lexists(Path(os.fsdecode(common.strip())) / "info" / "grafts")
+    ):
         return None, None
-    if head.returncode != 0 or status.returncode != 0:
+    status = git("status", "--porcelain", "--untracked-files=normal")
+    if head is None or status is None:
         return None, None
-    commit = head.stdout.decode("ascii", errors="replace").strip()
+    commit = head.decode("ascii", errors="replace").strip()
     if re.fullmatch(r"[0-9a-f]{40}", commit) is None:
         return None, None
-    return commit, bool(status.stdout.strip())
+    return commit, bool(status.strip())
 
 
 # ----- the store -----

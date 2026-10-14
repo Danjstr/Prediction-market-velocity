@@ -1,8 +1,8 @@
 # Python
 __pycache__/
 *.pyc
-.venv/
-venv/
+/.venv/
+/venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -29,19 +29,24 @@ secrets.json
 secrets.toml
 secrets.yaml
 secrets.yml
-keystore/
+/keystore/
 UTC--*
-secrets/
+/secrets/
 .claude/settings.local.json
 
 # Local data, logs, caches, and databases
-# (versioned manifests, split definitions, and audit evidence stay tracked)
-data/
-logs/
-*.log
-*.sqlite
-*.sqlite3
-*.db
-*.parquet
-*.feather
-*.arrow
+# (versioned manifests, split definitions, and audit evidence stay tracked).
+# Anchored to the repository root: an unanchored "data/" would also ignore source
+# packages such as src/pmv/data/, and an unanchored "*.parquet" would hide test fixtures
+# (Step 11 F-02; tests/unit/test_repository_layout.py). The directory patterns above
+# (/.venv/, /venv/, /keystore/, /secrets/) are anchored for the same reason; a file
+# outside them stays visible to Git status and to the untracked secret scan.
+/data/
+/logs/
+/*.log
+/*.sqlite
+/*.sqlite3
+/*.db
+/*.parquet
+/*.feather
+/*.arrow

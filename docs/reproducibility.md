@@ -2,7 +2,9 @@
 
 This document describes how the installed Python environment is identified and checked, and how that identity makes a future experiment run evidence-eligible.
 
-**The v2 reproducibility mechanism is implemented and synthetically testable, but real evidentiary use is not yet authorized pending Step 11 resolution of the remaining execution-boundary issues** (cached bytecode, working-directory shadowing, and gate verification of run files; see `docs/gate0_readiness.md`).
+**The v2 reproducibility mechanism is implemented and synthetically testable, but real evidentiary use is not yet authorized.**
+- **Resolved in Step 11:** gate tooling now verifies every referenced run's files (F-13).
+- **Still open:** cached bytecode and working-directory shadowing (Step 11 F-19: a single evidence launcher, due **before any real v2 `evidence_candidate` may count as evidence**). See `docs/gate0_readiness.md`.
 - Implementation: `src/pmv/reproducibility.py`.
 - Environment document schema: `schemas/environment_v1.json`.
 - Experiment integration: `docs/experiments.md`.
@@ -120,7 +122,12 @@ This is intentionally not an OS image, container, Nix, Docker or SBOM system.
 
   The ledger verifier refuses a v2 `run_started` that claims a clean `evidence_candidate` without a fingerprint.
 
-  Limit: neither the ledger nor `environment.json` records that `verify` itself passed. That rests on the store code, which tests check, refusing the start otherwise. Recording it explicitly would be a format addition and is an open Step 11 decision.
+  **Closed in Step 11 (M-4), with no format change.** Neither the ledger nor `environment.json` stores a `verified` flag, and none is added. Such a flag would be written by the same process whose verification it claims, so it would prove nothing. Verification is a required precondition in control flow instead:
+  - an `evidence_candidate` start calls `reproducibility.verify` and is refused if it fails;
+  - a plain capture that skips verification yields no evidence-eligible run;
+  - the ledger refuses a clean v2 `evidence_candidate` without a fingerprint.
+
+  Tests cover each of these (`tests/unit/test_experiments.py`, M-4).
 - **Later:**
   - `verify_run` requires `environment.json` to exist exactly when a fingerprint was recorded, to hash to it, and to be a valid document.
   - Later changes to the environment, `uv.lock` or code never alter a past run's eligibility at start; they only produce new identities for new runs.

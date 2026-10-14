@@ -10,13 +10,23 @@ This step stores and verifies raw captures only. It does not connect to any venu
 
 | Key | Meaning |
 |---|---|
-| `root` | Absolute path of the store. Must be outside the Git working tree, owned by the current user, and not writable by group or others. No default. |
+| `root` | Absolute path of the store. Must be outside the Git working tree, owned by the current user, and not writable by group or others. No default. **In every non-`test` environment it must resolve inside `~/pmv-protected/raw`** (see below). |
 | `warning_free_bytes` | At or below this many available bytes: structured warning and a `disk_warning` event; capture continues. |
 | `hard_stop_free_bytes` | At or below this: no new captures; an active capture stops accepting payloads, records `disk_hard_stop`, and finalizes its captured prefix. Must leave room for finalization. |
 | `retention_class` | Identifier recorded in manifests, or unset. |
 | `backup_policy_id` | Identifier recorded in manifests, or unset. |
 
 `warning_free_bytes > hard_stop_free_bytes > 0`. Capture operations fail closed while `root` or either threshold is unset. Free space is read with `statvfs` before each append and before finalization; this narrows but cannot close the window in which the disk can still fill (btrfs free space is approximate, and btrfs metadata exhaustion can affect even renames).
+
+### Real raw data lives in the protected area (owner-approved 2026-10-14, Step 11 F-01)
+
+Real market captures are holdout-eligible plaintext. The deterministic collector may write future observations, but Claude and development agents must never be able to inspect the unreleased raw dataset.
+
+- **The rule.** In the `development`, `shadow`, and `production` environments, `[raw_storage].root` must resolve inside `~/pmv-protected/raw`, either that directory or a descendant. It is checked both lexically (after `..`) and after resolving symlinks, so siblings, `../` traversal, and symlink escapes are refused.
+- **Agent sessions cannot read it.** `~/pmv-protected` is denied to the built-in Read and Edit tools and to the Bash sandbox (`.claude/settings.json`). The collector therefore runs outside Claude Code.
+- **Where it is enforced.** `pmv.config.load_config` refuses a non-test configuration with a root outside the protected location, so every entrypoint that loads a real configuration fails closed, including a future collector. `python -m pmv.data_access_guard check-config`, run by `scripts/check.sh`, loads every committed `configs/*.toml` and reports any violation.
+- **What is exempt.** The low-level store (`RawCaptureStore`, `RawStorageConfig`) is deliberately not restricted, so unit tests and synthetic fixtures keep using temporary directories. The `test` environment is likewise exempt.
+- **What agents work with.** Agents work only with synthetic fixtures until the release architecture (Step 11 F-08) is decided and built.
 
 ## Layout
 

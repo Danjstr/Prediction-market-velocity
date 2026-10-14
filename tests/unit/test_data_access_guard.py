@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import subprocess
+import sys
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
@@ -12,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from pmv.config import LoggingConfig, LogLevel
+from pmv.config import UNKNOWN_ACCOUNT_HOME, LoggingConfig, LogLevel, account_home
 from pmv.data_access_guard import (
     DataRequest,
     Guard,
@@ -1062,3 +1063,159 @@ def test_l1_non_historical_requests_on_a_non_venue_family_fail_closed_even_off_a
     # The provider serves no protected BTC family, so only this rule refuses it.
     silver_now = window("fx_data_vendor", "silver_spot", *OLD, "current_state")
     assert decide(Guard(registry(scope())), silver_now).reason is UNKNOWN
+
+
+# ----- Step 11 F-22: a zero-byte local settings mask is no override -----
+
+
+def test_an_exactly_empty_local_settings_file_is_no_override(tmp_path: Path) -> None:
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / "settings.json").write_bytes(
+        (REPO / ".claude" / "settings.json").read_bytes()
+    )
+    local = tmp_path / ".claude" / "settings.local.json"
+    local.write_bytes(b"")
+    assert check_config(tmp_path) == []
+    for content in (b"\n", b" ", b"{}x"):
+        local.write_bytes(content)
+        assert check_config(tmp_path) == [
+            "the local Claude settings are unreadable or not valid JSON"
+        ]
+    local.write_text(json.dumps({"sandbox": {"enabled": False}}), encoding="utf-8")
+    assert "the local Claude settings must not override the sandbox" in check_config(tmp_path)
+    local.write_text(
+        json.dumps({"permissions": {"allow": ["Read(~/pmv-protected/**)"]}}), encoding="utf-8"
+    )
+    assert "a local allow entry names the protected location" in check_config(tmp_path)
+    local.write_text("{}", encoding="utf-8")
+    assert check_config(tmp_path) == []
+
+
+def test_a_symlink_to_an_empty_file_is_not_treated_as_an_empty_mask(tmp_path: Path) -> None:
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / "settings.json").write_bytes(
+        (REPO / ".claude" / "settings.json").read_bytes()
+    )
+    empty = tmp_path / "empty"
+    empty.write_bytes(b"")
+    (tmp_path / ".claude" / "settings.local.json").symlink_to(empty)
+    assert check_config(tmp_path) == ["the local Claude settings are unreadable or not valid JSON"]
+
+
+def test_a_fifo_at_a_settings_path_fails_closed_without_hanging(tmp_path: Path) -> None:
+    # Step 11 red-team finding 8: reading a FIFO used to block the check forever.
+    script = (
+        "import sys; from pathlib import Path; from pmv.data_access_guard import check_config; "
+        "print(check_config(Path(sys.argv[1])))"
+    )
+    (tmp_path / ".claude").mkdir()
+    shared = tmp_path / ".claude" / "settings.json"
+    shared.write_bytes((REPO / ".claude" / "settings.json").read_bytes())
+    local = tmp_path / ".claude" / "settings.local.json"
+    os.mkfifo(local)
+    completed = subprocess.run(  # noqa: S603 - fixed interpreter and script
+        [sys.executable, "-c", script, str(tmp_path)],
+        capture_output=True,
+        timeout=30,
+        check=True,
+    )
+    assert b"the local Claude settings are unreadable or not valid JSON" in completed.stdout
+    local.unlink()
+    shared.unlink()
+    os.mkfifo(shared)
+    completed = subprocess.run(  # noqa: S603 - fixed interpreter and script
+        [sys.executable, "-c", script, str(tmp_path)],
+        capture_output=True,
+        timeout=30,
+        check=True,
+    )
+    assert b"the project Claude settings are missing or not valid JSON" in completed.stdout
+
+
+def test_a_directory_at_the_local_settings_path_fails_closed(tmp_path: Path) -> None:
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / "settings.json").write_bytes(
+        (REPO / ".claude" / "settings.json").read_bytes()
+    )
+    (tmp_path / ".claude" / "settings.local.json").mkdir()
+    assert check_config(tmp_path) == ["the local Claude settings are unreadable or not valid JSON"]
+
+
+# ----- Step 11 red-team finding 3: HOME cannot move the protected location -----
+
+
+def test_tilde_paths_use_the_account_home_not_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = account_home() / "pmv-protected"
+    monkeypatch.setenv("HOME", str(tmp_path / "fake-home"))
+    assert check_path(Path("~/pmv-protected/raw/x"), root) is (
+        RefusalReason.DIRECT_HOLDOUT_ACCESS_FORBIDDEN
+    )
+    assert check_path(Path("~"), account_home() / "pmv-protected") is None
+    assert check_path(tmp_path / "fake-home" / "pmv-protected" / "x", root) is None
+
+
+def test_an_unknown_account_home_refuses_every_path(tmp_path: Path) -> None:
+    unknown = UNKNOWN_ACCOUNT_HOME / "pmv-protected"
+    assert check_path(tmp_path / "anything", unknown) is (
+        RefusalReason.DIRECT_HOLDOUT_ACCESS_FORBIDDEN
+    )
+
+
+# ----- Step 11 F-01 / F-03: committed configs and the credential location -----
+
+
+def settings_copy(tmp_path: Path) -> dict[str, Any]:
+    (tmp_path / ".claude").mkdir(exist_ok=True)
+    settings: dict[str, Any] = json.loads((REPO / ".claude" / "settings.json").read_text("utf-8"))
+    return settings
+
+
+def write_settings(tmp_path: Path, settings: dict[str, Any]) -> None:
+    (tmp_path / ".claude" / "settings.json").write_text(json.dumps(settings), encoding="utf-8")
+
+
+def test_the_credential_location_must_stay_denied(tmp_path: Path) -> None:
+    mutations: list[Callable[[dict[str, Any]], None]] = [
+        lambda s: s["permissions"]["deny"].remove("Read(~/pmv-credentials/**)"),
+        lambda s: s["permissions"]["deny"].remove("Edit(~/pmv-credentials/**)"),
+        lambda s: s["sandbox"]["filesystem"]["denyRead"].remove("~/pmv-credentials"),
+        lambda s: s["sandbox"]["filesystem"]["denyWrite"].remove("~/pmv-credentials"),
+        lambda s: s["permissions"].update(allow=["Read(~/pmv-credentials/kalshi.pem)"]),
+    ]
+    for mutate in mutations:
+        settings = settings_copy(tmp_path)
+        mutate(settings)
+        write_settings(tmp_path, settings)
+        assert check_config(tmp_path)
+    write_settings(tmp_path, settings_copy(tmp_path))
+    assert check_config(tmp_path) == []
+
+
+def test_a_committed_real_config_with_an_unprotected_raw_root_fails_the_check(
+    tmp_path: Path,
+) -> None:
+    write_settings(tmp_path, settings_copy(tmp_path))
+    configs = tmp_path / "configs"
+    configs.mkdir()
+    header = 'schema_version = 1\nenvironment = "{env}"\n\n[logging]\nlevel = "INFO"\n'
+    inside = account_home() / "pmv-protected" / "raw" / "kalshi"
+    (configs / "development.toml").write_text(
+        header.format(env="development") + f'\n[raw_storage]\nroot = "{inside}"\n',
+        encoding="utf-8",
+    )
+    (configs / "test.toml").write_text(
+        header.format(env="test") + '\n[raw_storage]\nroot = "/srv/scratch-raw"\n',
+        encoding="utf-8",
+    )
+    assert check_config(tmp_path) == []
+    (configs / "production.toml").write_text(
+        header.format(env="production") + '\n[raw_storage]\nroot = "/srv/pmv-raw"\n',
+        encoding="utf-8",
+    )
+    problems = check_config(tmp_path)
+    assert problems == [
+        "configs/production.toml does not load, or places the raw store outside ~/pmv-protected/raw"
+    ]
+    assert check_config(REPO) == []

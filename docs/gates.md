@@ -4,6 +4,8 @@ Every gate decision is recorded as an immutable, generated file at `docs/decisio
 
 This step provides the tooling only. No gate decision has been recorded. Gate 0's record is created only after the full Phase 0 audit (Step 11) and its approved corrections.
 
+**Gate 7 is the final protected-holdout result** (PASS, FAIL, or INCONCLUSIVE; START_HERE Phase 7), not preregistration sign-off. The v1 holdout-access tooling still uses a Gate 7 PASS record as pre-reveal plan approval. That is a recorded mismatch (Step 11 F-18), described in `docs/holdout_access.md`, and must be fixed before the Phase 7 reveal.
+
 ## What is authoritative
 
 - The whole Markdown file is generated: a fixed "do not edit" header, a deterministic summary, and one fenced canonical JSON record (sorted keys, ASCII, no floats). The verifier parses the JSON, re-renders the entire file, and requires byte equality, so any edit, including to the summary, fails verification.
@@ -45,7 +47,11 @@ This step provides the tooling only. No gate decision has been recorded. Gate 0'
 
 Reviewers recommend by role: `ml_engineer`, `data_scientist`, `statistician`, `independent_statistical_auditor`, `quant_business_lead`, `reliability_red_team`, `risk_performance_engineer`, `api_execution_engineer`, `meta_reviewer_human`, `meta_reviewer_other_model_family`. No personal names are stored.
 
-The final decision is always the project owner's. In v1 **every gate decision, including Gate 0, requires explicit project-owner approval**; there is no gate-specific exception, and the request cannot choose otherwise. Every record has `approval_requirement: required` and `approval_attested: true`; creation refuses anything else. Agents and reviewers only recommend; their recommendations never substitute for the owner's decision. The attestation records the operator's explicit assertion that owner approval occurred. The tool cannot prove human identity cryptographically; the owner's Git commit is the durable publication step. Signed commits are deferred.
+The final decision is always the project owner's. In v1 **every gate decision, including Gate 0, requires explicit project-owner approval**; there is no gate-specific exception, and the request cannot choose otherwise. Every record has `approval_requirement: required` and `approval_attested: true`; creation refuses anything else. Agents and reviewers only recommend; their recommendations never substitute for the owner's decision. The attestation records the operator's explicit assertion that owner approval occurred.
+
+This rule is stricter than START_HERE ("user approval is required only where governance already requires it"). The owner approved keeping it on 2026-10-14 (Step 11 F-42).
+
+**Limitation:** owner approval is recorded procedurally. The system does not cryptographically prove that the owner personally set the flag or made the commit. Under the Phase 0 threat model (`docs/protected_information.md`) this is acceptable as a procedural control. Gate records are created by the owner from a normal terminal, not from an agent session. Commit signing is deferred (Step 11 F-14: before the first real protected scope or Gate 6 authorization).
 
 ## Binding to one repository state
 
@@ -61,10 +67,12 @@ The record is written only after its project identity is pinned, so it cannot co
 
 - **Documents** must be under `docs/` or `research/` (never the gate directory), tracked at `HEAD`, and byte-identical to `HEAD` with the referenced hash.
 - **Experiment evidence** requires a pin `{ledger_seq, entry_sha256}` that matches the verified ledger; the record also stores the store's `store_id`. Every referenced run must be reserved and terminal at or before the pin; evidence after the pin is invisible. Each run's state and `eligibility_as_of(run_id, ledger_seq)` are evaluated at the pin only. Artifacts must be registered at or before the pin with the referenced hash, and their bytes are re-verified. Later supersession of a run never changes an existing record.
-- Every artifact's producing run must be listed in `evidence.runs` and so is checked at the pin. Under Option B no v1 run is evidence-eligible, so no PASS can rest on run or artifact evidence from a candidate or supporting run until an installed-environment fingerprint is approved.
+- **Run files are verified, not just the ledger (Step 11 F-13).** Every referenced run, and every run that produced one of its run-artifact inputs (transitively), must pass the experiment store's own `verify_run`: spec, `environment.json`, registered artifacts, and completion manifest. If a file is missing, tampered with, or inconsistent, the record is refused, even when the ledger says the run is eligible.
+- Every artifact's producing run must be listed in `evidence.runs` and so is checked at the pin.
+- **Eligibility by run version.** A v1 run is never evidence-eligible. A v2 `evidence_candidate` can be eligible (`docs/reproducibility.md`). However, **no real v2 experiment may count as evidence, and no gate may rely on one,** until the remaining execution-boundary items (Step 11 F-19: cached bytecode, working-directory shadowing) are resolved.
 - Run roles are declarations made by the record's creator. Step 7 verifies their allowed semantics and the referenced evidence, but it cannot prove that a run was given the scientifically correct role (for example, that a run labelled `baseline` was not really the candidate). Methodological review remains responsible for that.
 - **Raw captures** are verified with the Step 5 store and must match the referenced manifest hash.
-- **Protected-holdout evidence** is rejected by evidence, not by gate number: any `evidence.holdout` entry and any `holdout_evaluation` document are refused, because holdout-access linkage (Step 8) does not exist yet. Gate 6 and Gate 7 records without such evidence are allowed. Step 7 never accesses the protected holdout.
+- **Protected-holdout evidence** is rejected by evidence, not by gate number: any `evidence.holdout` entry and any `holdout_evaluation` document are refused. Linking Step 8 holdout-access events into gate records is not designed yet (Step 11 F-18, before the Phase 7 reveal). Gate 6 and Gate 7 records without such evidence are allowed. Step 7 never accesses the protected holdout.
 
 ## Lineage and supersession
 
@@ -81,16 +89,21 @@ Creation refuses a second root for a lineage, and refuses a successor unless the
 - the index or working tree differs from `HEAD` for a committed record, or a committed record is missing;
 - any file in the gate directory is not a valid, exactly rendered record (including leftover temporary files);
 - any lineage has more than one root, a fork (competing successors), a cycle, a dangling or cross-lineage reference, a stale or uncommitted predecessor, or a hash mismatch;
-- the clone is shallow, or `info/grafts` rewrites history (history cannot be checked). Local replace refs are ignored (`GIT_NO_REPLACE_OBJECTS=1`).
+- the clone is shallow, `info/grafts` rewrites history, or any Git replace ref exists (Step 11 F-20). History is always read with `GIT_NO_REPLACE_OBJECTS=1`;
+- a clean-tree record's governance or config hash, or its set of `configs/*.toml`, does not match the files at its recorded `project.commit` (Step 11 F-21). The pins are re-derived from that commit, not trusted. A dirty-tree record (only FAIL or INCONCLUSIVE can be one) cannot be re-derived, so it is checked only for canonical form.
 
-It verifies the immutable record files and the Git history only. It does not re-evaluate mutable or live external evidence (the experiment store, raw captures, or documents as they are now); the hashes and the experiment-ledger pin preserve exactly what the gate referenced when it was decided.
+**What history verification can and cannot catch.** It detects non-canonical, edited, moved, or deleted records, and records whose pins disagree with their commit. It cannot detect a record that was hand-made with correct pins but a false `check_sh` result or a false approval. That needs owner signatures (F-14) and the hosted-CI corroboration in Step 12.
+
+It verifies the immutable record files and the Git history only. It does not re-evaluate mutable or live external evidence (the experiment store, raw captures, or documents as they are now); the hashes and the experiment-ledger pin preserve exactly what the gate referenced when it was decided. In particular, run files are verified with `verify_run` only when a record is created (F-13), not again by history verification. Whether history verification should also re-verify referenced experiment artifacts is deferred to an explicit design decision (Step 11 red-team RT-2), due before a gate relies on experiment evidence.
 
 ## Operating rules and recovery
 
 - Make `scripts/check.sh` (and therefore `verify-history`) a required CI check before gate-record changes are merged into the eventual main branch. Two branches can each hold a valid successor of the same record; only verification of the merge result catches the fork.
 - A forked lineage, a leftover `.tmp-*` file, or any record added or edited outside the tooling makes verification, and every later `create`, fail closed. That is intended. Recovery is an explicit operator decision after inspection (for example removing an uncommitted stray file, or reverting an unmerged branch); nothing is deleted or repaired automatically, and a committed record is never edited or removed.
 
-Git is the external historical anchor. It is not cryptographic notarization: someone who can rewrite Git history and every copy of it can rewrite records.
+Local Git is **not** an external or immutable anchor. These checks are integrity checks over the ancestry of the current `HEAD`: a local reset, rebase, or branch switch can remove a committed record without anything inside the repository noticing.
+
+The Step 12 private remote adds an off-host backup copy and a second witness of history at push time. It is still not notarization: the owner or an administrator can force-push or delete. An external anchor for the holdout log and protected scopes is required before the first real protected scope and before the Phase 7 reveal (Step 11 S-1).
 
 ## Command line
 

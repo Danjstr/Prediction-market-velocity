@@ -7,6 +7,8 @@ completely before any value is used.
 
 import hashlib
 import json
+import os
+import pwd
 import re
 import tomllib
 from collections.abc import Mapping
@@ -24,6 +26,44 @@ _IDENTIFIER: Final = re.compile(r"[a-z][a-z0-9_]{0,63}")
 
 class ConfigError(Exception):
     """Configuration is missing, malformed, or inconsistent."""
+
+
+# Stands in for an account home that cannot be determined; nothing validates inside it.
+UNKNOWN_ACCOUNT_HOME: Final = Path("/nonexistent/pmv-unknown-account-home")
+
+
+def account_home() -> Path:
+    """The running account's home directory from the password database, never ``HOME``.
+
+    A changed ``HOME`` must not move the protected location (Step 11 red-team finding 3).
+    Returns UNKNOWN_ACCOUNT_HOME when the account has no usable entry.
+    """
+    try:
+        home = pwd.getpwuid(os.getuid()).pw_dir
+    except KeyError:
+        return UNKNOWN_ACCOUNT_HOME
+    if not home or not os.path.isabs(home) or os.path.normpath(home) == "/":
+        return UNKNOWN_ACCOUNT_HOME
+    return Path(os.path.normpath(home))
+
+
+# Real raw market data is holdout-eligible plaintext: in every non-test environment the
+# raw store root must resolve inside this Claude-denied location, so the deterministic
+# collector can write future observations that agents cannot inspect (Step 11 F-01).
+PROTECTED_RAW_BASE: Final = account_home() / "pmv-protected" / "raw"
+
+
+def protected_raw_root_problem(root: Path, base: Path = PROTECTED_RAW_BASE) -> str | None:
+    """Why ``root`` is not inside ``base`` (lexically after ``..`` and after symlinks), or None."""
+    if base.is_relative_to(UNKNOWN_ACCOUNT_HOME):
+        return "the account home directory, and so the protected raw location, is unknown"
+    if not root.is_absolute():
+        return "the raw store root must be an absolute path"
+    lexical, lexical_base = Path(os.path.normpath(root)), Path(os.path.normpath(base))
+    resolved, resolved_base = Path(os.path.realpath(root)), Path(os.path.realpath(base))
+    if not lexical.is_relative_to(lexical_base) or not resolved.is_relative_to(resolved_base):
+        return "the raw store root must resolve inside the protected raw location"
+    return None
 
 
 class Environment(StrEnum):
@@ -194,6 +234,10 @@ def load_config(path: Path, expected_environment: Environment) -> AppConfig:
     raw_storage = RawStorageConfig()
     if "raw_storage" in document:
         raw_storage = _parse_raw_storage(_require_table(document, "raw_storage", where), where)
+    if environment is not Environment.TEST and raw_storage.root is not None:
+        problem = protected_raw_root_problem(raw_storage.root, PROTECTED_RAW_BASE)
+        if problem is not None:
+            raise ConfigError(f"{where} [raw_storage]: {problem}")
     experiments = ExperimentStorageConfig()
     if "experiments" in document:
         experiments = _parse_experiments(_require_table(document, "experiments", where), where)

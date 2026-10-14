@@ -11,18 +11,48 @@ Implementation:
 
 The project owner directed this design. It replaced an earlier plan for a separate vault or container. The reason is that protecting only the holdout file does not stop leakage: the same information is available from many places. A protected BTC contract resolves on the BTC price, so Coinbase spot, a CF Benchmarks index, CME futures, a public dataset, or a web page for the protected window all reveal the outcome. The embargo therefore covers equivalent observables, not just the file.
 
-## Threat model
+## Threat model (owner-approved 2026-10-14, Step 11 F-05)
 
-**In scope**
-- A development agent obtains protected observations or outcomes, or equivalent information, through a project data path. That includes venue APIs, alternate providers, datasets, derived features whose lookback crosses into the protected window, and protected-period contract metadata.
-- A local plaintext copy of protected data is read through ordinary tools, symlinks, or path traversal.
-- The protected scope is quietly narrowed after the fact.
+**In scope.** The project's controls are designed to prevent, or to detect and fail closed on:
+- accidental data leakage;
+- honest operator mistakes;
+- ordinary agent and tool mistakes;
+- accidental exposure of protected information;
+- unsafe project configuration;
+- implementation defects that ordinary project controls can reasonably detect;
+- accidental Git, history, or configuration mistakes;
+- contamination from normal data and API use.
 
-**Out of scope (not prevented by code; governed by rules and recorded when it happens)**
-- General web browsing. Agents may freely research code, papers, documentation, and methodology online. The guard does **not** intercept web research, and no domain filtering is claimed to enforce the embargo. The Protected Information Rule governs this.
+**Out of scope as a security guarantee.** The project is not designed as a security boundary against:
+- intentionally malicious root-capable processes;
+- kernel compromise;
+- deliberate sandbox escape or exploitation;
+- a hostile process using passwordless sudo or disk-level access (the development user is in the `sudo` and `disk` groups);
+- a malicious local administrator, against whom no cryptographic defense is offered.
+
+**Sandbox behavior is not irrelevant.** Unexpected Claude Code sandbox behavior (for example masked paths that appear as `/dev/null` devices in one session and as zero-byte files in another) stays something the project tests and fails closed around where practical. The claim above is only that the project is not designed to resist an intentionally malicious privileged process.
+
+**Governed by rules, not code.** These are recorded when they happen:
+- General web browsing. Agents may freely research code, papers, documentation, and methodology online. The guard does not intercept web research, and no domain filtering is claimed to enforce the embargo (network and WebFetch denies for market-data hosts are Step 11 F-09, before Phase 1 real collection).
 - A human, or a process outside Claude Code, that bypasses the protocol.
-- Knowledge the model already had from training.
-- Production credentials. These are deferred to the runtime phase. Step 9 builds no credential infrastructure. Existing secret denies stay in place.
+- Knowledge the model already had from training (relevant to how the holdout is formed: Step 11 F-06).
+
+**"Tamper-evident" means accident-resistant.** Wherever this project says "tamper-evident", it means detection of accidental or ordinary-tool changes. In practice that is hash chains plus integrity checks over the ancestry of the current Git `HEAD`. Local history can be reset or replaced, so nothing is stronger than that without an off-host anchor (S-1).
+
+**Raw captures are holdout-eligible plaintext** (Step 11 F-01).
+- Real raw market data must live inside `~/pmv-protected/raw` (`docs/raw_data.md`). It is denied to the Read and Edit tools and to the Bash sandbox.
+- The deterministic collector runs outside Claude Code, writing observations that agents cannot inspect.
+- `load_config` and `check-config` enforce the location for every non-test configuration.
+
+**Credentials (owner decision, 2026-10-14, Step 11 F-03).**
+- **Current state:** no credential exists, and the project possesses none.
+- **Deadline:** credential isolation must be in place **before any venue credential exists, including a credential needed only for public-data or WebSocket collection** (Kalshi requires authentication even for public channels).
+- **Approved minimum architecture:**
+  - the collector runs outside Claude and agent sessions;
+  - the credential lives only in the Claude-denied `~/pmv-credentials/` (denied to Read, Edit, and the Bash sandbox, and checked by `check-config`);
+  - the collector receives it directly;
+  - it is never copied into repository files, logs, configuration artifacts, or agent context.
+- **Least privilege:** use the least privilege the venue supports, and prefer a genuinely data-only or read-only credential. If a venue requires broader permissions, stop for explicit owner approval before creating or using it.
 
 ## Phase 0 status: what is safe now
 
@@ -43,9 +73,16 @@ The project owner directed this design. It replaced an earlier plan for a separa
 8. **Identifier kinds are caller-asserted** (M-2). A caller-supplied kind cannot prove the identifier was labelled honestly. A Polymarket question ID or negative-risk ID labelled as a condition ID, an event slug labelled as a slug, or a Kalshi multivariate ticker labelled as a market ticker is checked as the asserted kind. The trusted endpoint/catalog (item 1) must supply kinds before real data. **MUST RESOLVE BEFORE PHASE 1 AGENT-FACING REAL MARKET DATA.**
 9. **Recorded contracts only** (M-3). Rule 1 below protects contracts recorded in a scope. A whole-venue scope without contract records cannot refuse post-interval history of unlisted protected-period contracts. That needs the lifecycle catalog (item 2). **MUST RESOLVE BEFORE PHASE 1 AGENT-FACING REAL MARKET DATA.**
 
+**Step 11 dispositions (recorded, not yet decided).** Items 1, 2, 3, 7, 8, and 9 assume agents request market data through the guard. Step 11 (F-08) recommends a simpler architecture instead:
+- a trusted collector writes to the protected raw store;
+- an owner-run tool releases to agents only records received before a fixed development boundary;
+- the first release is the durable first-exposure record (S-4).
+
+If the owner adopts F-08, items 1, 3, 7, 8, and 9 become unnecessary for access control, and item 2 is needed only for Phase 2 labels. They are retired through an owner-approved governance change. Until then they stay listed here and unresolved. F-08 must be decided **before agents are shown any real observation**. Item 4 is recommended as time-only real scopes with no contract list (Step 11 F-10), and item 6 as a protected remote branch plus an off-host record (S-1); both are due **before the first real protected scope**.
+
 **Until these are resolved, Step 9 is safe for** synthetic fixtures, methodology research, documentation, open-source and code research, and infrastructure development. **Step 9 is not authorization for agents to inspect real market observations.**
 
-**Approved collection rule (S-6).** Before the split and protected scope are frozen, deterministic project tooling may **collect** raw real market data. Agents may work on schemas, API documentation, synthetic fixtures, capture, parsing, and integration code, and on metadata that exposes no protected observation. Agents do **not inspect** collected real observations until the chronological split and protected scope are established under the approved process. After that, only the approved development portion becomes agent-readable; the protected portion stays embargoed.
+**Approved collection rule (S-6).** Before the split and protected scope are frozen, deterministic project tooling may **collect** raw real market data, into the protected raw store only (Step 11 F-01), by a collector running outside Claude Code. Agents may work on schemas, API documentation, synthetic fixtures, capture, parsing, and integration code, and on metadata that exposes no protected observation. Agents do **not inspect** collected real observations until the chronological split and protected scope are established under the approved process. After that, only the approved development portion becomes agent-readable; the protected portion stays embargoed.
 
 ## The protected scope
 
@@ -175,8 +212,8 @@ If it could influence development, record `contamination_recorded` through `pyth
 ## Defense in depth (local)
 
 `.claude/settings.json` adds the following. `python -m pmv.data_access_guard check-config` checks all of it.
-- **Permission denies:** `Read(~/pmv-protected/**)` and `Edit(~/pmv-protected/**)`, alongside the existing secret denies.
-- **An OS sandbox for Bash:** enabled, fail closed if unavailable, no unsandboxed fallback, no excluded commands, and `denyRead`/`denyWrite` on `~/pmv-protected`.
+- **Permission denies:** `Read(~/pmv-protected/**)` and `Edit(~/pmv-protected/**)`, plus `Read(~/pmv-credentials/**)` and `Edit(~/pmv-credentials/**)` (Step 11 F-03), alongside the existing secret denies.
+- **An OS sandbox for Bash:** enabled, fail closed if unavailable, no unsandboxed fallback, no excluded commands, and `denyRead`/`denyWrite` on `~/pmv-protected` and `~/pmv-credentials`.
 
 **Observed behavior (Claude Code 2.1.299):**
 - The built-in Read tool refuses the protected path through the permission rules.
@@ -186,7 +223,12 @@ If it could influence development, record `contamination_recorded` through `pyth
 - Listing the masked root may succeed and show an empty directory; the real entries stay hidden.
 - If the directory does not exist on the host, it is simply absent inside the sandbox.
 
-The settings check also refuses two things: any allow-style entry, such as `allow` or `allowRead`, that names the protected location, and a `.claude/settings.local.json` that overrides `sandbox` or re-allows the protected location. Inside the sandbox, an absent local settings file appears as a `/dev/null` mask. That mask is treated as absent; anything else that is not a valid settings file is a problem. Depending on the session, Claude Code may instead show masked paths as zero-byte regular files. In that case this check reports the local settings file as invalid, an open item recorded in `docs/gate0_readiness.md`.
+The settings check also refuses three things:
+- any allow-style entry, such as `allow` or `allowRead`, that names the protected or credentials location;
+- a `.claude/settings.local.json` that overrides `sandbox` or re-allows those locations;
+- a non-test `configs/*.toml` that places the raw store outside `~/pmv-protected/raw`.
+
+Depending on the session, the Claude Code sandbox represents an absent, masked local settings file either as a `/dev/null` device or as an **exactly zero-byte** regular file. Both are treated as "no local override" (Step 11 F-22). Any file with content, including a single newline, and any symlink is still read and validated; malformed or prohibited content is refused.
 
 This guards a local plaintext copy against ordinary agent tools. It does not enforce the embargo. `check_path` is a path check only, with three limits:
 - hard links and bind mounts that lead into the protected location are not detected;

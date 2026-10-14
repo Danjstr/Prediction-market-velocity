@@ -19,6 +19,7 @@ from pmv.config import Environment, LoggingConfig, LogLevel, RawStorageConfig
 from pmv.experiment_spec import (
     ArtifactType,
     MediaType,
+    RunArtifactInput,
     RunClass,
     RunSpec,
     Seed,
@@ -38,6 +39,9 @@ from pmv.gate_record import (
     ReviewConclusion,
     ReviewerRole,
     RunRole,
+    parse_record_file,
+    render_record,
+    validate_record,
 )
 from pmv.gates import (
     ArtifactEvidence,
@@ -52,6 +56,7 @@ from pmv.gates import (
     Review,
     RunEvidence,
     Supersedes,
+    capture_project_identity,
     create_gate_record,
     list_gate_records,
     main,
@@ -588,46 +593,112 @@ def test_run_evidence_is_evaluated_only_at_the_pinned_head(
     verify_gate_record(created.path)
 
 
-def test_an_eligible_v2_candidate_run_can_support_a_pass(
-    repo: Path, store: ExperimentStore, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    document = canonical_line(
-        {
-            "distributions": [],
-            "interpreter": {
-                "byteorder": "little",
-                "cache_tag": "cpython-313",
-                "flags": {
-                    "dev_mode": False,
-                    "hash_randomization": 1,
-                    "optimize": 0,
-                    "utf8_mode": 0,
-                },
-                "gil_disabled": False,
-                "implementation": "cpython",
-                "platform": "linux-x86_64",
-                "soabi": None,
-                "version": "3.13.5",
-            },
-            "project": {"editable": True, "name": "prediction-market-velocity", "version": "0.0.0"},
-            "schema": "pmv.environment",
-            "schema_version": 1,
-        }
-    )
+SYNTHETIC_ENVIRONMENT = canonical_line(
+    {
+        "distributions": [],
+        "interpreter": {
+            "byteorder": "little",
+            "cache_tag": "cpython-313",
+            "flags": {"dev_mode": False, "hash_randomization": 1, "optimize": 0, "utf8_mode": 0},
+            "gil_disabled": False,
+            "implementation": "cpython",
+            "platform": "linux-x86_64",
+            "soabi": None,
+            "version": "3.13.5",
+        },
+        "project": {"editable": True, "name": "prediction-market-velocity", "version": "0.0.0"},
+        "schema": "pmv.environment",
+        "schema_version": 1,
+    }
+)
+
+
+def eligible_runs_enabled(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A verified synthetic environment and a committed uv.lock make clean candidates eligible."""
     monkeypatch.setattr(
         experiments,
         "capture_environment",
-        lambda _repo, *, verify_conformance: EnvironmentCapture(document, sha256_hex(document)),
+        lambda _repo, *, verify_conformance: EnvironmentCapture(
+            SYNTHETIC_ENVIRONMENT, sha256_hex(SYNTHETIC_ENVIRONMENT)
+        ),
     )
     (repo / "uv.lock").write_text("# synthetic lock\n", encoding="ascii")
     commit_all(repo, "lock")
+
+
+def candidate_request(repo: Path, store: ExperimentStore, run_id: str) -> GateRequest:
+    return request(repo, ledger_pin=pin(store), runs=(RunEvidence(run_id, RunRole.CANDIDATE),))
+
+
+def run_dir(store: ExperimentStore, run_id: str) -> Path:
+    directory = store._root_path / "runs" / run_id
+    os.chmod(directory, 0o700)
+    return directory
+
+
+def test_an_eligible_v2_candidate_run_can_support_a_pass(
+    repo: Path, store: ExperimentStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    eligible_runs_enabled(repo, monkeypatch)
     run = completed_run(store, run_class=RunClass.EVIDENCE_CANDIDATE)
     assert store.eligibility_as_of(run.run_id)
-    create(
-        repo,
-        request(repo, ledger_pin=pin(store), runs=(RunEvidence(run.run_id, RunRole.CANDIDATE),)),
-        experiment_store=store,
+    create(repo, candidate_request(repo, store, run.run_id), experiment_store=store)
+
+
+@pytest.mark.parametrize(
+    "damage",
+    ["delete_environment", "tamper_environment", "delete_artifact", "tamper_manifest"],
+)
+def test_f13_a_pass_cannot_rest_on_missing_or_tampered_run_files(
+    repo: Path, store: ExperimentStore, monkeypatch: pytest.MonkeyPatch, damage: str
+) -> None:
+    eligible_runs_enabled(repo, monkeypatch)
+    run = completed_run(store, run_class=RunClass.EVIDENCE_CANDIDATE)
+    directory = run_dir(store, run.run_id)
+    if damage == "delete_environment":
+        (directory / "environment.json").unlink()
+    elif damage == "tamper_environment":
+        target = writable(directory / "environment.json")
+        target.write_bytes(target.read_bytes().replace(b"3.13.5", b"3.13.6"))
+    elif damage == "delete_artifact":
+        os.chmod(directory / "artifacts", 0o700)
+        (directory / "artifacts" / "model.bin").unlink()
+    else:
+        target = writable(directory / "manifest.json")
+        target.write_bytes(target.read_bytes() + b" ")
+    # The ledger still says the run is completed and eligible ...
+    assert store.eligibility_as_of(run.run_id)
+    # ... but the gate tool verifies the files and refuses.
+    with pytest.raises(GateEvidenceError, match="failed verification"):
+        create(repo, candidate_request(repo, store, run.run_id), experiment_store=store)
+
+
+def test_f13_a_tampered_producer_of_an_input_is_refused_too(
+    repo: Path, store: ExperimentStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    eligible_runs_enabled(repo, monkeypatch)
+    producer = completed_run(store, run_class=RunClass.EVIDENCE_CANDIDATE)
+    digest = store.snapshot().runs[producer.run_id].artifacts["model.bin"][0]["sha256"]
+    assert isinstance(digest, str)
+    consumer = store.reserve_run("velocity_baseline", RunClass.EVIDENCE_CANDIDATE)
+    consumer.start(
+        RunSpec(
+            study_id="velocity_baseline",
+            entrypoint="pmv.research.baselines:run",
+            sections=spec_sections(model={"family": "logistic"}),
+            seeds=(Seed("numpy", 7),),
+            splits_accessed=(Split.TRAIN,),
+            inputs=(RunArtifactInput(producer.run_id, "model.bin", digest),),
+        )
     )
+    consumer.write_artifact(
+        "model.bin", b"consumer", artifact_type=ArtifactType.MODEL, media_type=MediaType.BINARY
+    )
+    consumer.complete()
+    assert store.eligibility_as_of(consumer.run_id)
+    (run_dir(store, producer.run_id) / "environment.json").unlink()
+    with pytest.raises(GateEvidenceError, match="produced its inputs"):
+        create(repo, candidate_request(repo, store, consumer.run_id), experiment_store=store)
 
 
 def test_ineligible_candidate_runs_cannot_pass(repo: Path, store: ExperimentStore) -> None:
@@ -877,7 +948,8 @@ def test_local_replace_refs_and_grafts_cannot_hide_history(repo: Path) -> None:
     )
     commit_all(repo, "tamper")
     git(repo, "replace", "--graft", "HEAD")
-    with pytest.raises(GateIntegrityError, match="modified, deleted, or replaced"):
+    # Step 11 F-20: any replace ref now fails closed before history is even read.
+    with pytest.raises(GateIntegrityError, match="replace refs exist"):
         verify_gate_history(repo)
     git(repo, "replace", "-d", git(repo, "rev-parse", "HEAD").decode().strip())
     grafts = repo / ".git" / "info" / "grafts"
@@ -1038,3 +1110,52 @@ def test_pass_cannot_rest_on_an_ineligible_runs_artifacts(
             request(repo, ledger_pin=pin(store), runs=candidate, artifacts=artifact),
             experiment_store=store,
         )
+
+
+# ----- Step 11 F-21: governance and config pins are re-derived, not trusted -----
+
+
+@pytest.mark.parametrize("field", ["governance", "configs"])
+def test_f21_a_forged_pin_in_a_canonical_record_fails_history_verification(
+    repo: Path, field: str
+) -> None:
+    created = committed_record(repo)
+    verify_gate_history(repo)
+    record = parse_record_file(created.path.read_bytes(), created.path.name)
+    document = json.loads(json.dumps(dict(record.document)))
+    document["project"][field][0]["sha256"] = "f" * 64
+    forged = render_record(validate_record(document))
+    writable(created.path).write_bytes(forged)
+    # A forged file that is otherwise canonical must not pass as the committed record:
+    # re-commit it as the "original" by rewriting the introducing commit's content.
+    git(repo, "reset", "-q", "--soft", "HEAD~1")
+    commit_all(repo, "record decision (forged)")
+    with pytest.raises(GateIntegrityError, match="does not match its project commit"):
+        verify_gate_history(repo)
+
+
+def test_f21_a_record_whose_config_set_differs_from_its_commit_fails(repo: Path) -> None:
+    created = committed_record(repo)
+    record = parse_record_file(created.path.read_bytes(), created.path.name)
+    document = json.loads(json.dumps(dict(record.document)))
+    document["project"]["configs"] = []
+    writable(created.path).write_bytes(render_record(validate_record(document)))
+    git(repo, "reset", "-q", "--soft", "HEAD~1")
+    commit_all(repo, "record decision (forged)")
+    with pytest.raises(GateIntegrityError, match="config set does not match"):
+        verify_gate_history(repo)
+
+
+# ----- Step 11 F-20: replace refs cannot spoof evidence identity -----
+
+
+def test_f20_a_replace_ref_makes_gate_evidence_identity_unknown(repo: Path) -> None:
+    (repo / "docs" / "other.md").write_text("other\n", encoding="ascii")
+    commit_all(repo, "other")
+    head = git(repo, "rev-parse", "HEAD").decode().strip()
+    previous = git(repo, "rev-parse", "HEAD~1").decode().strip()
+    git(repo, "replace", head, previous)
+    with pytest.raises(GateStateError, match="code identity cannot be determined"):
+        capture_project_identity(repo)
+    git(repo, "replace", "-d", head)
+    assert capture_project_identity(repo).commit == head

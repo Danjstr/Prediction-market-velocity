@@ -13,7 +13,8 @@ ledger verification, the ledger append, and the mirror rewrite:
 
 Strict v1 consumption: ``access_started`` consumes the holdout permanently. Before any
 protected byte may be exposed, ``assert_started_committed`` must confirm that the event
-and its mirror are committed in HEAD and that Gate 6, the Gate 7 preregistration, and the
+and its mirror are committed in HEAD and that Gate 6, the Gate 7 PASS record used as v1
+plan approval (Step 11 F-18: Gate 7 itself is the holdout result), and the
 exact candidate identity still hold. Step 8 cannot prove that nobody bypassed this
 protocol; known or suspected bypasses are recorded as contamination and consume the
 holdout. There is no repair tooling: a malformed ledger fails closed.
@@ -515,8 +516,9 @@ class HoldoutLog:
 
         The ledger and mirror verify and agree; access_started exists, is open, and its
         ledger and Markdown bytes are exactly HEAD's (working tree and index match HEAD);
-        the tree is clean; Gate 6 and the Gate 7 preregistration are committed, current,
-        and matching; and the candidate identity still holds exactly.
+        the tree is clean; Gate 6 and the Gate 7 PASS record used as v1 plan approval
+        (Step 11 F-18) are committed, current, and matching; and the candidate identity
+        still holds exactly.
         """
         # The full Git history is verified here, so a consuming event that was ever
         # committed and later reverted or rewritten forward can never look unconsumed.

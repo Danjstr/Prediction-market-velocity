@@ -1287,3 +1287,94 @@ def test_a_retry_that_cannot_capture_beside_an_earlier_capture_is_refused(
         with pytest.raises(RunStateError, match="can no longer be captured"):
             handle.start(make_spec())
         assert not (directory / "run_spec.json").exists()
+
+
+# ----- Step 11 M-4: verification is a required precondition, not a stored claim -----
+
+REAL_CAPTURE_ENVIRONMENT = experiments.capture_environment
+REAL_COLLECT_GIT_IDENTITY = experiments.collect_git_identity
+
+
+def test_m4_a_capture_that_skips_verification_cannot_produce_an_eligible_run(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With the store's real capture path, a failing ``reproducibility.verify`` refuses an
+    evidence start even though a plain capture would succeed: no fingerprint, and so no
+    eligibility, can be obtained by bypassing verification. No ``verified`` field exists
+    because the same process that would write it is the one being checked."""
+    from pmv import reproducibility
+
+    monkeypatch.setattr(experiments, "capture_environment", REAL_CAPTURE_ENVIRONMENT)
+
+    def refuse(_root: Path) -> EnvironmentCapture:
+        raise ReproducibilityError("synthetic conformance failure")
+
+    monkeypatch.setattr(reproducibility, "verify", refuse)
+    monkeypatch.setattr(reproducibility, "capture", synthetic_capture)
+    with open_store(root) as store:
+        candidate = store.reserve_run("velocity_baseline", RunClass.EVIDENCE_CANDIDATE)
+        with pytest.raises(RunStateError, match="reproducibility verification failed"):
+            candidate.start(make_spec())
+        assert store.snapshot().runs[candidate.run_id].state is RunState.RESERVED
+        exploratory = store.reserve_run("velocity_baseline", RunClass.EXPLORATORY)
+        exploratory.start(make_spec())
+        run = store.snapshot().runs[exploratory.run_id]
+        assert run.identity is not None
+        assert run.identity.installed_environment_sha256 == synthetic_capture().sha256
+        assert not run.eligible_at_start
+        assert not any(item.eligible_at_start for item in store.snapshot().runs.values())
+    assert not hasattr(run.identity, "verified")
+
+
+# ----- Step 11 F-20: replace refs, grafts, and shallow clones make identity unknown -----
+
+
+def _git(repo: Path, *arguments: str) -> str:
+    environment = {
+        "PATH": "/usr/bin:/bin",
+        "HOME": "/nonexistent",
+        "LC_ALL": "C",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_AUTHOR_NAME": "Owner",
+        "GIT_AUTHOR_EMAIL": "owner@example.invalid",
+        "GIT_COMMITTER_NAME": "Owner",
+        "GIT_COMMITTER_EMAIL": "owner@example.invalid",
+    }
+    return subprocess.run(  # noqa: S603 - fixed test git invocation
+        ["/usr/bin/git", "-C", str(repo), "-c", "commit.gpgsign=false", *arguments],
+        env=environment,
+        capture_output=True,
+        check=True,
+        text=True,
+    ).stdout.strip()
+
+
+def test_f20_a_replace_ref_cannot_spoof_experiment_code_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(experiments, "collect_git_identity", REAL_COLLECT_GIT_IDENTITY)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    (repo / "f.py").write_text("innocent = True\n", encoding="ascii")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "A")
+    innocent = _git(repo, "rev-parse", "HEAD")
+    (repo / "f.py").write_text("innocent = False\n", encoding="ascii")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "B")
+    malicious = _git(repo, "rev-parse", "HEAD")
+    assert experiments.collect_git_identity(repo) == GitIdentity(malicious, False, None)
+    # The audit's spoof: record A while B's content runs.
+    _git(repo, "reset", "-q", "--soft", innocent)
+    _git(repo, "replace", innocent, malicious)
+    assert experiments.collect_git_identity(repo) == experiments.UNKNOWN_GIT
+    _git(repo, "replace", "-d", innocent)
+    identity = experiments.collect_git_identity(repo)
+    assert identity.commit == innocent
+    assert identity.dirty is True
+    grafts = repo / ".git" / "info" / "grafts"
+    grafts.parent.mkdir(exist_ok=True)
+    grafts.write_text(innocent + "\n", encoding="ascii")
+    assert experiments.collect_git_identity(repo) == experiments.UNKNOWN_GIT

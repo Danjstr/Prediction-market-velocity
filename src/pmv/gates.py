@@ -473,14 +473,37 @@ def _experiment_evidence(
         registered = run.artifacts.get(item.artifact_name)
         if registered is None or registered[1] > seq or registered[0]["sha256"] != item.sha256:
             raise GateEvidenceError("an artifact reference does not match the pinned ledger")
-        try:
-            store.verify_run(item.run_id)
-        except (ExperimentError, OSError):
-            raise GateEvidenceError("an artifact's run failed verification") from None
         artifacts.append(
             {"artifact_name": item.artifact_name, "run_id": item.run_id, "sha256": item.sha256}
         )
+    _verify_run_files(
+        store, state, [item.run_id for item in request.runs] + [a.run_id for a in request.artifacts]
+    )
     return pin, runs, artifacts
+
+
+def _verify_run_files(
+    store: ExperimentStore, state: ledger.LedgerState, run_ids: Sequence[str]
+) -> None:
+    """The ledger alone is not evidence: every referenced run, and every run that produced
+    one of its run-artifact inputs (transitively), must pass the store's own ``verify_run``
+    (spec, environment.json, artifacts, manifest) or the record is refused (Step 11 F-13)."""
+    pending, seen = list(run_ids), set[str]()
+    while pending:
+        run_id = pending.pop()
+        if run_id in seen:
+            continue
+        seen.add(run_id)
+        try:
+            store.verify_run(run_id)
+        except (ExperimentError, OSError):
+            raise GateEvidenceError(
+                "a referenced run, or a run that produced its inputs, failed verification"
+            ) from None
+        run = state.runs.get(run_id)
+        for item in run.inputs if run is not None else ():
+            if item.get("kind") == "run_artifact":
+                pending.append(str(item["run_id"]))
 
 
 def _capture_evidence(
@@ -617,6 +640,10 @@ def verify_gate_history(repo: Path) -> list[ScannedRecord]:
     )
     if os.path.lexists(Path(common) / "info" / "grafts"):
         raise GateIntegrityError("gate history cannot be verified while info/grafts rewrites it")
+    if _git(repo, "for-each-ref", "--format=%(refname)", "refs/replace/").strip():
+        # Replace objects are already ignored here (GIT_NO_REPLACE_OBJECTS); refusing them
+        # outright keeps every tool's view of history identical (Step 11 F-20).
+        raise GateIntegrityError("gate history cannot be verified while Git replace refs exist")
     _git(repo, "rev-parse", "--verify", "--quiet", "HEAD")
     # -m with --full-history shows each merge's changes against every parent, so a merge
     # cannot modify, delete, or replace a committed record without appearing here.
@@ -668,6 +695,7 @@ def verify_gate_history(repo: Path) -> list[ScannedRecord]:
         raise GateIntegrityError(str(exc)) from None
     for item in records:
         _check_project_commit(repo, item)
+        _check_project_pins(repo, item)
     return records
 
 
@@ -704,6 +732,45 @@ def _check_project_commit(repo: Path, item: ScannedRecord) -> None:
         raise GateIntegrityError(
             "a gate record must be committed in a new commit after the project commit it records"
         )
+
+
+def _check_project_pins(repo: Path, item: ScannedRecord) -> None:
+    """Re-derive a clean-tree record's governance and config hashes from its project commit.
+
+    A clean-tree record (every PASS is one) was captured from exactly the files at
+    ``project.commit``, so each recorded hash must equal the hash of that file at that
+    commit, and the recorded config set must equal the commit's ``configs/*.toml``. This
+    turns the pins from self-reported fields into checked facts; a missing commit or file
+    fails (Step 11 F-21). A dirty-tree record cannot be re-derived and is only canonical.
+    Replace objects are never honored (``GIT_NO_REPLACE_OBJECTS``).
+    """
+    project = item.record.document["project"]
+    if not isinstance(project, dict) or project["tree_dirty"] is not False:
+        return
+    commit = str(project["commit"])
+    governance = project["governance"]
+    configs = project["configs"]
+    if not isinstance(governance, list) or not isinstance(configs, list):
+        raise GateIntegrityError("a gate record's project pins are malformed")
+    listed = (
+        _git(repo, "ls-tree", "-z", "--name-only", f"{commit}:configs")
+        if _git_ok(repo, "cat-file", "-e", f"{commit}:configs")
+        else b""
+    )
+    committed_configs = sorted(
+        f"configs/{name}"
+        for name in (raw.decode("utf-8", "replace") for raw in listed.split(b"\0") if raw)
+        if name.endswith(".toml")
+    )
+    recorded_configs = sorted(str(entry["path"]) for entry in configs)
+    if recorded_configs != committed_configs:
+        raise GateIntegrityError("a gate record's config set does not match its project commit")
+    for entry in [*governance, *configs]:
+        path, digest = str(entry["path"]), entry["sha256"]
+        if sha256_hex(_git(repo, "cat-file", "blob", f"{commit}:{path}")) != digest:
+            raise GateIntegrityError(
+                "a gate record's governance or config hash does not match its project commit"
+            )
 
 
 # ----- filesystem and Git helpers -----

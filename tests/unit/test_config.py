@@ -1,6 +1,7 @@
 """Tests for configuration loading and validation."""
 
 import hashlib
+import os
 from pathlib import Path
 
 import pytest
@@ -9,9 +10,11 @@ from pmv.config import (
     ConfigError,
     Environment,
     LogLevel,
+    RawStorageConfig,
     environment_from,
     load_config,
     load_config_for_environment,
+    protected_raw_root_problem,
 )
 
 REPO_CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs"
@@ -151,3 +154,115 @@ def test_invalid_raw_storage_values_fail_clearly(
         load_config(
             write_config(tmp_path, VALID + "\n[raw_storage]\n" + section + "\n"), Environment.TEST
         )
+
+
+# ----- Step 11 F-01: real raw data lives in the protected raw location -----
+
+
+def raw_config(environment: str, root: Path) -> str:
+    return (
+        f'schema_version = 1\nenvironment = "{environment}"\n\n[logging]\nlevel = "INFO"\n'
+        f'\n[raw_storage]\nroot = "{root}"\n'
+    )
+
+
+@pytest.fixture
+def protected_base(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    import pmv.config as config_module
+
+    base = tmp_path / "home" / "pmv-protected" / "raw"
+    base.mkdir(parents=True)
+    monkeypatch.setattr(config_module, "PROTECTED_RAW_BASE", base)
+    return base
+
+
+@pytest.mark.parametrize("environment", ["development", "shadow", "production"])
+def test_a_real_raw_root_inside_the_protected_location_loads(
+    tmp_path: Path, protected_base: Path, environment: str
+) -> None:
+    for root in (protected_base, protected_base / "kalshi" / "2026"):
+        path = write_config(tmp_path, raw_config(environment, root), f"{environment}.toml")
+        config = load_config(path, Environment(environment))
+        assert config.raw_storage.root == root
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "../raw-sibling",
+        "../../pmv-raw",
+        "kalshi/../../escape",
+    ],
+)
+def test_a_real_raw_root_outside_the_protected_location_is_refused(
+    tmp_path: Path, protected_base: Path, relative: str
+) -> None:
+    root = Path(f"{protected_base}/{relative}")
+    path = write_config(tmp_path, raw_config("development", root), "development.toml")
+    with pytest.raises(ConfigError, match="protected raw location"):
+        load_config(path, Environment.DEVELOPMENT)
+
+
+def test_a_symlink_escaping_the_protected_location_is_refused(
+    tmp_path: Path, protected_base: Path
+) -> None:
+    outside = tmp_path / "agent-readable"
+    outside.mkdir()
+    link = protected_base / "linked"
+    link.symlink_to(outside, target_is_directory=True)
+    path = write_config(tmp_path, raw_config("production", link / "x"), "production.toml")
+    with pytest.raises(ConfigError, match="protected raw location"):
+        load_config(path, Environment.PRODUCTION)
+
+
+def test_test_configurations_and_direct_store_configs_may_use_temporary_roots(
+    tmp_path: Path, protected_base: Path
+) -> None:
+    scratch = tmp_path / "scratch-raw"
+    path = write_config(tmp_path, raw_config("test", scratch))
+    assert load_config(path, Environment.TEST).raw_storage.root == scratch
+    assert RawStorageConfig(root=scratch).root == scratch
+    assert protected_raw_root_problem(Path("relative/raw"), protected_base) is not None
+
+
+# ----- Step 11 red-team finding 3: HOME cannot move the protected location -----
+
+
+def test_the_protected_raw_location_ignores_a_changed_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import pwd
+
+    import pmv.config as config_module
+
+    real_home = Path(pwd.getpwuid(os.getuid()).pw_dir)
+    assert config_module.account_home() == real_home
+    assert real_home / "pmv-protected" / "raw" == config_module.PROTECTED_RAW_BASE
+    fake_home = tmp_path / "fake-home"
+    monkeypatch.setenv("HOME", str(fake_home))
+    assert config_module.account_home() == real_home
+    root = fake_home / "pmv-protected" / "raw" / "kalshi"
+    root.mkdir(parents=True)
+    path = write_config(tmp_path, raw_config("development", root), "development.toml")
+    with pytest.raises(ConfigError, match="protected raw location"):
+        load_config(path, Environment.DEVELOPMENT)
+
+
+def test_an_unknown_account_home_refuses_every_real_raw_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import pwd
+
+    import pmv.config as config_module
+
+    def missing(_uid: int) -> pwd.struct_passwd:
+        raise KeyError(_uid)
+
+    monkeypatch.setattr(pwd, "getpwuid", missing)
+    assert config_module.account_home() == config_module.UNKNOWN_ACCOUNT_HOME
+    base = config_module.UNKNOWN_ACCOUNT_HOME / "pmv-protected" / "raw"
+    monkeypatch.setattr(config_module, "PROTECTED_RAW_BASE", base)
+    for root in (base, base / "kalshi"):
+        path = write_config(tmp_path, raw_config("production", root), "production.toml")
+        with pytest.raises(ConfigError, match="account home directory"):
+            load_config(path, Environment.PRODUCTION)
