@@ -53,10 +53,11 @@ from pmv.experiments import (
     RunStateError,
     TornLedgerError,
 )
-from pmv.integrity import sha256_hex
+from pmv.integrity import canonical_line, sha256_hex
 from pmv.log import configure_logging
 from pmv.raw_manifest import RuntimeProvenance, SourceIdentity, Transport
 from pmv.raw_storage import RawCaptureStore
+from pmv.reproducibility import EnvironmentCapture, ReproducibilityError
 
 REPO = Path(__file__).resolve().parents[2]
 T0 = datetime(2026, 10, 13, 3, 40, 21, tzinfo=UTC)
@@ -86,6 +87,54 @@ def root(tmp_path: Path) -> Iterator[Path]:
 @pytest.fixture(autouse=True)
 def clean_git(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(experiments, "collect_git_identity", lambda _repo: CLEAN)
+
+
+def synthetic_capture(version: str = "1.0") -> EnvironmentCapture:
+    document = canonical_line(
+        {
+            "distributions": [{"files_sha256": "7" * 64, "name": "numpy", "version": version}],
+            "interpreter": {
+                "byteorder": "little",
+                "cache_tag": "cpython-313",
+                "flags": {
+                    "dev_mode": False,
+                    "hash_randomization": 1,
+                    "optimize": 0,
+                    "utf8_mode": 0,
+                },
+                "gil_disabled": False,
+                "implementation": "cpython",
+                "platform": "linux-x86_64",
+                "soabi": "cpython-313-x86_64-linux-gnu",
+                "version": "3.13.5",
+            },
+            "project": {"editable": True, "name": "prediction-market-velocity", "version": "0.0.0"},
+            "schema": "pmv.environment",
+            "schema_version": 1,
+        }
+    )
+    return EnvironmentCapture(document, sha256_hex(document))
+
+
+class FakeEnvironment:
+    """A synthetic installed environment; tests change or break it explicitly."""
+
+    def __init__(self) -> None:
+        self.capture: EnvironmentCapture | None = synthetic_capture()
+        self.calls: list[bool] = []
+
+    def __call__(self, _repo: Path, *, verify_conformance: bool) -> EnvironmentCapture:
+        self.calls.append(verify_conformance)
+        if self.capture is None:
+            raise ReproducibilityError("synthetic verification failure")
+        return self.capture
+
+
+@pytest.fixture(autouse=True)
+def environment(monkeypatch: pytest.MonkeyPatch) -> FakeEnvironment:
+    fake = FakeEnvironment()
+    monkeypatch.setattr(experiments, "capture_environment", fake)
+    return fake
 
 
 def open_store(root: Path, **kwargs: object) -> ExperimentStore:
@@ -181,10 +230,14 @@ def test_full_lifecycle_produces_verified_immutable_evidence(root: Path) -> None
             state, handle.run_id
         )
         assert mode(directory) == 0o500
-        for name in ("run_spec.json", "manifest.json", "artifacts/model.bin"):
+        for name in ("run_spec.json", "environment.json", "manifest.json", "artifacts/model.bin"):
             assert mode(directory / name) == 0o400
         assert mode(ledger_path(root)) == 0o600
-        assert not store.eligibility_as_of(handle.run_id)
+        assert (directory / "environment.json").read_bytes() == synthetic_capture().document
+        assert run.identity is not None
+        assert run.identity.version == 2
+        assert run.identity.installed_environment_sha256 == synthetic_capture().sha256
+        assert store.eligibility_as_of(handle.run_id)
         with pytest.raises(RunStateError):
             handle.record_metric("late", "development", 1)
 
@@ -351,7 +404,7 @@ def test_run_artifact_inputs_need_a_completed_producer_and_exact_bytes(root: Pat
         consumer.start(make_spec(inputs=(reference,)))
 
 
-def test_supersession_never_rewrites_history_and_no_v1_run_is_eligible(root: Path) -> None:
+def test_supersession_never_rewrites_history_and_retracts_as_of_eligibility(root: Path) -> None:
     with open_store(root) as store:
         producer = completed(store)
         state = store.snapshot()
@@ -371,11 +424,15 @@ def test_supersession_never_rewrites_history_and_no_v1_run_is_eligible(root: Pat
         assert after.entries[: len(before.entries)] == before.entries
         for run in after.runs.values():
             assert run.identity is not None
-            assert run.identity.installed_environment_sha256 is None
+            assert run.identity.installed_environment_sha256 == synthetic_capture().sha256
             assert run.start_fields["effective_run_class_at_start"] == "evidence_candidate"
-            assert run.eligible_at_start is False
-            assert not store.eligibility_as_of(run.run_id)
-        assert not hasattr(experiments, "_installed_environment_sha256")
+            assert run.eligible_at_start is True
+        # Supersession retracts later as-of answers (transitively), never history.
+        assert not store.eligibility_as_of(producer.run_id)
+        assert not store.eligibility_as_of(consumer.run_id)
+        assert store.eligibility_as_of(producer.run_id, len(before.entries) - 1)
+        assert store.eligibility_as_of(consumer.run_id, len(before.entries) - 1)
+        assert store.eligibility_as_of(replacement.run_id)
 
 
 # ----- recovery -----
@@ -1088,3 +1145,145 @@ def test_the_store_identity_record_is_permanent_and_bound_by_genesis(root: Path)
     (root / "store.v1.json").rename(root.parent / "store.v1.json")
     with pytest.raises(ExperimentIntegrityError, match="identity record is missing"):
         open_store(root)
+
+
+# ----- Step 10: installed-environment identity -----
+
+
+def test_an_evidence_candidate_start_is_refused_when_verification_fails(
+    root: Path, environment: FakeEnvironment
+) -> None:
+    environment.capture = None
+    with open_store(root) as store:
+        handle = store.reserve_run("velocity_baseline", RunClass.EVIDENCE_CANDIDATE)
+        with pytest.raises(RunStateError, match="reproducibility verification failed"):
+            handle.start(make_spec())
+        run = store.snapshot().runs[handle.run_id]
+        assert run.state is RunState.RESERVED
+        directory = root / "runs" / handle.run_id
+        assert not (directory / "run_spec.json").exists()
+        assert not (directory / "environment.json").exists()
+        environment.capture = synthetic_capture()
+        handle.start(make_spec())
+        assert store.snapshot().runs[handle.run_id].eligible_at_start is True
+    assert environment.calls == [True, True]
+
+
+@pytest.mark.parametrize("run_class", [RunClass.EXPLORATORY, RunClass.DEVELOPMENT])
+def test_other_runs_never_require_verification_and_record_no_unverifiable_fingerprint(
+    root: Path, environment: FakeEnvironment, run_class: RunClass
+) -> None:
+    with open_store(root) as store:
+        fingerprinted = store.reserve_run("velocity_baseline", run_class)
+        fingerprinted.start(make_spec())
+        environment.capture = None
+        blind = store.reserve_run("velocity_baseline", run_class)
+        blind.start(make_spec())
+        blind.complete()
+        state = store.snapshot()
+        identity = state.runs[blind.run_id].identity
+        assert identity is not None
+        assert identity.installed_environment_sha256 is None
+        assert not (root / "runs" / blind.run_id / "environment.json").exists()
+        store.verify_run(blind.run_id)
+        first = state.runs[fingerprinted.run_id].identity
+        assert first is not None
+        assert first.installed_environment_sha256 == synthetic_capture().sha256
+        assert not state.runs[fingerprinted.run_id].eligible_at_start
+    # A run started without a fingerprint has nothing to re-check at completion.
+    assert environment.calls == [False, False]
+
+
+def test_an_environment_change_during_the_run_fails_it(
+    root: Path, environment: FakeEnvironment
+) -> None:
+    with open_store(root) as store:
+        handle = started(store)
+        environment.capture = synthetic_capture("2.0")
+        with pytest.raises(RunStateError, match="installed environment changed"):
+            handle.complete()
+        failed = store.snapshot().runs[handle.run_id]
+        assert failed.state is RunState.FAILED
+        last = store.snapshot().entries[-1]
+        assert last.fields["failure_code"] == "environment_changed"
+        assert last.version == 2
+        assert not store.eligibility_as_of(handle.run_id)
+        unverifiable = started(store)
+        environment.capture = None
+        with pytest.raises(RunStateError, match="installed environment changed"):
+            unverifiable.complete()
+
+
+def test_a_code_change_is_still_reported_separately(
+    root: Path, monkeypatch: pytest.MonkeyPatch, environment: FakeEnvironment
+) -> None:
+    with open_store(root) as store:
+        handle = started(store)
+        environment.capture = synthetic_capture("2.0")
+        monkeypatch.setattr(
+            experiments, "collect_git_identity", lambda _repo: GitIdentity("b" * 40, False, None)
+        )
+        with pytest.raises(RunStateError, match="code identity changed"):
+            handle.complete()
+        assert store.snapshot().entries[-1].fields["failure_code"] == "code_identity_changed"
+
+
+def test_environment_json_must_match_the_recorded_fingerprint(root: Path) -> None:
+    with open_store(root) as store:
+        handle = completed(store)
+        store.verify_run(handle.run_id)
+        directory = root / "runs" / handle.run_id
+        target = directory / "environment.json"
+        os.chmod(directory, 0o700)
+        os.chmod(target, 0o600)
+        original = target.read_bytes()
+        target.write_bytes(synthetic_capture("9.9").document)
+        with pytest.raises(ExperimentIntegrityError, match="does not match its recorded hash"):
+            store.verify_run(handle.run_id)
+        target.unlink()
+        with pytest.raises(ExperimentIntegrityError, match=r"environment\.json is missing"):
+            store.verify_run(handle.run_id)
+        target.write_bytes(original)
+        store.verify_run(handle.run_id)
+
+
+def test_a_stray_environment_json_without_a_fingerprint_is_an_integrity_error(
+    root: Path, environment: FakeEnvironment
+) -> None:
+    environment.capture = None
+    with open_store(root) as store:
+        handle = store.reserve_run("velocity_baseline", RunClass.EXPLORATORY)
+        handle.start(make_spec())
+        handle.complete()
+        directory = root / "runs" / handle.run_id
+        os.chmod(directory, 0o700)
+        (directory / "environment.json").write_bytes(synthetic_capture().document)
+        with pytest.raises(ExperimentIntegrityError, match="recorded no fingerprint"):
+            store.verify_run(handle.run_id)
+
+
+def test_a_retried_start_must_see_the_same_environment(
+    root: Path, environment: FakeEnvironment
+) -> None:
+    with open_store(root) as store:
+        handle = store.reserve_run("velocity_baseline", RunClass.EVIDENCE_CANDIDATE)
+        directory = root / "runs" / handle.run_id
+        (directory / "environment.json").write_bytes(synthetic_capture("0.1").document)
+        with pytest.raises(RunStateError, match=r"existing environment\.json does not match"):
+            handle.start(make_spec())
+        assert store.snapshot().runs[handle.run_id].state is RunState.RESERVED
+        (directory / "environment.json").unlink()
+        handle.start(make_spec())
+
+
+def test_a_retry_that_cannot_capture_beside_an_earlier_capture_is_refused(
+    root: Path, environment: FakeEnvironment
+) -> None:
+    with open_store(root) as store:
+        handle = store.reserve_run("velocity_baseline", RunClass.EXPLORATORY)
+        directory = root / "runs" / handle.run_id
+        (directory / "environment.json").write_bytes(synthetic_capture().document)
+        environment.capture = None
+        with pytest.raises(RunStateError, match="can no longer be captured"):
+            handle.start(make_spec())
+        assert not (directory / "run_spec.json").exists()

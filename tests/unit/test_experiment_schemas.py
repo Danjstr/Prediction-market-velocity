@@ -20,6 +20,7 @@ from pmv.experiment_ledger import (
 )
 from pmv.experiment_spec import (
     SECTION_NAMES,
+    V1_FAILURE_CODES,
     AbortReason,
     ArtifactType,
     ExecutionIdentity,
@@ -45,10 +46,12 @@ def load(name: str) -> dict[str, Any]:
 
 
 ENTRY = load("experiment_ledger_entry_v1.json")
+ENTRY_V2 = load("experiment_ledger_entry_v2.json")
 SPEC = load("experiment_run_spec_v1.json")
 MANIFEST = load("experiment_run_manifest_v1.json")
 CHECKPOINT = load("experiment_ledger_checkpoint_v1.json")
 BRANCHES = {branch["properties"]["event_type"]["const"]: branch for branch in ENTRY["oneOf"]}
+BRANCHES_V2 = {branch["properties"]["event_type"]["const"]: branch for branch in ENTRY_V2["oneOf"]}
 
 
 def matches(schema: dict[str, Any], value: str) -> bool:
@@ -94,7 +97,36 @@ def test_every_event_branch_has_exactly_the_python_field_set() -> None:
     ],
 )
 def test_event_specific_enums_match_python(event: str, field: str, values: type[StrEnum]) -> None:
-    assert BRANCHES[event]["properties"][field]["enum"] == [item.value for item in values]
+    expected = [item.value for item in values]
+    if values is FailureCode:
+        assert BRANCHES[event]["properties"][field]["enum"] == [
+            item.value for item in FailureCode if item in V1_FAILURE_CODES
+        ]
+    else:
+        assert BRANCHES[event]["properties"][field]["enum"] == expected
+    assert BRANCHES_V2[event]["properties"][field]["enum"] == expected
+
+
+def test_the_v2_entry_schema_differs_from_v1_only_where_step_10_changed_it() -> None:
+    assert ENTRY["properties"]["schema_version"] == {"const": 1}
+    assert ENTRY_V2["properties"]["schema_version"] == {"const": 2}
+    assert ENTRY_V2["properties"]["event_type"] == ENTRY["properties"]["event_type"]
+    for event in LedgerEvent:
+        assert set(BRANCHES_V2[event.value]["required"]) == set(BRANCHES[event.value]["required"])
+    identity_v1 = ENTRY["$defs"]["execution_identity"]["properties"]
+    identity_v2 = ENTRY_V2["$defs"]["execution_identity"]["properties"]
+    assert identity_v1["schema_version"] == {"const": 1}
+    assert identity_v2["schema_version"] == {"const": 2}
+    changed = {"schema_version", "installed_environment_sha256"}
+    assert {key: value for key, value in identity_v1.items() if key not in changed} == {
+        key: value for key, value in identity_v2.items() if key not in changed
+    }
+    assert identity_v2["installed_environment_sha256"]["oneOf"] == [
+        {"$ref": "#/$defs/sha256"},
+        {"type": "null"},
+    ]
+    started = BRANCHES_V2["run_started"]["properties"]["evidence_eligible_at_start"]
+    assert started["type"] == "boolean"
 
 
 def test_shared_definitions_match_python() -> None:

@@ -1,0 +1,996 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pmv.experiment.ledger_entry/2",
+  "title": "PMV experiment ledger entry, version 2",
+  "description": "One line of ledger/experiments.v1.jsonl. Documentation only: the authoritative validator is pmv.experiment_ledger.verify_ledger, which also enforces the hash chain, contiguous ledger_seq, the run state machine, and the cross-field rules noted per event. Each event type has exactly the envelope fields plus its own fields. Canonical bytes: sorted keys, no spaces, ASCII, no floats, one trailing newline. JSON booleans are never integers. Version 2 (Phase 0 Step 10) differs from version 1 only in: run_started carries a version 2 execution identity whose installed_environment_sha256 is the SHA-256 of the run's canonical environment.json (schemas/environment_v1.json) or null; a clean evidence_candidate start must carry it; evidence_eligible_at_start can be true; and run_failed may use environment_changed. Version 1 entries are still verified exactly as defined in experiment_ledger_entry_v1.json, and once a version 2 entry appears no later entry may be version 1.",
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "store_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$",
+      "description": "permanent experiment-store identity (128 random bits)"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[0-9]{8}T[0-9]{6}\\.[0-9]{6}Z_[0-9a-f]{32}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$",
+      "description": "UTC; must also be a real calendar time"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "artifact_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}(\\.[a-z0-9]{1,8})?$"
+    },
+    "entrypoint": {
+      "type": "string",
+      "pattern": "^[a-z_][a-z0-9_]*(\\.[a-z_][a-z0-9_]*)*:[a-z_][a-z0-9_]*$"
+    },
+    "run_class": {
+      "enum": [
+        "exploratory",
+        "development",
+        "evidence_candidate"
+      ]
+    },
+    "split": {
+      "enum": [
+        "train",
+        "development",
+        "validation",
+        "inner_validation"
+      ],
+      "description": "protected_holdout is refused in Step 6 and never appears"
+    },
+    "metric_value": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "text"
+          ],
+          "properties": {
+            "type": {
+              "const": "integer"
+            },
+            "text": {
+              "type": "string",
+              "pattern": "^-?(0|[1-9][0-9]*)$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "text"
+          ],
+          "properties": {
+            "type": {
+              "const": "decimal"
+            },
+            "text": {
+              "type": "string",
+              "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?(e[+-]?[0-9]+)?$"
+            }
+          }
+        }
+      ]
+    },
+    "execution_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Closed identity object; execution_identity_sha256 is the SHA-256 of its canonical JSON line. Cross-field rules (pmv.experiment_spec.ExecutionIdentity): code_commit null => code_tree_dirty and dirty_tree_sha256 null; code_commit set => code_tree_dirty is a boolean; dirty_tree_sha256 is set exactly when code_tree_dirty is true.",
+      "required": [
+        "schema",
+        "schema_version",
+        "spec_sha256",
+        "code_commit",
+        "code_tree_dirty",
+        "dirty_tree_sha256",
+        "package_version",
+        "uv_lock_sha256",
+        "installed_environment_sha256",
+        "app_config_sha256",
+        "config_section_sha256",
+        "python_version",
+        "platform",
+        "entrypoint"
+      ],
+      "properties": {
+        "schema": {
+          "const": "pmv.experiment.execution_identity"
+        },
+        "schema_version": {
+          "const": 2
+        },
+        "spec_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "code_commit": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "code_tree_dirty": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "dirty_tree_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "package_version": {
+          "type": "string",
+          "pattern": "^[0-9][0-9A-Za-z.+-]{0,63}$"
+        },
+        "uv_lock_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "installed_environment_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "SHA-256 of the run's canonical environment.json (pmv.reproducibility). Required when the effective run class at start is evidence_candidate; null only when no fingerprint could be captured for a run that did not require one."
+        },
+        "app_config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "config_section_sha256": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "calibration",
+            "experiment",
+            "features",
+            "model",
+            "validation"
+          ],
+          "properties": {
+            "calibration": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "experiment": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "features": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "model": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "validation": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "python_version": {
+          "type": "string",
+          "pattern": "^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$"
+        },
+        "platform": {
+          "type": "string",
+          "pattern": "^[a-z0-9]{1,32}-[a-z0-9_]{1,32}$"
+        },
+        "entrypoint": {
+          "$ref": "#/$defs/entrypoint"
+        }
+      }
+    },
+    "run_artifact_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "run_id",
+        "artifact_name",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "const": "run_artifact"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "artifact_name": {
+          "$ref": "#/$defs/artifact_name"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "resolved_input": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "capture_id",
+            "manifest_sha256",
+            "capture_code_clean"
+          ],
+          "properties": {
+            "kind": {
+              "const": "raw_capture"
+            },
+            "capture_id": {
+              "$ref": "#/$defs/run_id"
+            },
+            "manifest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "capture_code_clean": {
+              "type": "boolean",
+              "description": "true only if the capture's code_commit is known and code_tree_dirty is false"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/run_artifact_input"
+        }
+      ]
+    },
+    "resolved_inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/resolved_input"
+      },
+      "uniqueItems": true,
+      "description": "In spec order; no reference repeats. A run_artifact input must name a registered artifact, with that exact hash, of a run completed earlier in the ledger."
+    }
+  },
+  "type": "object",
+  "required": [
+    "schema",
+    "schema_version",
+    "ledger_seq",
+    "prev_entry_sha256",
+    "entry_sha256",
+    "event_type",
+    "run_id",
+    "recorded_at"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pmv.experiment.ledger_entry"
+    },
+    "schema_version": {
+      "const": 2
+    },
+    "ledger_seq": {
+      "$ref": "#/$defs/count"
+    },
+    "prev_entry_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "null exactly for ledger_seq 0"
+    },
+    "entry_sha256": {
+      "$ref": "#/$defs/sha256",
+      "description": "SHA-256 of the canonical JSON of the entry without entry_sha256"
+    },
+    "event_type": {
+      "enum": [
+        "ledger_created",
+        "run_reserved",
+        "run_started",
+        "artifact_registered",
+        "metric_recorded",
+        "warning_recorded",
+        "run_completed",
+        "run_failed",
+        "run_aborted",
+        "run_interrupted",
+        "run_superseded",
+        "ledger_tail_repaired"
+      ]
+    },
+    "run_id": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/run_id"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "null exactly for ledger_created and ledger_tail_repaired"
+    },
+    "recorded_at": {
+      "$ref": "#/$defs/timestamp"
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "event_type": {
+          "const": "ledger_created"
+        },
+        "run_id": {
+          "type": "null"
+        },
+        "store_id": {
+          "$ref": "#/$defs/store_id"
+        },
+        "ledger_seq": {
+          "const": 0
+        },
+        "prev_entry_sha256": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "store_id"
+      ],
+      "propertyNames": {
+        "enum": [
+          "entry_sha256",
+          "event_type",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "recorded_at",
+          "run_id",
+          "schema",
+          "schema_version",
+          "store_id"
+        ]
+      },
+      "description": "Genesis. Exactly entry 0, and only entry 0. store_id must equal the store_id in the store's store.v1.json; it is created only for a pristine store."
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "run_reserved"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "study_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "run_class": {
+          "$ref": "#/$defs/run_class"
+        }
+      },
+      "required": [
+        "run_class",
+        "study_id"
+      ],
+      "propertyNames": {
+        "enum": [
+          "entry_sha256",
+          "event_type",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "recorded_at",
+          "run_class",
+          "run_id",
+          "schema",
+          "schema_version",
+          "study_id"
+        ]
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "run_started"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "spec_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "spec_size_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1048576
+        },
+        "execution_identity": {
+          "$ref": "#/$defs/execution_identity"
+        },
+        "execution_identity_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "effective_run_class_at_start": {
+          "$ref": "#/$defs/run_class"
+        },
+        "evidence_eligible_at_start": {
+          "type": "boolean",
+          "description": "Recomputed from the ledger prefix by the verifier: true only for a clean evidence_candidate with an environment fingerprint whose inputs are eligible."
+        },
+        "inputs": {
+          "$ref": "#/$defs/resolved_inputs"
+        }
+      },
+      "required": [
+        "effective_run_class_at_start",
+        "evidence_eligible_at_start",
+        "execution_identity",
+        "execution_identity_sha256",
+        "inputs",
+        "spec_sha256",
+        "spec_size_bytes"
+      ],
+      "propertyNames": {
+        "enum": [
+          "effective_run_class_at_start",
+          "entry_sha256",
+          "event_type",
+          "evidence_eligible_at_start",
+          "execution_identity",
+          "execution_identity_sha256",
+          "inputs",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "recorded_at",
+          "run_id",
+          "schema",
+          "schema_version",
+          "spec_sha256",
+          "spec_size_bytes"
+        ]
+      },
+      "description": "effective_run_class_at_start is exploratory unless code_commit is known, code_tree_dirty is false, and uv_lock_sha256 is set; otherwise it equals the reserved run_class."
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "artifact_registered"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "name": {
+          "$ref": "#/$defs/artifact_name"
+        },
+        "artifact_type": {
+          "enum": [
+            "model",
+            "predictions",
+            "calibration",
+            "table",
+            "figure",
+            "report",
+            "log_summary"
+          ]
+        },
+        "media_type": {
+          "enum": [
+            "json",
+            "jsonl",
+            "csv",
+            "parquet",
+            "binary",
+            "png",
+            "svg",
+            "html"
+          ]
+        },
+        "size_bytes": {
+          "$ref": "#/$defs/count"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "artifact_schema_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifact_schema_version": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/count"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "artifact_schema_id",
+        "artifact_schema_version",
+        "artifact_type",
+        "media_type",
+        "name",
+        "sha256",
+        "size_bytes"
+      ],
+      "propertyNames": {
+        "enum": [
+          "artifact_schema_id",
+          "artifact_schema_version",
+          "artifact_type",
+          "entry_sha256",
+          "event_type",
+          "ledger_seq",
+          "media_type",
+          "name",
+          "prev_entry_sha256",
+          "recorded_at",
+          "run_id",
+          "schema",
+          "schema_version",
+          "sha256",
+          "size_bytes"
+        ]
+      },
+      "description": "artifact_schema_id and artifact_schema_version are both null or both set; names are unique per run."
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "metric_recorded"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "split": {
+          "$ref": "#/$defs/split"
+        },
+        "value": {
+          "$ref": "#/$defs/metric_value"
+        },
+        "unit": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fold": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "step": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/count"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "fold",
+        "name",
+        "split",
+        "step",
+        "unit",
+        "value"
+      ],
+      "propertyNames": {
+        "enum": [
+          "entry_sha256",
+          "event_type",
+          "fold",
+          "ledger_seq",
+          "name",
+          "prev_entry_sha256",
+          "recorded_at",
+          "run_id",
+          "schema",
+          "schema_version",
+          "split",
+          "step",
+          "unit",
+          "value"
+        ]
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "warning_recorded"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "code": {
+          "enum": [
+            "nondeterministic_operation",
+            "convergence_warning",
+            "data_quality_issue",
+            "resource_limit",
+            "library_warning"
+          ]
+        },
+        "context": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "context"
+      ],
+      "propertyNames": {
+        "enum": [
+          "code",
+          "context",
+          "entry_sha256",
+          "event_type",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "recorded_at",
+          "run_id",
+          "schema",
+          "schema_version"
+        ]
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "run_completed"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "artifact_count": {
+          "$ref": "#/$defs/count"
+        },
+        "metric_count": {
+          "$ref": "#/$defs/count"
+        }
+      },
+      "required": [
+        "artifact_count",
+        "manifest_sha256",
+        "metric_count"
+      ],
+      "propertyNames": {
+        "enum": [
+          "artifact_count",
+          "entry_sha256",
+          "event_type",
+          "ledger_seq",
+          "manifest_sha256",
+          "metric_count",
+          "prev_entry_sha256",
+          "recorded_at",
+          "run_id",
+          "schema",
+          "schema_version"
+        ]
+      },
+      "description": "Counts equal the run's registered artifacts and metrics; manifest_sha256 equals the SHA-256 of the manifest the verifier rebuilds from the ledger prefix."
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "run_failed"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "failure_code": {
+          "enum": [
+            "exception",
+            "input_verification_failed",
+            "artifact_verification_failed",
+            "resource_exhausted",
+            "invalid_state",
+            "code_identity_changed",
+            "environment_changed"
+          ]
+        },
+        "exception_type": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.]{0,127}$",
+              "description": "type name only; never a message"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "exception_type",
+        "failure_code"
+      ],
+      "propertyNames": {
+        "enum": [
+          "entry_sha256",
+          "event_type",
+          "exception_type",
+          "failure_code",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "recorded_at",
+          "run_id",
+          "schema",
+          "schema_version"
+        ]
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "run_aborted"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "reason": {
+          "enum": [
+            "operator_request",
+            "invalid_input",
+            "resource_limit"
+          ]
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "propertyNames": {
+        "enum": [
+          "entry_sha256",
+          "event_type",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "reason",
+          "recorded_at",
+          "run_id",
+          "schema",
+          "schema_version"
+        ]
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "run_interrupted"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "last_state": {
+          "enum": [
+            "reserved",
+            "started"
+          ]
+        }
+      },
+      "required": [
+        "last_state"
+      ],
+      "propertyNames": {
+        "enum": [
+          "entry_sha256",
+          "event_type",
+          "last_state",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "recorded_at",
+          "run_id",
+          "schema",
+          "schema_version"
+        ]
+      },
+      "description": "last_state equals the run's state before the event."
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "run_superseded"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "superseded_by": {
+          "$ref": "#/$defs/run_id"
+        },
+        "reason": {
+          "enum": [
+            "corrected_input",
+            "corrected_code",
+            "corrected_config",
+            "methodology_change"
+          ]
+        }
+      },
+      "required": [
+        "reason",
+        "superseded_by"
+      ],
+      "propertyNames": {
+        "enum": [
+          "entry_sha256",
+          "event_type",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "reason",
+          "recorded_at",
+          "run_id",
+          "schema",
+          "schema_version",
+          "superseded_by"
+        ]
+      },
+      "description": "The run is terminal and not already superseded; superseded_by is another, completed run."
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "ledger_tail_repaired"
+        },
+        "run_id": {
+          "type": "null"
+        },
+        "repair_evidence_name": {
+          "type": "string",
+          "pattern": "^torn-(0|[1-9][0-9]*)-[1-9][0-9]*-[1-9][0-9]*-(none|0|[1-9][0-9]*)-(none|[0-9a-f]{64})-[0-9a-f]{64}\\.bin$"
+        },
+        "torn_byte_offset": {
+          "$ref": "#/$defs/count"
+        },
+        "torn_byte_length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "torn_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "original_ledger_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "last_valid_ledger_seq": {
+          "$ref": "#/$defs/count"
+        },
+        "last_valid_entry_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "last_valid_entry_sha256",
+        "last_valid_ledger_seq",
+        "original_ledger_size",
+        "repair_evidence_name",
+        "torn_byte_length",
+        "torn_byte_offset",
+        "torn_sha256"
+      ],
+      "propertyNames": {
+        "enum": [
+          "entry_sha256",
+          "event_type",
+          "last_valid_entry_sha256",
+          "last_valid_ledger_seq",
+          "ledger_seq",
+          "original_ledger_size",
+          "prev_entry_sha256",
+          "recorded_at",
+          "repair_evidence_name",
+          "run_id",
+          "schema",
+          "schema_version",
+          "torn_byte_length",
+          "torn_byte_offset",
+          "torn_sha256"
+        ]
+      },
+      "description": "Every field equals the corresponding part of repair_evidence_name; offset + length = original_ledger_size; the named entry ends at the offset and only repair events follow it. The name grammar admits 'none', but entry 0 is always ledger_created, so a valid v1 event never has a null last_valid_ledger_seq or last_valid_entry_sha256."
+    }
+  ]
+}

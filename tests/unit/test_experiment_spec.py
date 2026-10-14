@@ -6,8 +6,12 @@ from decimal import Decimal
 import pytest
 
 from pmv.experiment_spec import (
+    IDENTITY_V1,
+    IDENTITY_V2,
     SECTION_NAMES,
+    V1_FAILURE_CODES,
     ExecutionIdentity,
+    FailureCode,
     RawCaptureInput,
     RunArtifactInput,
     RunSpec,
@@ -185,7 +189,10 @@ def test_execution_identity_round_trips_and_hashes_deterministically() -> None:
         {"code_tree_dirty": None},
         {"platform": "Linux x86_64 user@host"},
         {"config_section_sha256": {"model": None}},
-        {"installed_environment_sha256": "9" * 64},
+        {"installed_environment_sha256": "9" * 64, "version": IDENTITY_V1},
+        {"installed_environment_sha256": "not-a-digest"},
+        {"version": 3},
+        {"version": True},
     ],
 )
 def test_execution_identity_rejects_inconsistent_null_combinations(
@@ -200,3 +207,19 @@ def test_parsed_execution_identity_rejects_boolean_schema_version() -> None:
     document["schema_version"] = True
     with pytest.raises(SpecError, match="schema is not supported"):
         parse_execution_identity(document)
+
+
+def test_v1_and_v2_identities_parse_exactly_as_their_version() -> None:
+    v1 = identity(version=IDENTITY_V1)
+    v2 = identity(installed_environment_sha256="9" * 64)
+    assert v2.version == IDENTITY_V2
+    assert v1.to_json()["schema_version"] == 1
+    assert v2.to_json()["schema_version"] == 2
+    assert parse_execution_identity(v1.to_json()) == v1
+    assert parse_execution_identity(v2.to_json()) == v2
+    assert v1.sha256() != identity(version=IDENTITY_V2).sha256()
+    forged = v1.to_json()
+    forged["installed_environment_sha256"] = "9" * 64
+    with pytest.raises(SpecError, match="must be null in v1"):
+        parse_execution_identity(forged)
+    assert frozenset(FailureCode) - {FailureCode.ENVIRONMENT_CHANGED} == V1_FAILURE_CODES

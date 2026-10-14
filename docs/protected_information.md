@@ -186,7 +186,7 @@ If it could influence development, record `contamination_recorded` through `pyth
 - Listing the masked root may succeed and show an empty directory; the real entries stay hidden.
 - If the directory does not exist on the host, it is simply absent inside the sandbox.
 
-The settings check also refuses two things: any allow-style entry, such as `allow` or `allowRead`, that names the protected location, and a `.claude/settings.local.json` that overrides `sandbox` or re-allows the protected location. Inside the sandbox, an absent local settings file appears as a `/dev/null` mask. That mask is treated as absent; anything else that is not a valid settings file is a problem.
+The settings check also refuses two things: any allow-style entry, such as `allow` or `allowRead`, that names the protected location, and a `.claude/settings.local.json` that overrides `sandbox` or re-allows the protected location. Inside the sandbox, an absent local settings file appears as a `/dev/null` mask. That mask is treated as absent; anything else that is not a valid settings file is a problem. Depending on the session, Claude Code may instead show masked paths as zero-byte regular files. In that case this check reports the local settings file as invalid, an open item recorded in `docs/gate0_readiness.md`.
 
 This guards a local plaintext copy against ordinary agent tools. It does not enforce the embargo. `check_path` is a path check only, with three limits:
 - hard links and bind mounts that lead into the protected location are not detected;

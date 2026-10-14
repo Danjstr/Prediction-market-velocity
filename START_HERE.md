@@ -130,7 +130,7 @@ Before Phase 3, the Statistician defines nested chronological or walk-forward va
 
 Do not build the trading model yet.
 
-**Gate 0:** The repository must be reproducible, testable, and safe to extend, and the controls above must be in place before Phase 1 capture or any experiment begins.
+**Gate 0:** The repository must be reproducible, testable, and safe to extend, and the controls above must be in place before Phase 1 capture or any experiment begins. Gate 0 is decided only after a full Reliability/Red-Team-led audit of all Phase 0 requirements and implementation, and after the corrections approved from that audit. After Gate 0 and before any substantive Phase 1 work, the complete repository history must be pushed to a private remote, its secret and history hygiene verified, and the first hosted CI run must pass.
 
 ---
 
@@ -1157,7 +1157,7 @@ Do not spend frontier-model inference on mechanical tasks unnecessarily.
 
 After all project-control files and agent definitions are completed and committed:
 
-Begin Phase 0 and Phase 1 only.
+Begin Phase 0. Begin Phase 1 only after Gate 0 and the private-remote and hosted-CI verification that follows it (see Phase 0).
 
 Do not build a predictive model yet.
 

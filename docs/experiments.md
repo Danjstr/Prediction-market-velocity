@@ -22,6 +22,8 @@ The ledger is created only when a store is opened for the first time and is pris
 <root>/
   .run_ids/<run_id>                 permanent run-ID reservation
   runs/<run_id>/run_spec.json       immutable spec (0400); spec_sha256 = SHA-256 of these bytes
+  runs/<run_id>/environment.json    canonical environment document (0400), present exactly when
+                                    a fingerprint was recorded (docs/reproducibility.md)
   runs/<run_id>/artifacts/<name>    registered artifacts (0400)
   runs/<run_id>/.staging/           private temporary files; never trusted
   runs/<run_id>/manifest.json       completed runs only (0400); run directory then 0500
@@ -52,7 +54,12 @@ A derived dataset that cannot be expressed this way must not be used as an input
 - **Dirty-tree policy.** Dirty or unknown code, or a missing `uv.lock`, forces the effective run class to `exploratory` and makes the run ineligible. Git runs with a clean environment and fixed options; skip-worktree and assume-unchanged entries count as dirty. If the code identity differs at completion, the run is failed with `code_identity_changed`.
 - **Temporal eligibility.** `effective_run_class_at_start` and `evidence_eligible_at_start` are computed once, from the ledger prefix before `run_started`, and never change. A run is eligible at start only if its class is `evidence_candidate`, an installed-environment fingerprint exists, every raw-capture input was produced by clean code, and every run-artifact producer is eligible as of that prefix.
 - **As-of eligibility.** `eligibility_as_of(run_id, seq)` additionally requires the run to be completed and not superseded at `seq`, transitively through run-artifact inputs. Supersession changes later as-of answers, never history.
-- **v1 limitation (Option B).** `installed_environment_sha256` must be null in v1 because `uv.lock` does not prove what is installed. This is enforced by the format, not only by the writer: a v1 execution identity with a non-null value cannot be constructed or parsed, so a ledger containing one fails verification. **No v1 run can be evidence-eligible.** An approved installed-environment fingerprint, and a new identity version, are required before any `evidence_candidate` run can count. Tests exercise the eligibility rules a future fingerprint would enable through private pure functions only.
+- **v1 limitation (Option B), unchanged for v1.** `installed_environment_sha256` must be null in a v1 execution identity, because `uv.lock` does not prove what is installed. The format enforces this, not only the writer: a v1 identity with a non-null value cannot be constructed or parsed, so a ledger containing one fails verification. **No v1 run can be evidence-eligible**, and v1 ledgers are still verified exactly that way.
+- **v2 (Phase 0 Step 10).** Writers now emit ledger entry v2 with execution identity v2. Its `installed_environment_sha256` is the fingerprint of the installed environment (`docs/reproducibility.md`).
+  - **Start:** an `evidence_candidate` start is refused, before anything is written, unless `python -m pmv.reproducibility verify` passes. It is never demoted to exploratory. The canonical document is written once as `environment.json`.
+  - **Completion:** the fingerprint is recomputed; a change fails the run with `environment_changed`.
+  - **Ledger checks:** a clean `evidence_candidate` start without a fingerprint is refused by the ledger verifier. Entry versions never go backwards.
+  - **Other run classes** record a fingerprint when one can be computed and null otherwise; they are never eligible.
 
 ## Lifecycle
 
@@ -81,7 +88,7 @@ Every authoritative append:
 
 If anything fails after the write (read-back, size, root, ledger, or run-directory identity), the line may already be durable somewhere, so the error says the write outcome is unknown and the authoritative state must be re-verified; the store latches and refuses further writes until a new store re-verifies the ledger. A short or failed write that was rolled back was not recorded. If rollback itself fails, the damaged bytes stay in place and every later append is refused as a torn tail.
 
-Entry 0 is always `ledger_created`, and only entry 0 may be. Each entry carries `ledger_seq` (from 0, +1), `prev_entry_sha256` (null for the first), and `entry_sha256` (SHA-256 of the canonical entry without `entry_sha256`). Verification checks canonical bytes, closed per-event field sets, sequence continuity, every hash and link, the run state machine, and recomputes start eligibility.
+Entry 0 is always `ledger_created`, and only entry 0 may be. Each entry is version 1 (`schemas/experiment_ledger_entry_v1.json`) or version 2 (`schemas/experiment_ledger_entry_v2.json`); a version-1 entry may not follow a version-2 entry. Each entry carries `ledger_seq` (from 0, +1), `prev_entry_sha256` (null for the first), and `entry_sha256` (SHA-256 of the canonical entry without `entry_sha256`). Verification checks canonical bytes, closed per-event field sets, sequence continuity, every hash and link, the run state machine, and recomputes start eligibility.
 
 ## Checkpoints
 
@@ -111,5 +118,5 @@ Immediately before truncating, repair re-walks the root, `ledger/`, `ledger/repa
 - Deliberately deleting a pending-repair marker together with the repair evidence is undetectable without a checkpoint, like deleting complete entries from the end of the ledger.
 - An older copy of this store's own ledger (a prefix) is detectable only by a checkpoint. Truncation of complete entries is detectable only up to the latest checkpoint, and only committed checkpoints are independent of the working tree.
 - Crash tests kill real processes at each boundary; they demonstrate process-crash behavior, not host power loss.
-- No v1 run is evidence-eligible until an installed-environment fingerprint is approved.
+- No v1 run is evidence-eligible. A v2 run's environment fingerprint has the limits listed in `docs/reproducibility.md` (it does not cover the standard library, system libraries, kernel, or CPU).
 - The store records what runs did; it cannot prove a run read only its declared inputs.

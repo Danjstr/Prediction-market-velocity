@@ -32,6 +32,7 @@ case "$actual_uv" in
 esac
 uv lock --check
 uv sync --locked
+uv run --locked python -m pmv.reproducibility verify
 uv run --locked ruff format --check .
 uv run --locked ruff check .
 uv run --locked mypy

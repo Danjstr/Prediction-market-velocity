@@ -4,6 +4,8 @@ Layout under the explicitly configured root (no default; outside Git and the raw
 
     .run_ids/<run_id>                 permanent run-ID reservation (closed metadata)
     runs/<run_id>/run_spec.json       immutable spec; spec_sha256 = SHA-256 of its bytes
+    runs/<run_id>/environment.json    canonical environment document (pmv.reproducibility);
+                                      its SHA-256 is the v2 identity's installed_environment_sha256
     runs/<run_id>/artifacts/<name>    registered artifacts (0400)
     runs/<run_id>/.staging/           private temporary files, never trusted
     runs/<run_id>/manifest.json       completed runs only; hash recorded in run_completed
@@ -24,9 +26,10 @@ identity is re-checked after every run-local durable step and around every run e
 
 Limits: tamper evidence is detection, not prevention; complete entries removed from the
 end are detectable only before the latest committed checkpoint; durability across power
-loss depends on the filesystem and virtualization stack; uv.lock does not prove the
-installed environment, so no run is evidence-eligible until an approved installed-
-environment fingerprint exists.
+loss depends on the filesystem and virtualization stack. An evidence_candidate start is
+refused unless pmv.reproducibility.verify passes; its environment fingerprint is recorded in
+a v2 execution identity and re-checked at completion (a change fails the run with
+environment_changed). What a fingerprint does not prove: docs/reproducibility.md.
 """
 
 import contextlib
@@ -52,7 +55,7 @@ from types import TracebackType
 from typing import Final
 
 from pmv import experiment_ledger as ledger
-from pmv import safe_fs
+from pmv import reproducibility, safe_fs
 from pmv.experiment_ledger import (
     Checkpoint,
     Entry,
@@ -105,6 +108,7 @@ LEDGER_NAME: Final = "experiments.v1.jsonl"
 STORE_NAME: Final = "store.v1.json"
 STORE_SCHEMA: Final = "pmv.experiment.store"
 SPEC_NAME: Final = "run_spec.json"
+ENVIRONMENT_NAME: Final = "environment.json"
 MANIFEST_NAME: Final = "manifest.json"
 ARTIFACTS: Final = "artifacts"
 STAGING: Final = ".staging"
@@ -345,6 +349,16 @@ def _hash_path(path: Path) -> str:
         os.close(fd)
 
 
+def capture_environment(
+    repo_root: Path, *, verify_conformance: bool
+) -> reproducibility.EnvironmentCapture:
+    """The running environment's canonical document and fingerprint; with
+    ``verify_conformance`` it must first conform to the approved project (a test seam)."""
+    if verify_conformance:
+        return reproducibility.verify(repo_root)
+    return reproducibility.capture()
+
+
 def _uv_lock_sha256(repo_root: Path) -> str | None:
     try:
         return _hash_path(repo_root / "uv.lock")
@@ -583,6 +597,7 @@ class ExperimentStore:
             orphan = False
             if run.started_seq is not None:
                 self._verify_spec(run_fd, run)
+                self._verify_environment(run_fd, run)
             with _fs_errors():
                 artifacts_fd = safe_fs.open_dir(run_fd, ARTIFACTS)
                 staging_fd = safe_fs.open_dir(run_fd, STAGING)
@@ -1334,6 +1349,27 @@ class ExperimentStore:
         if recorded != [reference.to_json() for reference in spec.inputs]:
             raise ExperimentIntegrityError("run_spec.json inputs do not match run_started")
 
+    def _verify_environment(self, run_fd: int, run: ledger.RunRecord) -> None:
+        """environment.json exists exactly when a fingerprint was recorded, and matches it."""
+        digest = None if run.identity is None else run.identity.installed_environment_sha256
+        present = safe_fs.exists(run_fd, ENVIRONMENT_NAME)
+        if digest is None:
+            if present:
+                raise ExperimentIntegrityError(
+                    "environment.json exists but the run recorded no fingerprint"
+                )
+            return
+        if not present:
+            raise ExperimentIntegrityError("environment.json is missing")
+        with _fs_errors():
+            data = safe_fs.read_small(run_fd, ENVIRONMENT_NAME, reproducibility.MAX_DOCUMENT_BYTES)
+        if sha256_hex(data) != digest:
+            raise ExperimentIntegrityError("environment.json does not match its recorded hash")
+        try:
+            reproducibility.parse_document(data)
+        except reproducibility.ReproducibilityError:
+            raise ExperimentIntegrityError("environment.json is invalid") from None
+
     def _recover_one(self, runs: int, run_id: str, last_state: RunState) -> RecoveryResult:
         try:
             with _fs_errors():
@@ -1457,6 +1493,7 @@ class RunHandle:
         self._state = RunState.RESERVED
         self._spec: RunSpec | None = None
         self._start_identity: tuple[GitIdentity, str | None] | None = None
+        self._start_environment: str | None = None
 
     # ----- lifecycle -----
 
@@ -1474,7 +1511,17 @@ class RunHandle:
         # Advisory pre-check so a refused start leaves no spec behind; the authoritative
         # check repeats under the ledger lock in build().
         _check_run_artifact_inputs(store.snapshot(), resolved)
+        environment = self._capture_environment()
+        if environment is None and safe_fs.exists(self._run_fd, ENVIRONMENT_NAME):
+            # An earlier start attempt captured an environment that this one cannot: refuse
+            # rather than record no fingerprint beside an existing environment.json.
+            raise RunStateError(
+                "an earlier start recorded environment.json but the environment can no longer "
+                "be captured; start refused"
+            )
         self._write_spec(spec_bytes)
+        if environment is not None:
+            self._write_environment(environment.document)
         identity = ExecutionIdentity(
             spec_sha256=sha256_hex(spec_bytes),
             code_commit=git.commit,
@@ -1482,8 +1529,7 @@ class RunHandle:
             dirty_tree_sha256=git.dirty_sha256,
             package_version=_package_version(),
             uv_lock_sha256=uv_lock,
-            # Option B: no installed-environment fingerprint is approved in v1.
-            installed_environment_sha256=None,
+            installed_environment_sha256=None if environment is None else environment.sha256,
             app_config_sha256=store._app_config_sha256,
             config_section_sha256={name: spec.section_sha256(name) for name in SECTION_NAMES},
             python_version=platform.python_version(),
@@ -1515,6 +1561,7 @@ class RunHandle:
         self._state = RunState.STARTED
         self._spec = spec
         self._start_identity = (git, uv_lock)
+        self._start_environment = None if environment is None else environment.sha256
         return entry
 
     def staging_path(self) -> Path:
@@ -1685,6 +1732,18 @@ class RunHandle:
         if self._start_identity != (git, uv_lock):
             self.fail(FailureCode.CODE_IDENTITY_CHANGED)
             raise RunStateError("the code identity changed during the run; the run was failed")
+        if self._start_environment is not None:
+            try:
+                current: str | None = capture_environment(
+                    store._repo_root, verify_conformance=False
+                ).sha256
+            except reproducibility.ReproducibilityError:
+                current = None
+            if current != self._start_environment:
+                self.fail(FailureCode.ENVIRONMENT_CHANGED)
+                raise RunStateError(
+                    "the installed environment changed during the run; the run was failed"
+                )
         snapshot = store.snapshot()
         run = snapshot.runs[self.run_id]
         if run.state is not RunState.STARTED:
@@ -1782,6 +1841,31 @@ class RunHandle:
         finally:
             os.close(staging_fd)
         self._check_run_dir()
+
+    def _capture_environment(self) -> reproducibility.EnvironmentCapture | None:
+        """An evidence_candidate start requires a verified, fingerprinted environment and is
+        refused otherwise (never silently demoted). Other runs record a fingerprint when one
+        can be computed, and none when it cannot."""
+        evidence = self._requested is RunClass.EVIDENCE_CANDIDATE
+        try:
+            return capture_environment(self._store._repo_root, verify_conformance=evidence)
+        except reproducibility.ReproducibilityError:
+            if evidence:
+                raise RunStateError(
+                    "reproducibility verification failed; the evidence_candidate run was "
+                    "not started"
+                ) from None
+            return None
+
+    def _write_environment(self, document: bytes) -> None:
+        # A start retried after a refusal must see the same environment.
+        if safe_fs.exists(self._run_fd, ENVIRONMENT_NAME):
+            with _fs_errors():
+                existing = safe_fs.read_small(self._run_fd, ENVIRONMENT_NAME, len(document) + 1)
+            if existing != document:
+                raise RunStateError("an existing environment.json does not match; start refused")
+            return
+        self._write_once(self._run_fd, ENVIRONMENT_NAME, document)
 
     def _write_spec(self, spec_bytes: bytes) -> None:
         # A start refused after the spec was written may be retried with the identical spec.

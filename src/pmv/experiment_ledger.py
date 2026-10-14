@@ -8,6 +8,13 @@ encoding, the closed schema of every event type, sequence continuity, every hash
 link, and every run's state transitions, recomputes the start-time policy fields, and
 rebuilds every completed run's manifest to check its recorded hash.
 
+Entry versions: v1 entries (Step 6) are verified exactly as originally defined: their
+``run_started`` carries a v1 execution identity (null environment fingerprint, never
+eligible) and ``run_failed`` uses only the v1 failure codes. v2 entries (Step 10) carry a v2
+execution identity, may record ``environment_changed``, and a clean ``evidence_candidate``
+start must carry an environment fingerprint. Writers emit v2. Versions never go backwards:
+once a v2 entry appears, a later v1 entry is refused.
+
 Tamper evidence: this detects altered, reordered, duplicated, malformed, and interior-
 deleted entries and broken links. It cannot detect complete entries removed from the end
 unless a checkpoint anchors a later head; checkpoints are verified when supplied.
@@ -21,7 +28,9 @@ from typing import Final
 
 from pmv.experiment_spec import (
     EXCEPTION_TYPE,
+    IDENTITY_V2,
     MAX_SPEC_BYTES,
+    V1_FAILURE_CODES,
     AbortReason,
     ArtifactType,
     ExecutionIdentity,
@@ -55,7 +64,11 @@ from pmv.integrity import (
 ENTRY_SCHEMA: Final = "pmv.experiment.ledger_entry"
 CHECKPOINT_SCHEMA: Final = "pmv.experiment.ledger_checkpoint"
 MANIFEST_SCHEMA: Final = "pmv.experiment.run_manifest"
-SCHEMA_VERSION: Final = 1
+ENTRY_V1: Final = 1
+ENTRY_V2: Final = 2
+ENTRY_VERSIONS: Final = (ENTRY_V1, ENTRY_V2)
+ENTRY_WRITE_VERSION: Final = ENTRY_V2  # the entry version writers emit
+SCHEMA_VERSION: Final = 1  # the run manifest and checkpoint formats (unchanged in Step 10)
 _STORE_ID: Final = re.compile(r"[0-9a-f]{32}")
 PENDING_MARKER_PREFIX: Final = "repair-pending-"
 _EVIDENCE_NAME: Final = re.compile(
@@ -179,6 +192,7 @@ class Entry:
     fields: Mapping[str, object]
     start: int
     end: int
+    version: int = ENTRY_V1
 
 
 @dataclass(slots=True)
@@ -211,6 +225,7 @@ class LedgerState:
     runs: dict[str, RunRecord] = field(default_factory=dict)
     repairs: dict[str, Entry] = field(default_factory=dict)
     size: int = 0
+    version: int = ENTRY_V1  # the highest entry version seen so far
 
     @property
     def head_seq(self) -> int:
@@ -267,8 +282,10 @@ def encode_entry(
     run_id: str | None,
     recorded_at: str,
     fields: Mapping[str, object],
+    *,
+    version: int = ENTRY_WRITE_VERSION,
 ) -> bytes:
-    """Build the next canonical ledger line on top of ``state``."""
+    """Build the next canonical ledger line on top of ``state`` (writers use v2)."""
     body: dict[str, object] = {
         "event_type": event_type.value,
         "ledger_seq": state.head_seq + 1,
@@ -276,7 +293,7 @@ def encode_entry(
         "recorded_at": recorded_at,
         "run_id": run_id,
         "schema": ENTRY_SCHEMA,
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": version,
         **fields,
     }
     return canonical_line({**body, "entry_sha256": chain_entry_sha256(body)})
@@ -299,7 +316,7 @@ def start_eligibility(
     Requires an evidence_candidate class, an installed-environment fingerprint, raw
     captures produced by clean code, and run-artifact producers that are evidence-eligible
     as of the same prefix. A v1 ExecutionIdentity cannot carry a fingerprint (Option B), so
-    this is always false in v1.
+    this is always false for v1 entries; a v2 identity can.
     """
     return _eligible_at_start(
         state,
@@ -318,9 +335,7 @@ def _eligible_at_start(
     environment_fingerprinted: bool,
     inputs: Sequence[Mapping[str, object]],
 ) -> bool:
-    """The start-eligibility rules as a pure function. Private: tests use it to exercise
-    the rules a future approved fingerprint would enable; no v1 parser or store calls it
-    with ``environment_fingerprinted=True``."""
+    """The start-eligibility rules as a pure function."""
     if effective is not RunClass.EVIDENCE_CANDIDATE or not environment_fingerprinted:
         return False
     for item in inputs:
@@ -553,13 +568,12 @@ def _parse_entry(line: bytes, state: LedgerState, start: int, end: int) -> Entry
     except ValueError:
         event_type = None
     if event_type is None or set(document) != _ENVELOPE | _FIELDS[event_type]:
-        raise LedgerError(f"ledger line {number} does not match the v1 schema")
-    if (
-        document["schema"] != ENTRY_SCHEMA
-        or not is_int(document["schema_version"])
-        or document["schema_version"] != SCHEMA_VERSION
-    ):
+        raise LedgerError(f"ledger line {number} does not match the entry schema")
+    version = document["schema_version"]
+    if document["schema"] != ENTRY_SCHEMA or not is_int(version) or version not in ENTRY_VERSIONS:
         raise LedgerError(f"ledger line {number} has an unsupported schema")
+    if version < state.version:
+        raise LedgerError(f"ledger line {number}: entry versions must not go backwards")
     if (event_type is LedgerEvent.LEDGER_CREATED) != (not state.entries):
         raise LedgerError(f"ledger line {number}: only the first entry is ledger_created")
     seq = document["ledger_seq"]
@@ -594,6 +608,7 @@ def _parse_entry(line: bytes, state: LedgerState, start: int, end: int) -> Entry
         fields=fields,
         start=start,
         end=end,
+        version=version,
     )
 
 
@@ -606,6 +621,7 @@ def _apply(state: LedgerState, entry: Entry) -> None:
     except (KeyError, TypeError, ValueError):
         raise LedgerError(f"{where} has malformed fields") from None
     state.entries.append(entry)
+    state.version = max(state.version, entry.version)
     if entry.run_id is not None and entry.run_id in state.runs:
         run = state.runs[entry.run_id]
         if entry.event_type is not LedgerEvent.RUN_SUPERSEDED:
@@ -640,6 +656,10 @@ def _apply_started(state: LedgerState, entry: Entry) -> None:
     run = _run(state, entry, RunState.RESERVED)
     fields = entry.fields
     identity = parse_execution_identity(fields["execution_identity"])
+    if identity.version != entry.version:
+        raise LedgerError(
+            f"ledger entry {entry.seq}: the execution identity version must match the entry"
+        )
     if identity.sha256() != fields["execution_identity_sha256"]:
         raise LedgerError(f"ledger entry {entry.seq}: execution_identity_sha256 does not match")
     if identity.spec_sha256 != fields["spec_sha256"]:
@@ -656,6 +676,15 @@ def _apply_started(state: LedgerState, entry: Entry) -> None:
     if len({canonical_line(dict(item)) for item in resolved}) != len(resolved):
         raise LedgerError(f"ledger entry {entry.seq}: inputs must not repeat")
     effective = effective_run_class(run.requested_class, identity)
+    if (
+        effective is RunClass.EVIDENCE_CANDIDATE
+        and identity.version == IDENTITY_V2
+        and identity.installed_environment_sha256 is None
+    ):
+        raise LedgerError(
+            f"ledger entry {entry.seq}: an evidence_candidate start requires an "
+            "environment fingerprint"
+        )
     eligible = start_eligibility(state, entry.seq - 1, effective, identity, resolved)
     if fields["effective_run_class_at_start"] != effective.value:
         raise LedgerError(f"ledger entry {entry.seq}: effective_run_class_at_start is wrong")
@@ -761,7 +790,9 @@ def _apply_completed(state: LedgerState, entry: Entry) -> None:
 
 def _apply_failed(state: LedgerState, entry: Entry) -> None:
     run = _run(state, entry, RunState.STARTED)
-    FailureCode(str(entry.fields["failure_code"]))
+    code = FailureCode(str(entry.fields["failure_code"]))
+    if entry.version == ENTRY_V1 and code not in V1_FAILURE_CODES:
+        raise LedgerError(f"ledger entry {entry.seq}: the failure code is not valid in v1")
     exception_type = entry.fields["exception_type"]
     if exception_type is not None and (
         not isinstance(exception_type, str) or EXCEPTION_TYPE.fullmatch(exception_type) is None

@@ -32,6 +32,12 @@ from pmv.redaction import redact_text
 SPEC_SCHEMA: Final = "pmv.experiment.run_spec"
 IDENTITY_SCHEMA: Final = "pmv.experiment.execution_identity"
 SCHEMA_VERSION: Final = 1
+# Execution identity versions. v1 (Step 6, "Option B") requires a null installed-environment
+# fingerprint, so no v1 run can be evidence-eligible. v2 (Step 10) records the SHA-256 of the
+# canonical environment document (pmv.reproducibility), or null when none was captured.
+IDENTITY_V1: Final = 1
+IDENTITY_V2: Final = 2
+IDENTITY_VERSIONS: Final = (IDENTITY_V1, IDENTITY_V2)
 MAX_SPEC_BYTES: Final = 1_048_576
 MAX_SAFE_DEPTH: Final = 8
 SEED_MAX: Final = 2**64 - 1
@@ -99,6 +105,12 @@ class FailureCode(StrEnum):
     RESOURCE_EXHAUSTED = "resource_exhausted"
     INVALID_STATE = "invalid_state"
     CODE_IDENTITY_CHANGED = "code_identity_changed"
+    # Ledger entry v2 only: the installed environment changed during the run.
+    ENVIRONMENT_CHANGED = "environment_changed"
+
+
+# The failure codes a v1 ledger entry may carry, exactly as Step 6 defined them.
+V1_FAILURE_CODES: Final = frozenset(FailureCode) - {FailureCode.ENVIRONMENT_CHANGED}
 
 
 class AbortReason(StrEnum):
@@ -434,8 +446,11 @@ class ExecutionIdentity:
     python_version: str
     platform: str
     entrypoint: str
+    version: int = IDENTITY_V2
 
     def __post_init__(self) -> None:
+        if isinstance(self.version, bool) or self.version not in IDENTITY_VERSIONS:
+            raise SpecError("execution identity version is not supported")
         for name in ("spec_sha256", "app_config_sha256"):
             if not is_sha256(getattr(self, name)):
                 raise SpecError(f"{name} must be a SHA-256 hex digest")
@@ -443,10 +458,13 @@ class ExecutionIdentity:
             value = getattr(self, name)
             if value is not None and not is_sha256(value):
                 raise SpecError(f"{name} must be a SHA-256 hex digest or null")
-        if self.installed_environment_sha256 is not None:
+        environment = self.installed_environment_sha256
+        if self.version == IDENTITY_V1 and environment is not None:
             # Option B: no installed-environment fingerprint is approved in v1, so the
             # value must be null and no v1 run can be evidence-eligible.
             raise SpecError("installed_environment_sha256 must be null in v1")
+        if environment is not None and not is_sha256(environment):
+            raise SpecError("installed_environment_sha256 must be a SHA-256 hex digest or null")
         if self.code_commit is not None and (
             not isinstance(self.code_commit, str) or _COMMIT.fullmatch(self.code_commit) is None
         ):
@@ -492,7 +510,7 @@ class ExecutionIdentity:
             "platform": self.platform,
             "python_version": self.python_version,
             "schema": IDENTITY_SCHEMA,
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": self.version,
             "spec_sha256": self.spec_sha256,
             "uv_lock_sha256": self.uv_lock_sha256,
         }
@@ -509,13 +527,18 @@ class ExecutionIdentity:
 
 
 def parse_execution_identity(value: object) -> ExecutionIdentity:
-    keys = set(ExecutionIdentity.__dataclass_fields__) | {"schema", "schema_version"}
+    """Parse a v1 or v2 execution identity (both have the same fields)."""
+    keys = (set(ExecutionIdentity.__dataclass_fields__) - {"version"}) | {
+        "schema",
+        "schema_version",
+    }
     if not isinstance(value, Mapping) or set(value) != keys:
-        raise SpecError("execution identity fields do not match the v1 schema")
+        raise SpecError("execution identity fields do not match the schema")
+    version = value["schema_version"]
     if (
         value["schema"] != IDENTITY_SCHEMA
-        or not is_int(value["schema_version"])
-        or value["schema_version"] != SCHEMA_VERSION
+        or not is_int(version)
+        or version not in IDENTITY_VERSIONS
     ):
         raise SpecError("execution identity schema is not supported")
     sections = value["config_section_sha256"]
@@ -537,6 +560,7 @@ def parse_execution_identity(value: object) -> ExecutionIdentity:
         python_version=_text(value["python_version"]),
         platform=_text(value["platform"]),
         entrypoint=_text(value["entrypoint"]),
+        version=int(str(version)),
     )
 
 

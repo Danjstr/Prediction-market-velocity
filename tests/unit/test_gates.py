@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 
+import pmv.experiments as experiments
 import pmv.gates as gates
 from pmv.config import Environment, LoggingConfig, LogLevel, RawStorageConfig
 from pmv.experiment_spec import (
@@ -58,10 +59,11 @@ from pmv.gates import (
     verify_gate_history,
     verify_gate_record,
 )
-from pmv.integrity import sha256_hex
+from pmv.integrity import canonical_line, sha256_hex
 from pmv.log import configure_logging
 from pmv.raw_manifest import RuntimeProvenance, SourceIdentity, Transport
 from pmv.raw_storage import RawCaptureStore
+from pmv.reproducibility import EnvironmentCapture
 
 T0 = datetime(2026, 10, 14, 3, 15, tzinfo=UTC)
 GOVERNANCE = ("CLAUDE.md", "HOLDOUT_ACCESS_LOG.md", "PROJECT_BRIEF.md", "START_HERE.md")
@@ -515,8 +517,14 @@ def store(tmp_path: Path, repo: Path) -> Iterator[ExperimentStore]:
         os.chmod(directory, 0o700)
 
 
-def completed_run(store: ExperimentStore, data: bytes = b"model") -> RunHandle:
-    handle = store.reserve_run("velocity_baseline", RunClass.EVIDENCE_CANDIDATE)
+def completed_run(
+    store: ExperimentStore,
+    data: bytes = b"model",
+    run_class: RunClass = RunClass.DEVELOPMENT,
+) -> RunHandle:
+    """A completed run. A development run is never evidence-eligible (Step 10 made a
+    verified, fingerprinted evidence_candidate eligible; see the test below)."""
+    handle = store.reserve_run("velocity_baseline", run_class)
     handle.start(
         RunSpec(
             study_id="velocity_baseline",
@@ -578,6 +586,48 @@ def test_run_evidence_is_evaluated_only_at_the_pinned_head(
     store.supersede(early.run_id, late.run_id, SupersedeReason.CORRECTED_CODE)
     assert created.path.read_bytes() == before
     verify_gate_record(created.path)
+
+
+def test_an_eligible_v2_candidate_run_can_support_a_pass(
+    repo: Path, store: ExperimentStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    document = canonical_line(
+        {
+            "distributions": [],
+            "interpreter": {
+                "byteorder": "little",
+                "cache_tag": "cpython-313",
+                "flags": {
+                    "dev_mode": False,
+                    "hash_randomization": 1,
+                    "optimize": 0,
+                    "utf8_mode": 0,
+                },
+                "gil_disabled": False,
+                "implementation": "cpython",
+                "platform": "linux-x86_64",
+                "soabi": None,
+                "version": "3.13.5",
+            },
+            "project": {"editable": True, "name": "prediction-market-velocity", "version": "0.0.0"},
+            "schema": "pmv.environment",
+            "schema_version": 1,
+        }
+    )
+    monkeypatch.setattr(
+        experiments,
+        "capture_environment",
+        lambda _repo, *, verify_conformance: EnvironmentCapture(document, sha256_hex(document)),
+    )
+    (repo / "uv.lock").write_text("# synthetic lock\n", encoding="ascii")
+    commit_all(repo, "lock")
+    run = completed_run(store, run_class=RunClass.EVIDENCE_CANDIDATE)
+    assert store.eligibility_as_of(run.run_id)
+    create(
+        repo,
+        request(repo, ledger_pin=pin(store), runs=(RunEvidence(run.run_id, RunRole.CANDIDATE),)),
+        experiment_store=store,
+    )
 
 
 def test_ineligible_candidate_runs_cannot_pass(repo: Path, store: ExperimentStore) -> None:

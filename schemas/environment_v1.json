@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pmv.environment/1",
+  "title": "PMV installed-environment document, version 1",
+  "description": "The canonical environment document produced by pmv.reproducibility (stored as runs/<run_id>/environment.json); its SHA-256 is the environment fingerprint recorded in a version 2 execution identity. Documentation only: the authoritative validator is pmv.reproducibility.validate_document. It holds only non-secret reproducibility metadata: no paths, usernames, hostnames, timestamps, or environment-variable values. Canonical bytes: sorted keys, no spaces, ASCII, no floats, one trailing newline. JSON booleans are never integers.",
+  "$defs": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "PEP 503 normalized distribution name"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9.+!_-]{0,63}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "flag_integer": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["distributions", "interpreter", "project", "schema", "schema_version"],
+  "properties": {
+    "schema": {"const": "pmv.environment"},
+    "schema_version": {"const": 1},
+    "interpreter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "byteorder",
+        "cache_tag",
+        "flags",
+        "gil_disabled",
+        "implementation",
+        "platform",
+        "soabi",
+        "version"
+      ],
+      "properties": {
+        "byteorder": {"enum": ["little", "big"]},
+        "cache_tag": {"type": "string", "minLength": 1},
+        "flags": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["dev_mode", "hash_randomization", "optimize", "utf8_mode"],
+          "description": "The sys.flags values that change how code executes. The PYTHONHASHSEED value itself is never recorded.",
+          "properties": {
+            "dev_mode": {"type": "boolean"},
+            "hash_randomization": {"$ref": "#/$defs/flag_integer"},
+            "optimize": {"$ref": "#/$defs/flag_integer"},
+            "utf8_mode": {"$ref": "#/$defs/flag_integer"}
+          }
+        },
+        "gil_disabled": {"type": "boolean"},
+        "implementation": {"type": "string", "minLength": 1},
+        "platform": {"type": "string", "minLength": 1, "description": "sysconfig.get_platform()"},
+        "soabi": {"type": ["string", "null"]},
+        "version": {"type": "string", "minLength": 1, "description": "platform.python_version()"}
+      }
+    },
+    "distributions": {
+      "type": "array",
+      "description": "Every third-party distribution in the environment, sorted by name, unique. files_sha256 is the SHA-256 of the canonical JSON object {\"files\": [[path, sha256], ...]} over every RECORD-listed hashed file (sorted by path), excluding bytecode and generated console/GUI-script launchers. Each file's bytes were re-hashed and matched its RECORD digest.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["files_sha256", "name", "version"],
+        "properties": {
+          "files_sha256": {"$ref": "#/$defs/sha256"},
+          "name": {"$ref": "#/$defs/name"},
+          "version": {"$ref": "#/$defs/version"}
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["editable", "name", "version"],
+      "description": "PMV itself, installed editable. Its path-dependent install metadata is excluded; its code identity is the Git commit and dirty state in the execution identity.",
+      "properties": {
+        "editable": {"const": true},
+        "name": {"const": "prediction-market-velocity"},
+        "version": {"$ref": "#/$defs/version"}
+      }
+    }
+  }
+}

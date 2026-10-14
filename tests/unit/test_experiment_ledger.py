@@ -1,4 +1,9 @@
-"""Tests for the pure experiment-ledger verifier, state machine, and eligibility rules."""
+"""Tests for the pure experiment-ledger verifier, state machine, and eligibility rules.
+
+Most tests build v1 ledgers (v1 entries and v1 execution identities), so they are the
+regression suite proving v1 is verified exactly as Step 6 defined it. The Step 10 section at
+the end covers v2 entries and identities.
+"""
 
 import dataclasses
 import json
@@ -32,7 +37,14 @@ from pmv.experiment_ledger import (
     verify_checkpoints,
     verify_ledger,
 )
-from pmv.experiment_spec import SECTION_NAMES, ExecutionIdentity, RunClass, SpecError
+from pmv.experiment_spec import (
+    IDENTITY_V1,
+    IDENTITY_V2,
+    SECTION_NAMES,
+    ExecutionIdentity,
+    RunClass,
+    SpecError,
+)
 from pmv.integrity import canonical_line, chain_entry_sha256, sha256_hex
 
 TS = "2026-10-13T03:40:21.123456Z"
@@ -43,7 +55,9 @@ def rid(letter: str) -> str:
     return "20261013T034021.123456Z_" + letter * 32
 
 
-def make_identity(*, clean: bool = True) -> ExecutionIdentity:
+def make_identity(
+    *, clean: bool = True, version: int = IDENTITY_V1, environment: str | None = None
+) -> ExecutionIdentity:
     return ExecutionIdentity(
         spec_sha256="1" * 64,
         code_commit="a" * 40 if clean else None,
@@ -51,23 +65,25 @@ def make_identity(*, clean: bool = True) -> ExecutionIdentity:
         dirty_tree_sha256=None,
         package_version="0.0.0",
         uv_lock_sha256="2" * 64,
-        installed_environment_sha256=None,
+        installed_environment_sha256=environment,
         app_config_sha256="3" * 64,
         config_section_sha256=dict.fromkeys(SECTION_NAMES),
         python_version="3.13.5",
         platform="linux-x86_64",
         entrypoint="pmv.research.baselines:run",
+        version=version,
     )
 
 
 class Builder:
-    def __init__(self) -> None:
+    def __init__(self, version: int = 1) -> None:
+        self.version = version
         self.data = b""
         self.state: LedgerState = verify_ledger(b"")[0]
         self.add(LedgerEvent.LEDGER_CREATED, None, {"store_id": STORE})
 
     def add(self, event: LedgerEvent, run_id: str | None, fields: dict[str, object]) -> bytes:
-        line = encode_entry(self.state, event, run_id, TS, fields)
+        line = encode_entry(self.state, event, run_id, TS, fields, version=self.version)
         self.state = verify_ledger(self.data + line)[0]
         self.data += line
         return line
@@ -147,9 +163,9 @@ class Builder:
         return manifest
 
 
-def completed_run(builder: Builder, run_id: str, **identity_options: bool) -> None:
+def completed_run(builder: Builder, run_id: str, *, clean: bool = True) -> None:
     builder.reserve(run_id)
-    builder.start(run_id, make_identity(**identity_options))
+    builder.start(run_id, make_identity(clean=clean))
     builder.artifact(run_id, "model.bin")
     builder.metric(run_id)
     builder.complete(run_id)
@@ -698,3 +714,117 @@ def test_pending_marker_names_bind_the_store_and_the_evidence() -> None:
     assert parse_pending_marker_name(name) == (STORE, evidence)
     for bad in (name.replace(STORE, "A" * 32), name + "x", "repair-pending-" + evidence):
         assert parse_pending_marker_name(bad) is None
+
+
+# ----- Step 10: v2 entries and v2 execution identities -----
+
+FINGERPRINT = "e" * 64
+
+
+def v2_identity(*, clean: bool = True, environment: str | None = FINGERPRINT) -> ExecutionIdentity:
+    return make_identity(clean=clean, version=IDENTITY_V2, environment=environment)
+
+
+def test_v1_entries_are_still_written_and_verified_exactly_as_in_step_6() -> None:
+    builder = Builder()
+    completed_run(builder, rid("a"))
+    for line in builder.data.splitlines():
+        document = json.loads(line)
+        assert document["schema_version"] == 1
+        if document["event_type"] == "run_started":
+            assert document["execution_identity"]["schema_version"] == 1
+    assert not builder.state.runs[rid("a")].eligible_at_start
+
+
+def test_a_fingerprinted_clean_v2_evidence_candidate_is_eligible() -> None:
+    builder = Builder(version=2)
+    builder.reserve(rid("a"))
+    builder.start(rid("a"), v2_identity())
+    builder.artifact(rid("a"), "model.bin")
+    builder.complete(rid("a"))
+    run = builder.state.runs[rid("a")]
+    assert run.eligible_at_start
+    assert eligibility_as_of(builder.state, rid("a"), builder.state.head_seq)
+    assert verify_ledger(builder.data)[0].runs[rid("a")].eligible_at_start
+    forged = Builder(version=2)
+    forged.reserve(rid("b"))
+    with pytest.raises(LedgerError, match="evidence_eligible_at_start is wrong"):
+        forged.start(rid("b"), v2_identity(), claim_eligible=False)
+
+
+def test_a_clean_v2_evidence_candidate_needs_a_fingerprint() -> None:
+    builder = Builder(version=2)
+    builder.reserve(rid("a"))
+    with pytest.raises(LedgerError, match="requires an environment fingerprint"):
+        builder.start(rid("a"), v2_identity(environment=None))
+
+
+@pytest.mark.parametrize(
+    ("run_class", "clean"),
+    [
+        (RunClass.EXPLORATORY, True),
+        (RunClass.DEVELOPMENT, True),
+        (RunClass.EVIDENCE_CANDIDATE, False),
+    ],
+)
+def test_v2_runs_that_are_not_clean_candidates_may_lack_a_fingerprint(
+    run_class: RunClass, clean: bool
+) -> None:
+    builder = Builder(version=2)
+    builder.reserve(rid("a"), run_class)
+    builder.start(rid("a"), v2_identity(clean=clean, environment=None))
+    assert not builder.state.runs[rid("a")].eligible_at_start
+
+
+@pytest.mark.parametrize(("entry", "identity"), [(1, IDENTITY_V2), (2, IDENTITY_V1)])
+def test_the_identity_version_must_match_the_entry_version(entry: int, identity: int) -> None:
+    builder = Builder(version=entry)
+    builder.reserve(rid("a"))
+    environment = FINGERPRINT if identity == IDENTITY_V2 else None
+    with pytest.raises(LedgerError, match="identity version must match"):
+        builder.start(rid("a"), make_identity(version=identity, environment=environment))
+
+
+def failed_run(builder: Builder, run_id: str, code: str) -> None:
+    builder.reserve(run_id)
+    identity = v2_identity() if builder.version == 2 else make_identity()
+    builder.start(run_id, identity)
+    builder.add(LedgerEvent.RUN_FAILED, run_id, {"exception_type": None, "failure_code": code})
+
+
+def test_environment_changed_is_a_v2_failure_code_only() -> None:
+    v2 = Builder(version=2)
+    failed_run(v2, rid("a"), "environment_changed")
+    assert v2.state.runs[rid("a")].state.value == "failed"
+    v1 = Builder()
+    with pytest.raises(LedgerError, match="not valid in v1"):
+        failed_run(v1, rid("a"), "environment_changed")
+    failed_run(Builder(), rid("b"), "code_identity_changed")
+
+
+def test_entry_versions_never_go_backwards() -> None:
+    builder = Builder()
+    completed_run(builder, rid("a"))
+    builder.version = 2
+    builder.reserve(rid("b"))
+    builder.start(rid("b"), v2_identity())
+    builder.version = 1
+    with pytest.raises(LedgerError, match="must not go backwards"):
+        builder.reserve(rid("c"))
+    upgraded = verify_ledger(builder.data)[0]
+    assert not upgraded.runs[rid("a")].eligible_at_start
+    assert upgraded.runs[rid("b")].eligible_at_start
+
+
+def test_unknown_entry_and_identity_versions_are_refused() -> None:
+    builder = Builder()
+    items = builder.data.splitlines()
+    genesis = {**json.loads(items[0]), "schema_version": 3}
+    body = {key: value for key, value in genesis.items() if key != "entry_sha256"}
+    line = canonical_line({**body, "entry_sha256": chain_entry_sha256(body)})
+    with pytest.raises(LedgerError, match="unsupported schema"):
+        verify_ledger(line)
+    with pytest.raises(SpecError, match="version is not supported"):
+        make_identity(version=3)
+    with pytest.raises(SpecError, match="SHA-256"):
+        make_identity(version=IDENTITY_V2, environment="not-a-digest")

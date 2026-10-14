@@ -2,7 +2,7 @@
 
 Every gate decision is recorded as an immutable, generated file at `docs/decisions/gates/<gate_id>_<record_id>.md`, as START_HERE.md requires. Implementation: `src/pmv/gate_record.py` (schema, rendering, lineage rules) and `src/pmv/gates.py` (tooling). Schema document: `schemas/gate_record_v1.json`. The Python validators are authoritative.
 
-This step provides the tooling only. No gate decision has been recorded; Gate 0's record is created in Step 10.
+This step provides the tooling only. No gate decision has been recorded. Gate 0's record is created only after the full Phase 0 audit (Step 11) and its approved corrections.
 
 ## What is authoritative
 

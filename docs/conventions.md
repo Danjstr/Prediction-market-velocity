@@ -16,9 +16,15 @@ Engineering conventions only. Project governance lives in PROJECT_BRIEF.md, CLAU
 - Never `pip install` into the project environment.
 - Runtime dependencies stay empty until a specific need exists.
 
+## Reproducibility
+
+- `python -m pmv.reproducibility fingerprint` identifies the installed environment: the interpreter plus the bytes of every third-party distribution. `verify` checks that it conforms to `pyproject.toml`, `.python-version`, and `uv.lock`, offline. See `docs/reproducibility.md`, including what a fingerprint does not prove.
+- An `evidence_candidate` experiment run starts only if `verify` passes. Its fingerprint is recorded in the run's v2 execution identity and `environment.json`; a change during the run fails it.
+- Never set `PYTHONPATH` or add files to the project virtual environment by hand: both make fingerprinting fail closed.
+
 ## Checks
 
-- `scripts/check.sh` runs the secret scan (`scripts/scan_secrets.sh`), lock verification, formatting, linting, type checking, and tests.
+- `scripts/check.sh` runs the secret scan (`scripts/scan_secrets.sh`), lock verification, environment conformance (`python -m pmv.reproducibility verify`), formatting, linting, type checking, the history and settings verifiers, and tests.
 - It must pass before a commit. CI runs the same script.
 - CI (`.github/workflows/ci.yml`) runs `scripts/check.sh` with the same pinned uv (`scripts/uv.pin`) and Betterleaks. GitHub Actions are pinned to full commit SHAs, with the release version in a comment. CI has read-only permissions, no secrets, no caching, and no uploaded artifacts.
 
