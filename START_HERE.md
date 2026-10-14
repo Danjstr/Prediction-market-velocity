@@ -58,11 +58,15 @@ The split-formation rule must be recorded before inspection and must not be sele
 
 Phase 1 may use only a declared development, discovery, or pilot subset for outcome-dependent work. Data inspected during Phase 1 is development-only for that cycle.
 
-Because development agents may have shell and file access, protected holdout observations must remain outside ordinary development-agent-readable storage until an authorized Gate 6 release for the specific candidate, split, and cycle. Code-level loader restrictions alone are insufficient. Development sessions may access holdout manifests, hashes, partition metadata, and other specifically whitelisted non-observation metadata.
+The primary protection for the final holdout is an information embargo. Protected observations, outcomes, and equivalent information capable of reconstructing them must remain unavailable to development agents until authorized final evaluation, regardless of source or representation.
+
+Local protected plaintext must additionally remain outside ordinary development-agent-readable storage until an authorized Gate 6 release for the specific candidate, split, and cycle. Filesystem/path isolation is defense in depth and does not replace the information embargo.
+
+Code-level loader restrictions alone are insufficient. Project data access must use the deterministic protected-scope/data-access controls. Development sessions may access holdout manifests, hashes, partition metadata, and other specifically whitelisted non-observation metadata.
 
 Production or live-order credentials, wallet or private-key material, and equivalent secrets must never be exposed to Claude, LLM, or development-agent environments.
 
-Claude Code permission rules in `.claude/settings.json` are defense-in-depth only and do not stop every shell or script read. Physical isolation of secrets and holdout data is the primary control.
+Claude Code permission rules in `.claude/settings.json` are defense-in-depth only and do not stop every shell or script read. Physical isolation is the primary control for secrets; for the holdout, the information embargo above is the primary control.
 
 ## Data and Contract Identity
 
@@ -119,7 +123,7 @@ Before Phase 3, the Statistician defines nested chronological or walk-forward va
 - CI;
 - automatic experiment tracking, as required under Research and Gate Records;
 - the gate-record format and location;
-- physical isolation of holdout-eligible data and of production credentials, as required under Protection of Holdout-Eligible Data;
+- the protected-information embargo and deterministic data-access controls for holdout-eligible data, and physical isolation of production credentials, as required under Protection of Holdout-Eligible Data;
 - raw-data storage outside Git, with the provenance and versioning required under Data and Contract Identity;
 - tamper-evident handling of HOLDOUT_ACCESS_LOG.md events;
 - reproducibility conventions.

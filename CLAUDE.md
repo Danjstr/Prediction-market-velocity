@@ -176,7 +176,15 @@ Opening the protected holdout requires both the Gate 6 checks in START_HERE.md a
 
 Once outcome-dependent protected information has been revealed, the holdout is consumed. A consumed holdout must never again be treated as untouched data, and must never be relabeled as development or validation data. See START_HERE.md Phase 7.
 
-No observation may become protected evaluation data after being exposed to development, and protected holdout observations stay outside development-agent-readable storage until authorized release. See Project-Wide Controls in START_HERE.md.
+No observation may become protected evaluation data after being exposed to development.
+
+The primary protection for the final holdout is an information embargo: protected observations, outcomes, and equivalent information capable of reconstructing them stay unavailable to development agents until authorized final evaluation, regardless of source or representation. Local protected plaintext additionally stays outside development-agent-readable storage until authorized release; filesystem/path isolation is defense in depth and does not replace the embargo. See Project-Wide Controls in START_HERE.md.
+
+## Protected Information Rule
+
+Agents may freely research code, repositories, documentation, papers, and methodology online. Agents must never access, request, reconstruct, or infer protected holdout observations or outcomes before authorized final evaluation, from any source: project files, copies, venue or alternate-provider APIs, websites, datasets, or equivalent observables such as the underlying asset prices that determine a protected contract. Before a real protected scope is declared, agents do not inspect real market observations at all.
+
+Project market data is obtained only through the deterministic data-access guard, which refuses overlapping, equivalent, or undeterminable requests. Agents may propose data needs; they never override the guard. When uncertain, treat information as protected. If protected information is exposed accidentally, stop using it, do not investigate further, and escalate; when it could influence development, record a contamination event under HOLDOUT_ACCESS_LOG.md. See docs/protected_information.md.
 
 # Modeling
 

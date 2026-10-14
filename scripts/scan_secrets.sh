@@ -2,9 +2,11 @@
 # Scan for committed or about-to-be-committed secrets with the pinned Betterleaks binary.
 #
 # A self-test runs first. Then four scans: full Git history, staged changes, unstaged
-# changes to tracked files, and untracked files that Git does not ignore. Ignored files
-# are never read. The scanner always runs with --redact, the repository config, an
-# explicit validated ignore file, an empty environment, and no network; network
+# changes to tracked files, and untracked files that the repository's own ignore rules
+# (.gitignore files and .git/info/exclude) do not ignore. Personal and global Git excludes
+# are never applied, so they cannot hide a file from the scan. Files ignored by the
+# repository's rules are never read. The scanner always runs with --redact, the repository
+# config, an explicit validated ignore file, an empty environment, and no network; network
 # validation is never enabled. Git runs with an empty environment too. Raw scanner output
 # is never printed: only rule IDs, files, lines, commits, and fingerprints, none of which
 # contain secret values.
@@ -83,26 +85,23 @@ actual_sha256="$(/usr/bin/env -i /usr/bin/sha256sum -- "$binary")" \
 for variable in BETTERLEAKS_CONFIG BETTERLEAKS_CONFIG_TOML GITLEAKS_CONFIG GITLEAKS_CONFIG_TOML; do
     [[ ! -v "$variable" ]] || malfunction "$variable is set; scanner config overrides are not allowed"
 done
-# Git runs with an empty environment, so personal global ignore rules are not applied.
-# Refuse to run if any exist, rather than scan files that only they would ignore.
-for global_git_file in "$HOME/.gitconfig" "$HOME/.config/git/config"; do
-    if [[ -f "$global_git_file" ]] && grep -qi 'excludesfile' -- "$global_git_file"; then
-        malfunction "personal global Git excludes are not honored here; move them into the repository .gitignore"
-    fi
-done
-[[ ! -e "$HOME/.config/git/ignore" ]] \
-    || malfunction "personal global Git excludes are not honored here; move them into the repository .gitignore"
-
-work="$(/usr/bin/env -i /usr/bin/mktemp -d /tmp/pmv-secret-scan.XXXXXXXX)" \
+# The private work directory goes under $TMPDIR when it is set (the Claude Code sandbox
+# makes /tmp itself read-only), otherwise /tmp; mktemp creates it 0700 with a random name.
+scan_tmp="${TMPDIR:-/tmp}"
+[[ "$scan_tmp" == /* && -d "$scan_tmp" && ! -L "$scan_tmp" ]] \
+    || malfunction "TMPDIR must be an absolute path to a directory"
+work="$(/usr/bin/env -i /usr/bin/mktemp -d -p "$scan_tmp" pmv-secret-scan.XXXXXXXX)" \
     || malfunction "cannot create a private directory"
 mkdir -- "$work/home" "$work/tmp" "$work/out" "$work/run" "$work/ignore"
 
 # Run Git with an empty environment, so variables such as GIT_DIR, GIT_WORK_TREE,
 # GIT_INDEX_FILE, or GIT_CONFIG_* cannot change which repository, index, worktree, or
-# configuration is used.
+# configuration is used. core.excludesFile=/dev/null is set explicitly, so no personal or
+# global ignore file (including the default ~/.config/git/ignore location) can hide a file.
 clean_git() {
     /usr/bin/env -i PATH=/usr/bin:/bin HOME="$work/home" LC_ALL=C \
-        GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /usr/bin/git "$@"
+        GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 /usr/bin/git \
+        -c core.excludesFile=/dev/null "$@"
 }
 
 # Run a command from an empty directory with an empty environment, inside a user and
@@ -310,7 +309,7 @@ has_rule() { # has_rule <rule> <newline-separated rules>
 }
 
 self_test_scopes() {
-    local root="$work/self-test-scopes" name scope expected reported decoy
+    local root="$work/self-test-scopes" name scope expected reported decoy entry found
     local -a odd_names=('space name.txt' $'tab\tname.txt' $'new\nline.txt' 'glob[*]?.txt' '-leading-dash.txt')
     test_repo="$root/repo"
     decoy="$root/decoy"
@@ -343,7 +342,13 @@ self_test_scopes() {
     export GIT_DIR="$decoy/.git" GIT_WORK_TREE="$decoy" GIT_INDEX_FILE="$decoy/.git/index"
     export GIT_CONFIG_GLOBAL="$root/decoy.gitconfig" GIT_CONFIG_SYSTEM="$root/decoy.gitconfig"
     export GIT_CONFIG_PARAMETERS="'core.excludesfile=$root/hide-everything'"
+    # A default-location global ignore that hides everything, inside the scanner's own Git
+    # HOME: core.excludesFile=/dev/null must neutralize it.
+    mkdir -p -- "$work/home/.config/git"
+    printf '*\n' >"$work/home/.config/git/ignore"
+    printf 'benign line\n' >"$test_repo/benign-global.txt"
     scan_repository "$test_repo"
+    rm -rf -- "$work/home/.config"
     unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM GIT_CONFIG_PARAMETERS
 
     for scope in history staged unstaged untracked; do
@@ -357,6 +362,11 @@ self_test_scopes() {
         || malfunction "self-test: the untracked report is malformed"
     [[ "$reported" == "$expected" ]] \
         || malfunction "self-test: untracked findings do not match the five unusual filenames exactly"
+    found=0
+    for entry in "${untracked[@]}"; do
+        [[ "$entry" != "$test_repo/benign-global.txt" ]] || found=1
+    done
+    [[ $found -eq 1 ]] || malfunction "self-test: a globally ignored benign file was not enumerated"
 }
 
 self_test_clean() {

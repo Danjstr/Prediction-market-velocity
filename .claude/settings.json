@@ -16,7 +16,22 @@
       "Read(~/.ssh/**)",
       "Edit(~/.ssh/**)",
       "Read(~/.aws/**)",
-      "Edit(~/.aws/**)"
+      "Edit(~/.aws/**)",
+      "Read(~/pmv-protected/**)",
+      "Edit(~/pmv-protected/**)"
     ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "filesystem": {
+      "denyRead": [
+        "~/pmv-protected"
+      ],
+      "denyWrite": [
+        "~/pmv-protected"
+      ]
+    }
   }
 }

@@ -91,6 +91,13 @@ Engineering conventions only. Project governance lives in PROJECT_BRIEF.md, CLAU
 - Commit the ledger and `HOLDOUT_ACCESS_LOG.md` together after every event; `access_started` must be committed, and `assert-started-committed` must pass, before any protected byte is exposed.
 - `access_started` consumes the holdout permanently. Known or suspected bypasses are recorded as contamination. The log never records protected observations, outcomes, metrics, or narrative text.
 
+## Protected Information
+
+- Project market data is requested only through `pmv.data_access_guard` (see `docs/protected_information.md`). Agents never override a refusal. With an empty registry, every real market observation is refused, and synthetic fixtures use only the `pmv_synthetic`/`synthetic_fixture` pair.
+- `research/protected_scopes/registry.v1.json` is append-only. A successor scope may only widen its predecessor, and `scripts/check.sh` verifies this against Git history. Scopes hold metadata only.
+- A new provider or instrument family is a reviewed change to the equivalence catalog. Until that change is made, the pair fails closed.
+- Any accidental exposure of protected information is escalated. If it could influence development, it is recorded as contamination in the holdout access log.
+
 ## Time
 
 - Every timestamp is timezone-aware UTC. Naive datetimes are lint errors.

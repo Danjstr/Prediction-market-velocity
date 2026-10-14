@@ -3,6 +3,17 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# uv's default cache (~/.cache/uv) is read-only inside the Claude Code sandbox. Unless the
+# caller sets UV_CACHE_DIR, use a fresh private cache under $TMPDIR (or /tmp) for this run
+# only and remove it on exit: no repository files, no shared fixed path, no home writes.
+if [[ -z "${UV_CACHE_DIR:-}" ]]; then
+    uv_cache="$(mktemp -d -p "${TMPDIR:-/tmp}" pmv-uv-cache.XXXXXXXX)"
+    trap 'rm -rf -- "$uv_cache"' EXIT
+    export UV_CACHE_DIR="$uv_cache"
+fi
+[[ "$UV_CACHE_DIR" == /* ]] \
+    || { echo "check.sh: UV_CACHE_DIR must be an absolute path" >&2; exit 1; }
+
 scripts/scan_secrets.sh
 uv_pin_lines="$(grep -E '^version=' scripts/uv.pin)" \
     || { echo "check.sh: scripts/uv.pin has no version entry" >&2; exit 1; }
@@ -26,4 +37,6 @@ uv run --locked ruff check .
 uv run --locked mypy
 uv run --locked python -m pmv.gates verify-history
 uv run --locked python -m pmv.holdout_log verify-history
+uv run --locked python -m pmv.protected_scope verify-history
+uv run --locked python -m pmv.data_access_guard check-config
 uv run --locked pytest
