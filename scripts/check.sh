@@ -25,4 +25,5 @@ uv run --locked ruff format --check .
 uv run --locked ruff check .
 uv run --locked mypy
 uv run --locked python -m pmv.gates verify-history
+uv run --locked python -m pmv.holdout_log verify-history
 uv run --locked pytest

@@ -1,0 +1,1321 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pmv.holdout_access.event/1",
+  "title": "PMV protected-holdout access event, version 1",
+  "description": "One line of research/holdout_access/ledger.v1.jsonl, the authoritative hash-chained holdout access ledger. Documentation only: the authoritative validator is pmv.holdout_record.verify_ledger, which also enforces the hash chain, contiguous ledger_seq and event IDs, non-decreasing recorded_at, references to earlier events by exact hash, and the holdout/authorization state machine. Canonical bytes: sorted keys, no spaces, ASCII escapes, no floats; JSON booleans are never integers. Records never contain protected observations, outcomes, metrics, model outputs, or narrative text.",
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "timestamp_id": {
+      "type": "string",
+      "pattern": "^[0-9]{8}T[0-9]{6}\\.[0-9]{6}Z_[0-9a-f]{32}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^HAL-(000[5-9]|00[1-9][0-9]|0[1-9][0-9]{2}|[1-9][0-9]{3,8})$",
+      "description": "HAL-NNNN with NNNN = ledger_seq + 5 (from HAL-0005; at least four digits, no extra leading zeros)"
+    },
+    "repo_path": {
+      "type": "string",
+      "maxLength": 512,
+      "pattern": "^(configs|docs|research|scripts|src)(/[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})+$"
+    },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/repo_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "description": "A repository file committed with exactly these bytes."
+    },
+    "event_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry_sha256",
+        "event_id"
+      ],
+      "properties": {
+        "entry_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "event_id": {
+          "$ref": "#/$defs/event_id"
+        }
+      },
+      "description": "An earlier event of the required type, by ID and exact entry hash."
+    },
+    "record_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "record_sha256"
+      ],
+      "properties": {
+        "record_id": {
+          "$ref": "#/$defs/timestamp_id"
+        },
+        "record_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "description": "A Step 7 gate record by record_id and whole-file SHA-256."
+    },
+    "owner_attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attested",
+        "role"
+      ],
+      "properties": {
+        "attested": {
+          "const": true
+        },
+        "role": {
+          "const": "project_owner"
+        }
+      }
+    },
+    "operator_attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attested",
+        "role"
+      ],
+      "properties": {
+        "attested": {
+          "const": true
+        },
+        "role": {
+          "enum": [
+            "authorized_operator",
+            "project_owner"
+          ]
+        }
+      }
+    },
+    "repo_file_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "const": "repo_file"
+        },
+        "path": {
+          "$ref": "#/$defs/repo_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "component_ref": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "repo_file"
+            },
+            "path": {
+              "$ref": "#/$defs/repo_path"
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "artifact_name",
+            "kind",
+            "run_id",
+            "sha256"
+          ],
+          "properties": {
+            "artifact_name": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}(\\.[a-z0-9]{1,8})?$"
+            },
+            "kind": {
+              "const": "run_artifact"
+            },
+            "run_id": {
+              "$ref": "#/$defs/timestamp_id"
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        }
+      ]
+    },
+    "candidate_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "components",
+        "cycle_id",
+        "experiment_ledger",
+        "holdout_id",
+        "project_commit",
+        "schema",
+        "schema_version"
+      ],
+      "properties": {
+        "schema": {
+          "const": "pmv.holdout_access.candidate_identity"
+        },
+        "schema_version": {
+          "const": 1
+        },
+        "candidate_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "cycle_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "holdout_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "project_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "experiment_ledger": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "entry_sha256",
+            "ledger_seq",
+            "store_id"
+          ],
+          "properties": {
+            "entry_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "ledger_seq": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "store_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            }
+          }
+        },
+        "components": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "calibration",
+            "candidate_manifest",
+            "configs",
+            "cost_assumptions",
+            "evaluation_plan",
+            "execution_assumptions",
+            "feature_definition",
+            "input_definition",
+            "model",
+            "preprocessing",
+            "readiness_review",
+            "runner"
+          ],
+          "properties": {
+            "candidate_manifest": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/component_ref"
+              }
+            },
+            "readiness_review": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/component_ref"
+              }
+            },
+            "model": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/component_ref"
+              }
+            },
+            "feature_definition": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/component_ref"
+              }
+            },
+            "preprocessing": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/component_ref"
+              }
+            },
+            "calibration": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/component_ref"
+              }
+            },
+            "configs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/component_ref"
+              }
+            },
+            "cost_assumptions": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/component_ref"
+              }
+            },
+            "execution_assumptions": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/component_ref"
+              }
+            },
+            "input_definition": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/component_ref"
+              }
+            },
+            "evaluation_plan": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "items": {
+                "$ref": "#/$defs/repo_file_ref"
+              }
+            },
+            "runner": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/component_ref"
+              }
+            }
+          },
+          "description": "Every component is a non-empty list of references sorted by canonical JSON, unique; the evaluation plan is exactly one repo_file."
+        }
+      },
+      "description": "The exact candidate. candidate_identity_sha256 = SHA-256 of its canonical JSON line. At access_started every reference is re-verified: repository files byte-identical at project_commit, HEAD, and the working tree; run artifacts registered at or before the pinned experiment-ledger head with the same hash; since project_commit only the holdout ledger, its mirror, and gate records may have changed."
+    }
+  },
+  "type": "object",
+  "required": [
+    "schema",
+    "schema_version",
+    "ledger_seq",
+    "event_id",
+    "prev_entry_sha256",
+    "entry_sha256",
+    "recorded_at",
+    "event_type",
+    "repository"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pmv.holdout_access.event"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "ledger_seq": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "event_id": {
+      "$ref": "#/$defs/event_id"
+    },
+    "prev_entry_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "null exactly for ledger_seq 0"
+    },
+    "entry_sha256": {
+      "$ref": "#/$defs/sha256",
+      "description": "SHA-256 of the canonical entry without entry_sha256"
+    },
+    "recorded_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "event_type": {
+      "enum": [
+        "log_initialized",
+        "cycle_registered",
+        "holdout_registered",
+        "access_requested",
+        "access_authorized",
+        "access_denied",
+        "access_started",
+        "access_completed",
+        "access_failed",
+        "access_interrupted",
+        "access_attempt_refused",
+        "contamination_recorded",
+        "historical_reclassification",
+        "correction_recorded"
+      ]
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "dirty_tree_sha256",
+        "tree_dirty"
+      ],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "tree_dirty": {
+          "type": "boolean"
+        },
+        "dirty_tree_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "tree_dirty": {
+              "const": false
+            },
+            "dirty_tree_sha256": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "properties": {
+            "tree_dirty": {
+              "const": true
+            },
+            "dirty_tree_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        }
+      ],
+      "description": "HEAD and working-tree state when the event was appended."
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "event_type": {
+          "const": "log_initialized"
+        },
+        "legacy_file_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "preamble_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "body_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "body_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "legacy_history_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "legacy_history_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "legacy_status_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "prior_last_event": {
+          "const": "HAL-0004"
+        },
+        "prior_contamination": {
+          "const": "none_known"
+        },
+        "prior_consumption": {
+          "const": "not_known_consumed"
+        }
+      },
+      "required": [
+        "body_sha256",
+        "body_size",
+        "legacy_file_sha256",
+        "legacy_history_sha256",
+        "legacy_history_size",
+        "legacy_status_sha256",
+        "preamble_sha256",
+        "prior_consumption",
+        "prior_contamination",
+        "prior_last_event"
+      ],
+      "propertyNames": {
+        "enum": [
+          "body_sha256",
+          "body_size",
+          "entry_sha256",
+          "event_id",
+          "event_type",
+          "ledger_seq",
+          "legacy_file_sha256",
+          "legacy_history_sha256",
+          "legacy_history_size",
+          "legacy_status_sha256",
+          "preamble_sha256",
+          "prev_entry_sha256",
+          "prior_consumption",
+          "prior_contamination",
+          "prior_last_event",
+          "recorded_at",
+          "repository",
+          "schema",
+          "schema_version"
+        ]
+      },
+      "description": "Exactly ledger_seq 0 (HAL-0005), and only there. Pins the reviewed legacy file, its fixed parts, and HAL-0001 to HAL-0004 by exact bytes."
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "cycle_registered"
+        },
+        "cycle_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "split_formation": {
+          "enum": [
+            "mechanical_partition",
+            "prospective_period"
+          ]
+        },
+        "development_subset": {
+          "$ref": "#/$defs/document"
+        },
+        "protected_start": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "protected_end": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "attestation": {
+          "$ref": "#/$defs/owner_attestation"
+        }
+      },
+      "required": [
+        "attestation",
+        "cycle_id",
+        "development_subset",
+        "protected_end",
+        "protected_start",
+        "split_formation"
+      ],
+      "propertyNames": {
+        "enum": [
+          "attestation",
+          "cycle_id",
+          "development_subset",
+          "entry_sha256",
+          "event_id",
+          "event_type",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "protected_end",
+          "protected_start",
+          "recorded_at",
+          "repository",
+          "schema",
+          "schema_version",
+          "split_formation"
+        ]
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "holdout_registered"
+        },
+        "holdout_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "cycle_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "split_definition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^research/splits/[a-z][a-z0-9_]{0,63}\\.yaml$"
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "snapshot_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "metadata_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "observation_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "start": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "end": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "purge_embargo_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "attestation": {
+          "$ref": "#/$defs/owner_attestation"
+        }
+      },
+      "required": [
+        "attestation",
+        "cycle_id",
+        "end",
+        "holdout_id",
+        "metadata_sha256",
+        "observation_count",
+        "purge_embargo_sha256",
+        "snapshot_manifest_sha256",
+        "source_manifest_sha256",
+        "split_definition",
+        "start"
+      ],
+      "propertyNames": {
+        "enum": [
+          "attestation",
+          "cycle_id",
+          "end",
+          "entry_sha256",
+          "event_id",
+          "event_type",
+          "holdout_id",
+          "ledger_seq",
+          "metadata_sha256",
+          "observation_count",
+          "prev_entry_sha256",
+          "purge_embargo_sha256",
+          "recorded_at",
+          "repository",
+          "schema",
+          "schema_version",
+          "snapshot_manifest_sha256",
+          "source_manifest_sha256",
+          "split_definition",
+          "start"
+        ]
+      },
+      "description": "Hashes and counts only; start before end; one holdout per cycle."
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "access_requested"
+        },
+        "cycle_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "holdout_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "candidate_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "candidate_identity": {
+          "$ref": "#/$defs/candidate_identity"
+        },
+        "candidate_identity_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "requested_by": {
+          "enum": [
+            "project_owner",
+            "authorized_operator",
+            "ml_engineer",
+            "data_scientist",
+            "statistician",
+            "independent_statistical_auditor",
+            "quant_business_lead",
+            "reliability_red_team",
+            "risk_performance_engineer",
+            "api_execution_engineer",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "candidate_id",
+        "candidate_identity",
+        "candidate_identity_sha256",
+        "cycle_id",
+        "holdout_id",
+        "requested_by"
+      ],
+      "propertyNames": {
+        "enum": [
+          "candidate_id",
+          "candidate_identity",
+          "candidate_identity_sha256",
+          "cycle_id",
+          "entry_sha256",
+          "event_id",
+          "event_type",
+          "holdout_id",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "recorded_at",
+          "repository",
+          "requested_by",
+          "schema",
+          "schema_version"
+        ]
+      },
+      "description": "The holdout must be registered and not consumed."
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "access_authorized"
+        },
+        "request": {
+          "$ref": "#/$defs/event_ref"
+        },
+        "candidate_identity_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "gate_6": {
+          "$ref": "#/$defs/record_ref"
+        },
+        "evaluation_plan": {
+          "$ref": "#/$defs/document"
+        },
+        "attestation": {
+          "$ref": "#/$defs/owner_attestation"
+        }
+      },
+      "required": [
+        "attestation",
+        "candidate_identity_sha256",
+        "evaluation_plan",
+        "gate_6",
+        "request"
+      ],
+      "propertyNames": {
+        "enum": [
+          "attestation",
+          "candidate_identity_sha256",
+          "entry_sha256",
+          "evaluation_plan",
+          "event_id",
+          "event_type",
+          "gate_6",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "recorded_at",
+          "repository",
+          "request",
+          "schema",
+          "schema_version"
+        ]
+      },
+      "description": "Owner authorization of an undecided request: same identity hash; the evaluation plan equals the identity's; gate_6 must be a committed, current, matching Gate 6 PASS record. Not an access."
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "access_denied"
+        },
+        "request": {
+          "$ref": "#/$defs/event_ref"
+        },
+        "reason": {
+          "enum": [
+            "owner_declined",
+            "gate_6_invalid",
+            "evaluation_plan_mismatch",
+            "candidate_identity_invalid",
+            "holdout_consumed"
+          ]
+        },
+        "attestation": {
+          "$ref": "#/$defs/owner_attestation"
+        }
+      },
+      "required": [
+        "attestation",
+        "reason",
+        "request"
+      ],
+      "propertyNames": {
+        "enum": [
+          "attestation",
+          "entry_sha256",
+          "event_id",
+          "event_type",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "reason",
+          "recorded_at",
+          "repository",
+          "request",
+          "schema",
+          "schema_version"
+        ]
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "access_started"
+        },
+        "authorization": {
+          "$ref": "#/$defs/event_ref"
+        },
+        "candidate_identity_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "gate_6": {
+          "$ref": "#/$defs/record_ref"
+        },
+        "gate_7": {
+          "$ref": "#/$defs/record_ref"
+        },
+        "evaluation_plan": {
+          "$ref": "#/$defs/document"
+        },
+        "attestation": {
+          "$ref": "#/$defs/operator_attestation"
+        }
+      },
+      "required": [
+        "attestation",
+        "authorization",
+        "candidate_identity_sha256",
+        "evaluation_plan",
+        "gate_6",
+        "gate_7"
+      ],
+      "propertyNames": {
+        "enum": [
+          "attestation",
+          "authorization",
+          "candidate_identity_sha256",
+          "entry_sha256",
+          "evaluation_plan",
+          "event_id",
+          "event_type",
+          "gate_6",
+          "gate_7",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "recorded_at",
+          "repository",
+          "schema",
+          "schema_version"
+        ]
+      },
+      "description": "The first consuming event (strict v1). Single use per authorization; the holdout must not be consumed. gate_7 must be a committed, current Gate 7 preregistration PASS record citing the same evaluation plan. Must be committed (with its Markdown mirror) before any protected byte is exposed."
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "access_completed"
+        },
+        "started": {
+          "$ref": "#/$defs/event_ref"
+        },
+        "recorded_by": {
+          "enum": [
+            "authorized_operator",
+            "project_owner"
+          ]
+        },
+        "restricted_evidence_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "recorded_by",
+        "restricted_evidence_sha256",
+        "started"
+      ],
+      "propertyNames": {
+        "enum": [
+          "entry_sha256",
+          "event_id",
+          "event_type",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "recorded_at",
+          "recorded_by",
+          "repository",
+          "restricted_evidence_sha256",
+          "schema",
+          "schema_version",
+          "started"
+        ]
+      },
+      "description": "Closes a started access once; the holdout stays consumed. No results or metrics are ever recorded."
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "access_failed"
+        },
+        "started": {
+          "$ref": "#/$defs/event_ref"
+        },
+        "recorded_by": {
+          "enum": [
+            "authorized_operator",
+            "project_owner"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "runner_error",
+            "data_integrity_error",
+            "resource_exhausted",
+            "operator_abort"
+          ]
+        },
+        "restricted_evidence_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "reason",
+        "recorded_by",
+        "restricted_evidence_sha256",
+        "started"
+      ],
+      "propertyNames": {
+        "enum": [
+          "entry_sha256",
+          "event_id",
+          "event_type",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "reason",
+          "recorded_at",
+          "recorded_by",
+          "repository",
+          "restricted_evidence_sha256",
+          "schema",
+          "schema_version",
+          "started"
+        ]
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "access_interrupted"
+        },
+        "started": {
+          "$ref": "#/$defs/event_ref"
+        },
+        "recorded_by": {
+          "enum": [
+            "authorized_operator",
+            "project_owner"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "process_crash",
+            "unknown_state"
+          ]
+        },
+        "restricted_evidence_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "reason",
+        "recorded_by",
+        "restricted_evidence_sha256",
+        "started"
+      ],
+      "propertyNames": {
+        "enum": [
+          "entry_sha256",
+          "event_id",
+          "event_type",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "reason",
+          "recorded_at",
+          "recorded_by",
+          "repository",
+          "restricted_evidence_sha256",
+          "schema",
+          "schema_version",
+          "started"
+        ]
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "access_attempt_refused"
+        },
+        "cycle_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "holdout_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "authorization": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/event_ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "enum": [
+            "no_authorization",
+            "authorization_already_used",
+            "wrong_cycle",
+            "wrong_holdout",
+            "wrong_candidate",
+            "candidate_changed",
+            "runner_mismatch",
+            "evaluation_plan_mismatch",
+            "gate_6_invalid",
+            "gate_7_missing",
+            "gate_7_invalid",
+            "holdout_consumed",
+            "owner_not_attested",
+            "repository_not_clean"
+          ]
+        }
+      },
+      "required": [
+        "authorization",
+        "candidate_id",
+        "cycle_id",
+        "holdout_id",
+        "reason"
+      ],
+      "propertyNames": {
+        "enum": [
+          "authorization",
+          "candidate_id",
+          "cycle_id",
+          "entry_sha256",
+          "event_id",
+          "event_type",
+          "holdout_id",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "reason",
+          "recorded_at",
+          "repository",
+          "schema",
+          "schema_version"
+        ]
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "contamination_recorded"
+        },
+        "holdout_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "level": {
+          "enum": [
+            "suspected",
+            "confirmed"
+          ]
+        },
+        "exposure_categories": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "labels_or_resolutions",
+              "predictions_against_outcomes",
+              "performance_metrics",
+              "calibration_results",
+              "pnl_or_ev",
+              "error_analysis",
+              "trade_outcomes",
+              "raw_protected_observations",
+              "other_outcome_derived"
+            ]
+          }
+        },
+        "exposed_roles": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "project_owner",
+              "authorized_operator",
+              "ml_engineer",
+              "data_scientist",
+              "statistician",
+              "independent_statistical_auditor",
+              "quant_business_lead",
+              "reliability_red_team",
+              "risk_performance_engineer",
+              "api_execution_engineer",
+              "unknown"
+            ]
+          }
+        },
+        "restricted_evidence_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attestation": {
+          "$ref": "#/$defs/owner_attestation"
+        }
+      },
+      "required": [
+        "attestation",
+        "exposed_roles",
+        "exposure_categories",
+        "holdout_id",
+        "level",
+        "restricted_evidence_sha256"
+      ],
+      "propertyNames": {
+        "enum": [
+          "attestation",
+          "entry_sha256",
+          "event_id",
+          "event_type",
+          "exposed_roles",
+          "exposure_categories",
+          "holdout_id",
+          "ledger_seq",
+          "level",
+          "prev_entry_sha256",
+          "recorded_at",
+          "repository",
+          "restricted_evidence_sha256",
+          "schema",
+          "schema_version"
+        ]
+      },
+      "description": "Suspected or confirmed exposure; both consume the holdout. Lists sorted."
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "historical_reclassification"
+        },
+        "holdout_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "untouched_holdout_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "attestation": {
+          "$ref": "#/$defs/owner_attestation"
+        }
+      },
+      "required": [
+        "attestation",
+        "holdout_id",
+        "untouched_holdout_id"
+      ],
+      "propertyNames": {
+        "enum": [
+          "attestation",
+          "entry_sha256",
+          "event_id",
+          "event_type",
+          "holdout_id",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "recorded_at",
+          "repository",
+          "schema",
+          "schema_version",
+          "untouched_holdout_id"
+        ]
+      },
+      "description": "Only a consumed holdout, given a different untouched holdout of another cycle; it stays consumed forever."
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "correction_recorded"
+        },
+        "corrects": {
+          "$ref": "#/$defs/event_ref"
+        },
+        "document": {
+          "$ref": "#/$defs/document"
+        },
+        "attestation": {
+          "$ref": "#/$defs/owner_attestation"
+        }
+      },
+      "required": [
+        "attestation",
+        "corrects",
+        "document"
+      ],
+      "propertyNames": {
+        "enum": [
+          "attestation",
+          "corrects",
+          "document",
+          "entry_sha256",
+          "event_id",
+          "event_type",
+          "ledger_seq",
+          "prev_entry_sha256",
+          "recorded_at",
+          "repository",
+          "schema",
+          "schema_version"
+        ]
+      },
+      "description": "Annotative only: never changes or reverses any state."
+    }
+  ]
+}

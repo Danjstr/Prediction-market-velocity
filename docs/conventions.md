@@ -85,6 +85,12 @@ Engineering conventions only. Project governance lives in PROJECT_BRIEF.md, CLAU
 - Changes create a new record that supersedes the committed lineage head; committed records are never modified or deleted, and `scripts/check.sh` verifies this against Git history.
 - Records hold only enums, identifiers, hashes, timestamps, and paths. Rationale lives in tracked review documents referenced by path and SHA-256.
 
+## Holdout Access Log
+
+- Every protected-holdout event is appended with `python -m pmv.holdout_log` (see `docs/holdout_access.md`); the machine ledger `research/holdout_access/ledger.v1.jsonl` is authoritative and `HOLDOUT_ACCESS_LOG.md` is its generated mirror. Never edit either by hand.
+- Commit the ledger and `HOLDOUT_ACCESS_LOG.md` together after every event; `access_started` must be committed, and `assert-started-committed` must pass, before any protected byte is exposed.
+- `access_started` consumes the holdout permanently. Known or suspected bypasses are recorded as contamination. The log never records protected observations, outcomes, metrics, or narrative text.
+
 ## Time
 
 - Every timestamp is timezone-aware UTC. Naive datetimes are lint errors.

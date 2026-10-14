@@ -14,15 +14,15 @@ This log does not define or change project governance. The holdout rules are set
 
 | Item | Value |
 |---|---|
-| Current cycle | N/A — no evaluation cycle has been defined yet. |
-| Holdout status | No protected holdout dataset or chronological split was found in this repository at initialization. |
-| Protected holdout ever opened | No repository evidence of protected-holdout access was found at initialization. No protected holdout dataset or split was found in the inspected repository. History outside this repository is unknown. |
-| Known contamination | None known from the inspected repository. History outside this repository is unknown. |
-| Gate currently authorized to open it | None reached. Opening is permitted only after Gate 6 of START_HERE.md, which includes explicit user approval for the specific candidate and frozen split. |
-| Consumed | Not known to be consumed from repository evidence. History outside this repository is unknown. |
-| Authoritative split definition | N/A — not yet defined. The split is created in START_HERE.md Phase 2. |
-| Dataset identity / version / hash | N/A — no project dataset was found in the inspected repository at initialization. |
-| Last event | HAL-0004 |
+| Current cycle | N/A — no evaluation cycle is registered in the machine ledger (HAL-0005). |
+| Holdout status | No protected holdout is registered in the machine ledger (HAL-0005). |
+| Protected holdout ever opened | No repository evidence of protected-holdout access (no access_started event; HAL-0001 to HAL-0004 record none); activity outside the governed repository and protocol is not knowable from this log (HAL-0005). |
+| Known contamination | None recorded in the machine ledger; prior status none known (HAL-0005). |
+| Gate currently authorized to open it | None — opening requires an access_authorized event backed by a committed Gate 6 PASS record and, before access_started, a committed Gate 7 preregistration PASS record. |
+| Consumed | No consuming event in the machine ledger; prior status not known to be consumed (HAL-0005). |
+| Authoritative split definition | N/A — no holdout is registered for the current cycle. |
+| Dataset identity / version / hash | N/A — no holdout is registered for the current cycle. |
+| Last event | HAL-0005 |
 
 The status section summarizes the history below. It may change only together with an appended event that justifies the change, and every change must cite that event's ID. If the status section and the history ever disagree, the history is authoritative.
 
@@ -110,6 +110,20 @@ Existing records must never be deleted, rewritten, renumbered, or silently corre
 A correction must be a new correction record that references the original event ID and states what is being corrected and why.
 
 Commit each new event to Git promptly, so that Git history provides tamper evidence.
+
+---
+
+## Machine-Readable Ledger
+
+From HAL-0005 onward, every event in this log is first recorded in the hash-chained machine ledger `research/holdout_access/ledger.v1.jsonl` by `python -m pmv.holdout_log`. The machine ledger is authoritative for event identity, order, hashes, authorization state, and holdout state. The tool then appends the event's generated Access History entry and regenerates Current Status. `python -m pmv.holdout_log verify-history`, which is part of `scripts/check.sh`, requires the generated history and Current Status to agree exactly with the machine ledger.
+
+HAL-0001 through HAL-0004 predate the machine ledger and are pinned by exact-byte hash in the `log_initialized` event.
+
+Generated entries contain only controlled identities, hashes, counts, timestamps, roles, and enumerated values. Exact protected observations, protected outcomes, metrics, model outputs, and narrative details must not be stored in this log. Restricted evidence may be referenced only by approved identity/hash.
+
+`access_started` and its generated Markdown mirror must be committed in Git before any protected observation can be exposed.
+
+Never edit a generated Access History entry or Current Status by hand.
 
 ---
 
@@ -325,3 +339,37 @@ Template for new events:
 - Holdout consumed by this event: No
 - Required remediation / escalation: None
 - Evidence / artifact references: HAL-0001 in this log
+
+### HAL-0005 — Machine ledger initialized
+
+- Event ID: HAL-0005
+- UTC timestamp: 2026-10-14T05:39:37.482150Z
+- Actor / process: `python -m pmv.holdout_log` (log_initialized)
+- Access type: N/A — not an access event
+- Reason: Initialize the machine-readable holdout access ledger; not an access event
+- Project phase and gate: Phase 0 Step 8; no gate reached
+- Cycle ID: N/A — not recorded by log_initialized events
+- Candidate ID: N/A — not recorded by log_initialized events
+- Candidate-manifest SHA-256: N/A — not recorded by log_initialized events
+- Implementation snapshot identity: N/A — not recorded by log_initialized events
+- Implementation readiness review SHA-256: N/A — not recorded by log_initialized events
+- Git commit: `65ddbb1a0dbe382f431cae146bd45353726df4c9`
+- Working-tree cleanliness: Not clean — dirty-tree fingerprint `330b22f2f1d1bee4ef5c396f7c4c231d4779aca59b200268e8463537a849a7c3`
+- Dataset identity / version / hash: N/A — not recorded by log_initialized events
+- Exact chronological split definition: N/A — not recorded by log_initialized events
+- Split freeze timestamp: N/A — not recorded by log_initialized events
+- Development boundary: N/A — not recorded by log_initialized events
+- Purge / embargo definition: N/A — not recorded by log_initialized events
+- Protected holdout boundary: N/A — not recorded by log_initialized events
+- Exact rows / timestamps / partition requested: N/A — not recorded by log_initialized events
+- Protected data actually exposed: No
+- Exposure scope: N/A — not recorded by log_initialized events
+- Authorization basis: N/A — not recorded by log_initialized events
+- Pre-access verification results: N/A — not recorded by log_initialized events
+- Operation performed: Created the machine ledger, inserted the approved Machine-Readable Ledger section, and generated Current Status
+- Metrics / results revealed: None — this log never records protected results
+- Downstream decision changed: No
+- Contamination status: none recorded by this event
+- Holdout consumed by this event: No
+- Required remediation / escalation: None
+- Evidence / artifact references: Legacy file `faf41f5f1e00bfc555aee1f34ac4dec38b024469aec8a56aae440e10620f5db7`; HAL-0001 to HAL-0004 bytes `87eb78ec72babd73b946dcd200fe83ee61961efe32954f617fbaeda27f91bee6`; prior status table `d85f21a0e9a72e0dbdfc23e9e4c1369384e1d018903cf422d76abc6df6d9dc33`; machine ledger seq 0, entry `db6eaf5d557eaed25d9f1d815a719d3d4579ab61083784ef2e6e3e7ff57de862`
