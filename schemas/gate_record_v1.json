@@ -1,0 +1,647 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pmv.gate_record/1",
+  "title": "PMV gate decision record, version 1",
+  "description": "The canonical JSON record embedded in docs/decisions/gates/<gate_id>_<record_id>.md. The whole Markdown file is generated from this record and must re-render byte for byte; the record's authoritative hash is the SHA-256 of the whole file. Documentation only: the authoritative validator is pmv.gate_record.validate_record / parse_record_file, which also enforces the cross-field rules described here. Lists are in one canonical order (pmv.gate_record.canonicalize) without duplicates. Canonical bytes: sorted keys, no spaces, ASCII, no floats; JSON booleans are never integers. As defense in depth, no string may look like secret material.",
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "timestamp_id": {
+      "type": "string",
+      "pattern": "^[0-9]{8}T[0-9]{6}\\.[0-9]{6}Z_[0-9a-f]{32}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$",
+      "description": "UTC; must be a real calendar time"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "document_path": {
+      "type": "string",
+      "maxLength": 512,
+      "pattern": "^(docs|research)(/[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})+$",
+      "not": {
+        "pattern": "^docs/decisions/gates/"
+      },
+      "description": "A path under docs/ or research/ of plain components, never under docs/decisions/gates/. Must be tracked at the recorded commit with exactly the recorded bytes."
+    },
+    "review_document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "audit",
+            "review"
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/document_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "description": "The document behind a finding or a review: kind review or audit only."
+    },
+    "evidence_document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "audit",
+            "checklist",
+            "plan",
+            "policy",
+            "review"
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/document_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "description": "Kinds audit, checklist, plan, policy, review. holdout_evaluation is rejected in v1 (no holdout-access linkage exists yet); governance is used only in project.governance."
+    },
+    "governance_document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "const": "governance"
+        },
+        "path": {
+          "enum": [
+            "CLAUDE.md",
+            "HOLDOUT_ACCESS_LOG.md",
+            "PROJECT_BRIEF.md",
+            "START_HERE.md"
+          ]
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_id",
+    "gate_id",
+    "scope",
+    "decided_at",
+    "decision",
+    "reasons",
+    "findings",
+    "reviews",
+    "final_decision",
+    "project",
+    "experiment_ledger",
+    "evidence",
+    "supersedes"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pmv.gate_record"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "record_id": {
+      "$ref": "#/$defs/timestamp_id",
+      "description": "Its timestamp equals decided_at."
+    },
+    "gate_id": {
+      "enum": [
+        "gate_0",
+        "gate_1",
+        "gate_2",
+        "gate_3",
+        "gate_4",
+        "gate_4_5",
+        "gate_5",
+        "gate_5_5",
+        "gate_6",
+        "gate_7",
+        "gate_8",
+        "gate_9",
+        "gate_10",
+        "gate_11"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "cycle_id"
+      ],
+      "properties": {
+        "candidate_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cycle_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "description": "Lineage key: (gate_id, cycle_id, candidate_id)."
+    },
+    "decided_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "decision": {
+      "enum": [
+        "pass",
+        "fail",
+        "inconclusive"
+      ]
+    },
+    "reasons": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "criteria_not_met",
+          "blocking_review_finding",
+          "leakage_detected",
+          "negative_after_cost_economics",
+          "calibration_failure",
+          "data_insufficient",
+          "control_missing",
+          "integrity_failure",
+          "unresolved_critical_failure_mode",
+          "insufficient_sample",
+          "missing_required_evidence",
+          "unstable_metric",
+          "unresolved_data_quality",
+          "execution_uncertainty",
+          "statistical_uncertainty",
+          "policy_not_defined",
+          "required_review_missing",
+          "review_not_independent"
+        ]
+      },
+      "description": "Empty for pass; at least one fail reason (and only fail reasons) for fail; at least one inconclusive reason (and only those) for inconclusive. Sorted."
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "document",
+          "finding_id",
+          "severity",
+          "status"
+        ],
+        "properties": {
+          "document": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/review_document"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finding_id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "severity": {
+            "enum": [
+              "blocking",
+              "non_blocking"
+            ]
+          },
+          "status": {
+            "enum": [
+              "open",
+              "resolved",
+              "accepted_by_owner"
+            ]
+          }
+        }
+      },
+      "description": "Pass requires every blocking finding to be resolved; accepted_by_owner never resolves a blocker. Sorted by finding_id, unique."
+    },
+    "reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "conclusion",
+          "document",
+          "independence",
+          "role"
+        ],
+        "properties": {
+          "conclusion": {
+            "enum": [
+              "recommend_pass",
+              "recommend_fail",
+              "recommend_inconclusive"
+            ]
+          },
+          "document": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/review_document"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "independence": {
+            "enum": [
+              "independent",
+              "material_author",
+              "not_assessed"
+            ]
+          },
+          "role": {
+            "enum": [
+              "ml_engineer",
+              "data_scientist",
+              "statistician",
+              "independent_statistical_auditor",
+              "quant_business_lead",
+              "reliability_red_team",
+              "risk_performance_engineer",
+              "api_execution_engineer",
+              "meta_reviewer_human",
+              "meta_reviewer_other_model_family"
+            ]
+          }
+        }
+      },
+      "description": "Recommendations by controlled role. Reviewers never make the final decision."
+    },
+    "final_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "approval_attested",
+        "approval_requirement",
+        "role"
+      ],
+      "properties": {
+        "approval_attested": {
+          "const": true
+        },
+        "approval_requirement": {
+          "const": "required"
+        },
+        "role": {
+          "const": "project_owner"
+        }
+      },
+      "description": "v1: every gate decision requires explicit project-owner approval, with no gate-specific exception. approval_attested is the operator's explicit assertion that owner approval occurred; the tool cannot prove human identity, and the owner's Git commit publishes the record."
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "configs",
+        "dirty_tree_sha256",
+        "governance",
+        "tree_dirty"
+      ],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$",
+          "description": "HEAD at creation. It must stay in HEAD's history and be a strict ancestor of the commit that introduces the record."
+        },
+        "tree_dirty": {
+          "type": "boolean",
+          "description": "Clean means clean apart from untracked valid gate records in the gate directory. Pass requires false."
+        },
+        "dirty_tree_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "governance": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/governance_document"
+          },
+          "description": "Exactly CLAUDE.md, HOLDOUT_ACCESS_LOG.md, PROJECT_BRIEF.md, START_HERE.md, in that order."
+        },
+        "configs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^configs/[a-z][a-z0-9_]{0,63}\\.toml$"
+              },
+              "sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          },
+          "description": "Every configs/*.toml, sorted by path."
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "tree_dirty": {
+              "const": false
+            },
+            "dirty_tree_sha256": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "properties": {
+            "tree_dirty": {
+              "const": true
+            },
+            "dirty_tree_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        }
+      ]
+    },
+    "experiment_ledger": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "checkpoint",
+            "entry_sha256",
+            "ledger_seq",
+            "store_id"
+          ],
+          "properties": {
+            "store_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "ledger_seq": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "entry_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "checkpoint": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "committed_in_git",
+                    "entry_sha256",
+                    "ledger_seq"
+                  ],
+                  "properties": {
+                    "committed_in_git": {
+                      "type": "boolean"
+                    },
+                    "entry_sha256": {
+                      "$ref": "#/$defs/sha256"
+                    },
+                    "ledger_seq": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "at or before the pinned ledger_seq"
+                    }
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "description": "The pinned experiment-ledger head. All run and artifact evidence is evaluated only at this prefix. Required when runs or artifacts are referenced."
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifacts",
+        "checks",
+        "documents",
+        "holdout",
+        "raw_captures",
+        "runs"
+      ],
+      "properties": {
+        "runs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "eligible_at_pin",
+              "role",
+              "run_id",
+              "state_at_pin"
+            ],
+            "properties": {
+              "eligible_at_pin": {
+                "type": "boolean"
+              },
+              "role": {
+                "enum": [
+                  "candidate",
+                  "supporting",
+                  "baseline",
+                  "counter",
+                  "failed_attempt"
+                ]
+              },
+              "run_id": {
+                "$ref": "#/$defs/timestamp_id"
+              },
+              "state_at_pin": {
+                "enum": [
+                  "completed",
+                  "failed",
+                  "aborted",
+                  "interrupted"
+                ]
+              }
+            }
+          },
+          "description": "Each run is terminal at the pin; sorted by run_id, unique. Pass requires candidate and supporting runs to be completed and evidence-eligible as of the pin. Roles are the record creator's declarations."
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "artifact_name",
+              "run_id",
+              "sha256"
+            ],
+            "properties": {
+              "artifact_name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}(\\.[a-z0-9]{1,8})?$"
+              },
+              "run_id": {
+                "$ref": "#/$defs/timestamp_id"
+              },
+              "sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          },
+          "description": "Every artifact's run_id must also appear in evidence.runs. Pass artifacts must come from candidate or supporting runs (which pass requires to be completed and eligible at the pin). Sorted by (run_id, artifact_name), unique."
+        },
+        "raw_captures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "capture_id",
+              "manifest_sha256"
+            ],
+            "properties": {
+              "capture_id": {
+                "$ref": "#/$defs/timestamp_id"
+              },
+              "manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          },
+          "description": "Sorted by capture_id, unique."
+        },
+        "documents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence_document"
+          },
+          "description": "Sorted by path, unique."
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "check_id",
+              "outcome"
+            ],
+            "properties": {
+              "check_id": {
+                "enum": [
+                  "check_sh"
+                ]
+              },
+              "outcome": {
+                "enum": [
+                  "passed",
+                  "failed"
+                ]
+              }
+            }
+          },
+          "description": "Produced only by the gate tool running ./scripts/check.sh against the recorded project identity. Pass requires check_sh passed."
+        },
+        "holdout": {
+          "type": "array",
+          "maxItems": 0,
+          "description": "Protected-holdout evidence. Always empty in v1: holdout-access linkage does not exist yet."
+        }
+      }
+    },
+    "supersedes": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "record_id",
+            "record_sha256"
+          ],
+          "properties": {
+            "record_id": {
+              "$ref": "#/$defs/timestamp_id"
+            },
+            "record_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          },
+          "description": "The committed head of the same lineage, by record ID and whole-file SHA-256. The successor's record_id is later and differs."
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

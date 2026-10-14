@@ -77,6 +77,14 @@ Engineering conventions only. Project governance lives in PROJECT_BRIEF.md, CLAU
 - Inputs are exact, hash-pinned raw captures or artifacts of completed runs. Dirty or unknown code makes a run exploratory and ineligible as evidence.
 - The authoritative ledger is append-only; nothing rewrites it except the operator-only torn-tail repair, which preserves the removed bytes first.
 
+## Gate Records
+
+- Every gate decision is a generated, immutable file at `docs/decisions/gates/<gate_id>_<record_id>.md`, created only with `python -m pmv.gates create` (see `docs/gates.md`). Never write or edit one by hand; verification re-renders the whole file.
+- The tool never stages, commits, or pushes. A decision is published only when the project owner reviews and commits the record, in a new commit; never amend a record into the commit whose state it records.
+- Every v1 gate decision requires explicit project-owner approval; reviewers and agents only recommend.
+- Changes create a new record that supersedes the committed lineage head; committed records are never modified or deleted, and `scripts/check.sh` verifies this against Git history.
+- Records hold only enums, identifiers, hashes, timestamps, and paths. Rationale lives in tracked review documents referenced by path and SHA-256.
+
 ## Time
 
 - Every timestamp is timezone-aware UTC. Naive datetimes are lint errors.
