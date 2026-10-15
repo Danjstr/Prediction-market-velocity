@@ -84,6 +84,13 @@ Engineering conventions only. Project governance lives in PROJECT_BRIEF.md, CLAU
 - Raw-storage metadata (manifests, frame headers, events, quarantine records) uses closed schemas with no free text, and logs carry only capture IDs, counts, sizes, hashes, and enumerated reasons.
 
 - In every non-test environment the raw store root must resolve inside `~/pmv-protected/raw`. Configuration loading and `check-config` enforce it (`docs/raw_data.md`).
+## Market Data
+
+- Normalized market data uses `pmv.market_data` (see `docs/market_data.md`). An observation is available at its PMV receipt time (`received_at`), never at its source time. Feature code receives an `AsOfView` with an explicit `min_latency`, never a whole log.
+- Official outcomes and labels (`market_data.labels`) never enter an observation log. Feature-side modules never import them.
+- Parsers never set receipt time or provenance. Every raw frame gets exactly one recorded disposition, and nothing is dropped silently.
+- Venue semantics (fields, units, sequence rules, contract rules, fees) are encoded only after verification from current official sources, recorded in `research/sources.md`. Until then an adapter fails closed.
+
 ## Experiments
 
 - Every research run is recorded through the experiment store described in `docs/experiments.md`, outside Git. Its root is explicit configuration with no default.
