@@ -31,8 +31,8 @@ Engineering conventions only. Project governance lives in PROJECT_BRIEF.md, CLAU
 
 ## Backup and Recovery
 
-- The private GitHub remote (`origin`) backs up committed code and history only, never secrets, credentials, or raw or protected data. Checkpoints, pushes, recovery, and the agent access boundary follow `docs/backup_and_recovery.md`. Only the current local checkpoint workflow is enabled.
-- Stage only explicit approved paths; never `git add -A`. Never force-push or rewrite published history.
+- The private GitHub remote (`origin`) backs up committed code and history only, never secrets, credentials, or raw or protected data. Checkpoints, pushes, recovery, and the agent access boundary follow `docs/backup_and_recovery.md`. Two checkpoint workflows are enabled: the local owner-controlled workflow, and, only inside the owner-approved isolated container, the task-branch workflow. Under the second, `main` advances only through a pull request with the "Quality gate" check passing.
+- Stage only explicit approved paths; never `git add -A`, `git add .`, or `git commit -a`. Claude Code sandbox masking placeholders (`.bashrc`, `.gitconfig`, `secrets`, `.claude/skills`, and others) can appear as untracked paths and must never be committed. Never push `main` from an agent session, never force-push, and never rewrite published history.
 
 ## Code Style
 

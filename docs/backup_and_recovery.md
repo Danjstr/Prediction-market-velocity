@@ -2,15 +2,17 @@
 
 This document covers four things: how the repository's code and history are backed up; the environments development agents may work in and the access boundary around them; how an approved batch of work becomes a verified checkpoint; and how to recover the repository if the local machine or container is lost. It covers the Git repository only. It does not provide a backup for raw market data, protected data, the experiment store, or credentials (see "Policy boundary").
 
-Owner basis: Step 11 F-04 (`docs/decisions/2026-10-14_phase0_step11_owner_decisions.md`); the Phase 0 Step 12 private-remote and restore verification completed after Gate 0; and the owner's operating-model decision for Phase 1 (2026-10-14), recorded in "Execution environments and access boundary" below.
+Owner basis: Step 11 F-04 (`docs/decisions/2026-10-14_phase0_step11_owner_decisions.md`); the Phase 0 Step 12 private-remote and restore verification completed after Gate 0; the owner's operating-model decision for Phase 1 (2026-10-14); and the owner's activation of the isolated autonomous environment (`docs/decisions/2026-10-15_isolated_autonomy_activation.md`). The last two are summarized in "Execution environments and access boundary" below.
 
 ## Authoritative locations
 
 | Item | Value |
 |---|---|
 | Working repository | `~/prediction-market-velocity` on the owner's ChromeOS Linux container |
-| Private remote | `origin` = `git@github-pmv:Danjstr/Prediction-market-velocity.git` (private GitHub repository `Danjstr/Prediction-market-velocity`) |
+| Isolated working copy | `/workspace` inside the owner-approved isolated container (see "Isolated autonomous execution"). It is a working copy, not a backup. |
+| Private remote | `origin` = `git@github-pmv:Danjstr/Prediction-market-velocity.git` (private GitHub repository `Danjstr/Prediction-market-velocity`). In the isolated container, `origin` points at the same repository through `ssh.github.com:443`. |
 | SSH alias | `github-pmv` is a host alias in the owner's local `~/.ssh/config`. It, and the passphrase-protected key it names, exist only on the owner's machine and are never in the repository. |
+| Isolated-environment credential | A repository-scoped GitHub deploy key, provisioned by the owner into the isolated container only. It is never in the repository, is not the owner's personal key, and is never exposed to the owner's personal machine sessions. |
 | Integration branch | `main` is the authoritative integration branch unless a later approved policy changes it. |
 | Reference point | Gate 0 PASS was committed as `db09acd91c909f787ea3acc4ece421d8de59af2d` ("Record Gate 0 PASS"); its record pins project commit `1b743781ff0179ff9194062f339b8b656648f3fd`. Later checkpoints move `main` forward from there. |
 | Secondary local bundle | `~/pmv-backups/prediction-market-velocity-pre-gate0-1b743781.bundle`, SHA-256 `7b1440b9e7d859000ff68a3d03ce783369e7db320a69ac8bc21b44db92a21655`, outside the repository |
@@ -25,23 +27,41 @@ The source of truth for the latest checkpoint is the verified `main` on GitHub, 
 
 Each meaningful work batch begins with an owner-approved **objective, scope, acceptance criteria, and boundaries**. The owner approves the mission once. Routine implementation within that approved scope does not need repeated owner confirmation. Anything outside the approved scope, any material change as defined in START_HERE.md, and any governance change still needs explicit owner approval (CLAUDE.md "Development Behavior").
 
-### Current model: local, owner-controlled (in force)
+Two execution models are in force. Which one applies depends on where the session runs, not on what the agent prefers.
+
+### Local model: owner-controlled (in force)
 
 - Development runs in local Claude Code sessions on the owner's Chromebook container, under the project's Claude Code permissions and sandbox (`.claude/settings.json`).
 - **Local sessions remain owner-controlled.** They are not approved for unattended autonomous execution. Ordinary local Claude Code sandboxing is not assumed to be enough for unattended work on the owner's personal machine.
 - Local Claude cannot read `~/.ssh`. The owner makes every authenticated push and remote verification from a normal terminal.
-- This model stays in force until an isolated autonomous environment is explicitly configured and approved by the owner.
+- Activation of the isolated model does not change any of this.
 
-### Future model: isolated autonomous execution (NOT YET ENABLED)
+### Isolated autonomous execution (ENABLED 2026-10-15)
 
-- Autonomous development is intended to run eventually in an isolated project environment: preferably a dedicated cloud, container, or VM session tied only to this private repository.
-- That environment must not have access to the owner's general local filesystem, personal browser or session data, email, payment methods, password stores, Downloads, documents, or unrelated repositories.
-- It may be allowed to authenticate to **only this private repository**, with a credential scoped to it, under the "Future isolated autonomous checkpoint workflow" below.
-- **None of this is enabled.** No such environment, credential, or branch-push permission exists or is approved. Enabling it requires an explicit owner decision recorded in `docs/decisions/` and the prerequisites listed in that workflow.
+The owner configured, tested, and approved this environment (`docs/decisions/2026-10-15_isolated_autonomy_activation.md`). Its properties:
+
+- **Isolation.** Agents run in a rootless Podman container as an unprivileged user. Host and owner-private files are not mounted and are unavailable: the owner's home directory, `~/.ssh`, browser and session data, email, password stores, payment data, Downloads, documents, and unrelated repositories. The only project content is the repository working copy at `/workspace`.
+- **Owner-controlled configuration outside the repository.** The launcher and the Claude Code managed settings live outside the repository, under owner control. Agents cannot edit them, and nothing in the repository can override them. Project `.claude/settings.json` still applies, and its denies remain in force.
+- **Network.** Default-deny egress. Only owner-approved domains are reachable. Agents never try to widen, tunnel around, or otherwise bypass the allowlist.
+- **Claude state and executable.** Claude Code state (`~/.claude`) and the Claude Code executable live in dedicated container volumes, separate from the repository and from the host. They are not project files and are not backed up by GitHub.
+- **Repository credential.** A deploy key scoped to this one private repository. It can push task branches. It cannot change repository settings, visibility, or rulesets, and it cannot reach other repositories.
+- **Protection of `main`.** The active GitHub ruleset "Protect Main" blocks direct pushes to `main` (including from the deploy key), requires a pull request with the "Quality gate" CI check passing before merge, blocks force pushes, and has no bypass actors. `main` advances only by a merged pull request.
+- **Scope.** Each batch still starts with an owner-approved charter (see "Owner control at batch start"). Autonomy covers implementing, checking, committing, and pushing task branches within that charter. It covers nothing else.
+
+### Not authorized in either model
+
+Activation of the isolated environment authorizes development work only. In **both** models, the following remain **not authorized** until a separate explicit owner decision recorded in `docs/decisions/`, together with the gates and controls that already govern them:
+
+- **Real venue credentials** of any kind, including data-only or read-only ones. Credential isolation under `docs/protected_information.md` and `docs/conventions.md` "Secrets" applies unchanged. The isolated container holds no venue credential and no `~/pmv-credentials`.
+- **Real-money execution.** CLAUDE.md "Real Capital and Venue Access" applies unchanged: Phase 12 at the earliest, with explicit owner approval.
+- **Irreplaceable live-data capture.** It still requires the approved raw/protected-data backup policy and its restore smoke test (`docs/raw_data.md`, START_HERE.md Gate 1). The isolated container holds no `~/pmv-protected`, and no protected scope or protected data is available in it.
+
+The production runtime stays LLM-free and agent-free (CLAUDE.md "Critical Runtime Independence"). The isolated environment is a development environment only. Nothing in production may depend on it, on Claude, or on any agent.
 
 ### Filesystem boundary (both models)
 
-- An agent's normal readable and writable scope is the project repository, plus explicitly approved project-specific runtime paths. Currently those are the session's temporary scratch directory and the pinned project tools under `~/.local/share/pmv-tools/`, which agents only execute through the project scripts.
+- An agent's normal readable and writable scope is the project repository, plus explicitly approved project-specific runtime paths. Currently those are the session's temporary scratch directory and the pinned project tools under `~/.local/share/pmv-tools/`, which agents only execute through the project scripts. In the isolated container, the Claude state and executable volumes are owner-managed infrastructure, not project scope. Agents leave them alone except for Claude Code's own operation.
+- In the isolated container, the deploy key file is used only by `git` through SSH. Agents never read, print, copy, move, or modify the key, its SSH configuration, or `known_hosts`, and never use the key for anything other than `git` operations on `origin`.
 - The protected-data path `~/pmv-protected` and the credential path `~/pmv-credentials` remain governed by `docs/protected_information.md`. They are denied to agents.
 - Personal paths and credential paths are denied by default. Agents never deliberately inspect or traverse unrelated home-directory content.
 - Outside scope: `~/.ssh`, browser profiles, email stores, password and key stores, financial information, Downloads, personal documents, and unrelated repositories or user files.
@@ -112,7 +132,7 @@ Rules:
 
 - **A failed check blocks the checkpoint.** If `./scripts/check.sh` or any step fails, do not stage, commit, or push. Fix the cause, or stop and report. No check is skipped, disabled, or worked around to obtain a backup.
 - If anything changes after step 3, run `./scripts/check.sh` again before committing.
-- **Inside a Claude Code sandbox**, `git status` can list masked placeholder paths (`.bashrc`, `.gitconfig`, `.mcp.json`, `secrets`, `.claude/skills`, and others) as untracked. They are not project files and must never be staged; explicit-path staging prevents that. A truly clean-tree check is run from a normal terminal (`docs/gate0_readiness.md`).
+- **Never use `git add -A`, `git add .`, or `git commit -a`, in either model.** Inside a Claude Code sandbox (local or isolated), `git status` can list masked placeholder paths (`.bashrc`, `.gitconfig`, `.mcp.json`, `secrets`, `.claude/skills`, and others) as untracked. They are sandbox artifacts, not project files, and must never be staged. Stage each intended file by explicit path and confirm with `git diff --cached --name-only`. A truly clean-tree check is run from a normal terminal (`docs/gate0_readiness.md`).
 - **A checkpoint is complete only after steps 9 and 10 succeed.** If the remote head does not match, or hosted CI fails or does not run, the checkpoint is reported as incomplete, with the exact failure. It is never declared complete.
 - **If a push is rejected** (for example as non-fast-forward), stop and report. Never force-push, never `pull --rebase` over published history, and never resolve a divergence of `main` without the owner. An unexpected divergence of the remote is an incident to investigate.
 - Push only `main`, with `git push origin main`. Pushing other branches or tags, or using `--all`, `--mirror`, `--tags`, `--delete`, `--force`, `--force-with-lease`, or a `+` refspec, needs explicit owner approval for that specific push.
@@ -123,35 +143,39 @@ The SSH key behind `github-pmv` is passphrase-protected, and `~/.ssh` is denied 
 
 Agents never ask for, receive, store, log, echo, or embed the passphrase or any key material. They never copy, generate, or modify keys or `~/.ssh` configuration, and never work around the denial: no HTTPS tokens, no changed remote URL, no credential helper, no agent forwarding. When an agent cannot run a step, it gives the owner the exact command to run and waits for the result.
 
-## Future isolated autonomous checkpoint workflow (NOT YET ENABLED)
+## Isolated autonomous checkpoint workflow (ENABLED 2026-10-15)
 
-This section describes an intended future operating mode. **It is not enabled.** No agent may push any branch under it, or describe autonomous branch pushing as available, until every prerequisite below is met and the owner has explicitly approved the mode.
+This workflow applies only inside the owner-approved isolated container described under "Isolated autonomous execution". In a local session, the local checkpoint workflow above still applies.
 
-**Prerequisites** (all required, each verified and recorded in `docs/decisions/`):
+**Prerequisites**, verified by the owner and recorded in `docs/decisions/2026-10-15_isolated_autonomy_activation.md`:
 
-1. An isolated autonomous environment (a dedicated cloud, container, or VM session) is configured, tied only to this repository, and explicitly approved by the owner. It has none of the access excluded under "Execution environments and access boundary".
-2. That environment has a credential that can reach **only this private repository**, with the minimum permissions needed to push task branches. It cannot change repository settings, visibility, rulesets, or other repositories, and it is never exposed to the owner's personal machine or to `~/.ssh`.
-3. GitHub branch protection or rulesets on `main` are configured and verified. At minimum they block force-pushes and deletion, and require the CI check (and any owner-required review) before a merge. The owner decides whether agents may merge.
-4. The CI trigger covers task branches as intended. Under the current `.github/workflows/ci.yml`, CI runs on `pull_request` and on pushes to `main` only, so a pushed task branch has no hosted CI until a pull request is opened. Any trigger change is a reviewed change to CI.
-5. The owner has approved the batch charter (objective, scope, acceptance criteria, boundaries) under which the agent runs.
+1. The isolated environment is configured, tied only to this repository, and approved by the owner. It has none of the access excluded under "Execution environments and access boundary".
+2. Its credential is a deploy key that reaches **only this private repository** and can push task branches. It cannot change repository settings, visibility, rulesets, or other repositories, and it is not exposed to the owner's personal machine or `~/.ssh`.
+3. The active "Protect Main" ruleset blocks direct pushes and force pushes to `main`, requires a pull request with the "Quality gate" check before merge, and has no bypass actors.
+4. CI covers task branches through pull requests. Under `.github/workflows/ci.yml`, CI runs on `pull_request` and on pushes to `main` only, so a pushed task branch has no hosted CI until a pull request is opened. Any trigger change is a reviewed change to CI.
+5. Each batch runs under an owner-approved charter (objective, scope, acceptance criteria, boundaries). The prerequisites above are standing; this one is renewed for every batch.
 
-**Workflow** (once enabled):
+If any prerequisite stops holding (for example, the ruleset is disabled, gains a bypass actor, or the deploy key's scope changes), autonomous pushing stops until the owner restores and re-verifies it.
 
-1. Create a task branch from the current verified `main`. Agents do not commit directly to `main`.
+**Workflow:**
+
+1. Create a task branch from the current verified `main`. Agents never commit to or push `main`.
 2. Implement within the approved batch scope.
-3. Run `./scripts/check.sh`. A failure blocks the checkpoint, exactly as in the current workflow.
-4. Stage explicit paths only, then commit with a meaningful message.
-5. Push only the task branch, fast-forward only, to `origin`.
-6. Verify that the remote task-branch head equals the local head.
-7. Obtain hosted CI for that exact commit (normally through a pull request into `main`).
-8. Review and merge into `main` according to the owner's policy at that time. `main` advances only through that process.
+3. Run `./scripts/check.sh`. A failure, or an inability to run it, blocks the checkpoint exactly as in the local workflow: nothing is committed or pushed.
+4. Inspect the exact diff. Stage explicit paths only (never `git add -A`; see the rules above), confirm with `git diff --cached --name-only`, then commit with a meaningful message.
+5. Push only the task branch to `origin` with an explicit refspec (`git push origin <task-branch>`), fast-forward only.
+6. Verify that the remote task-branch head equals the local head (`git ls-remote origin refs/heads/<task-branch>` against `git rev-parse HEAD`).
+7. Obtain hosted CI for that exact commit through a pull request into `main`. Agents open a pull request only when the batch charter authorizes it.
+8. Merge into `main` only through the pull request, with "Quality gate" passing, under the owner's merge policy. Unless the owner explicitly authorizes otherwise, merging stays with the owner. After the merge, the checkpoint is verified as in steps 9–10 of the local workflow, against the merged `main` SHA.
 
-Always forbidden, in this mode as in every other: force-pushing; rewriting published history; deleting `main` or other published branches without owner approval; changing repository visibility or settings; disabling or weakening CI or security controls; accessing other repositories unless the owner separately approves them; and pushing failed, unsafe, secret-bearing, or protected material.
+A pushed task branch is a backup of in-progress approved work, not a checkpoint of `main`. The checkpoint is complete only once the merged `main` passes hosted CI.
+
+Always forbidden, in this mode as in every other: pushing to `main`, or attempting it to test the ruleset; force-pushing any branch, including task branches; rewriting published history; deleting `main`, other published branches, or tags without owner approval; changing repository visibility, settings, rulesets, deploy keys, or remotes; changing `git` configuration unless the owner approves it; disabling or weakening CI or security controls; accessing other repositories; and pushing failed, unsafe, secret-bearing, or protected material. The ruleset is a backstop for these rules, not a substitute for them.
 
 ## Normal checkpoints, incomplete work, and emergencies
 
 - **Normal checkpoint.** Follow the applicable workflow above in full, after an approved batch passes every check.
-- **Uncommitted or incomplete work.** It is not backed up by either workflow and is not pushed merely to preserve it. Work that fails checks, is unreviewed, or is half-finished stays local, or (once the future mode is enabled) stays unpushed in the isolated environment. Reduce the exposure by splitting work into smaller approved batches that can each reach a passing checkpoint. In the current model, pushing work-in-progress branches is not approved policy.
+- **Uncommitted or incomplete work.** It is not backed up by either workflow and is not pushed merely to preserve it. Work that fails checks, is unreviewed, or is half-finished stays local, or stays unpushed in the isolated environment. Reduce the exposure by splitting work into smaller approved batches that can each reach a passing checkpoint. In the local model, pushing work-in-progress branches is not approved policy. In the isolated model, only task branches that passed `./scripts/check.sh` are pushed.
 - **Emergency: the device may fail before the next normal push.** Commits on `main` that already passed a checkpoint's checks but were not yet pushed are pushed by the normal steps 8–10. If checks cannot pass, nothing is pushed to `main`. The owner may instead make a Git bundle of committed history from a normal terminal (`git bundle create <file> --all`, then `git bundle verify <file>`), stored outside the repository and off the device. A bundle contains only committed Git objects, never untracked or ignored files, but it is still subject to every exclusion above. Agents never initiate this on their own.
 - **Emergency: the local repository is lost or corrupted.** Follow "Recovery procedure" below.
 
@@ -161,7 +185,9 @@ Development agents:
 
 - work only within the owner-approved batch scope and the access boundary above;
 - treat a verified checkpoint as part of finishing a meaningful approved work batch. They tell the owner when the batch is ready, giving the exact paths, the `./scripts/check.sh` result, and the proposed commit message;
-- in the current local model, stage, commit, or push only when the owner instructs it for that batch;
+- in the local model, stage, commit, or push only when the owner instructs it for that batch;
+- in the isolated model, commit and push task branches only within the approved batch charter, never push `main`, and open pull requests or merge only as the charter or owner policy allows;
+- stage by explicit path only, never with `git add -A`, `git add .`, or `git commit -a`;
 - never force-push, never rewrite or amend published history, never delete the remote or its branches, never change repository visibility or settings, and never create or change remotes;
 - never disable, weaken, or skip CI, the secret scan, `scripts/check.sh`, the access boundary, or any other security control;
 - never commit or push secrets, credentials, or protected or raw market data;
@@ -197,7 +223,8 @@ GitHub does not hold, and recovery from it does not restore:
 - credentials (`~/pmv-credentials`), SSH keys, or `~/.ssh` configuration;
 - ignored or untracked local files, including `.claude/settings.local.json`, the virtual environment, and installed tools (reinstalled in step 4);
 - uncommitted or unpushed work;
-- Claude Code session history and memory outside the repository.
+- Claude Code session history and memory outside the repository, including the isolated container's Claude state and executable volumes;
+- the isolated container's deploy key, launcher, and managed settings, which the owner re-provisions out of band.
 
 Restore those only from a separately approved backup system for that data class, where one exists for the current phase. Where none exists, the data is not recoverable, and a recovery report must say so rather than imply otherwise.
 
@@ -223,6 +250,7 @@ A newer bundle made under "Emergency" above is restored the same way, after veri
 
 ## Open risks
 
-- **Branch protection is unverified.** No GitHub branch protection or ruleset on `main` has been verified, so a force-push or deletion of `main` is not known to be technically blocked. Configuring and verifying it (blocking force-pushes and deletion, and requiring CI before merge) is recommended now, and is a **prerequisite** before any autonomous agent may push task branches.
+- **Ruleset scope is limited to `main`.** "Protect Main" blocks direct pushes and force pushes to `main`, requires a pull request with "Quality gate", and has no bypass actors. Branch deletion protection for `main` is not separately recorded here and should be confirmed in the ruleset. The ruleset does not protect task branches or tags, so force pushes or deletions there are prohibited by policy only. A repository administrator can still edit or disable the ruleset, so GitHub remains not an immutable archive (see "Policy boundary").
+- **Deploy key held by agents.** The deploy key can push to any non-protected branch, and agents in the container can use it. A misbehaving agent could therefore create, overwrite, or delete task branches. `main` is protected technically; everything else relies on policy and owner review.
 - **One off-device copy.** GitHub is the only off-device copy of the history; the bundle is on the same device.
 - **Untested end-to-end drill.** This procedure combines commands verified during Step 12; it has not been run end to end as a written restore drill.
