@@ -29,6 +29,11 @@ Engineering conventions only. Project governance lives in PROJECT_BRIEF.md, CLAU
 - It must pass before a commit. CI runs the same script.
 - CI (`.github/workflows/ci.yml`) runs `scripts/check.sh` with the same pinned uv (`scripts/uv.pin`) and Betterleaks. GitHub Actions are pinned to full commit SHAs, with the release version in a comment. CI has read-only permissions, no secrets, no caching, and no uploaded artifacts.
 
+## Backup and Recovery
+
+- The private GitHub remote (`origin`) backs up committed code and history only, never secrets, credentials, or raw or protected data. Checkpoints, pushes, recovery, and the agent access boundary follow `docs/backup_and_recovery.md`. Only the current local checkpoint workflow is enabled.
+- Stage only explicit approved paths; never `git add -A`. Never force-push or rewrite published history.
+
 ## Code Style
 
 - Formatting and linting: `ruff`, line length 100.
