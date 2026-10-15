@@ -1,0 +1,122 @@
+# Phase 1: Data Feasibility and Live Collection — Plan and Status
+
+Working record for Phase 1. The authoritative requirements are START_HERE.md (Phase 1, Gate 1, Project-Wide Controls), CLAUDE.md, and PROJECT_BRIEF.md; where this file summarizes them, they win. This is not a gate record and not an owner-decision record.
+
+## Owner direction for Phase 1 (batch charter, 2026-10-15)
+
+- First venue: Kalshi. Polymarket is deferred until separately approved and verified.
+- Underlyings: Bitcoin and gold.
+- Horizon: 15-minute markets first, with an architecture that supports roughly 15 minutes to 1 hour.
+- Strategy: quantitative short-horizon price-path and velocity prediction, not sentiment.
+- Production runtime: free of LLMs and agents.
+- Not authorized: real venue credentials, real-money execution, protected or holdout exposure, and irreplaceable live-data capture.
+
+This direction comes from the batch charter. It has not yet been recorded under `docs/decisions/`. Recommendation: the owner records it there, and in particular the Polymarket deferral, because PROJECT_BRIEF.md §1 and §6 name both venues.
+
+## What Phase 1 requires (START_HERE.md)
+
+1. **Verify current official documentation** for Kalshi, Polymarket (deferred, above), BTC reference feeds, and gold reference feeds. Determine historical depth, timestamp resolution, trade data, order-book data, market metadata, settlement metadata, rate limits, WebSocket behavior, sequence handling, authentication, and latency characteristics.
+2. **Build the ingestion architecture.** Preserve raw data, and capture contract identity per "Data and Contract Identity".
+3. **Before any outcome-dependent inspection,** create the `cycle_id` and record the split-formation method, the declared development subset, and the protected interval.
+4. **Begin high-frequency live capture** once the raw-data backup and retention policy exists and a backup-and-restore smoke test has passed.
+5. **Reliability review** of disconnects, reconnects, stale messages, duplicates, missing messages, sequence gaps, timestamp anomalies, and persistence failures.
+6. **Gate 1:**
+   - data sufficient to construct valid short-horizon training observations;
+   - per venue relied on, verification from current official sources of: API availability and permitted use, account eligibility, jurisdiction, market access, authentication, terms, and live-trading limits, with sources and retrieval dates;
+   - raw-data backup policy and restore smoke test.
+
+## Prerequisites and open decisions
+
+From `docs/gate0_readiness.md` ("Deferred findings and deadlines") and `docs/decisions/2026-10-14_phase0_step11_owner_decisions.md`. Status is as of this batch.
+
+| Item | Must be resolved before | Owner | Status |
+|---|---|---|---|
+| F-16 venue and jurisdiction eligibility, and whether in-scope gold contracts exist | Any venue account or credential, or any real collection or trading integration | Owner, with API / Execution research | Open. Needs AR-1 |
+| F-06 prospective holdout as the default formation | Agents see any real observation | Owner | Open |
+| F-08 release architecture (trusted collector plus release by receipt time) | Agents see any real observation | Owner | Open. This batch is compatible: availability is defined by receipt time |
+| F-07 power-based holdout size and unit of independence | First real protected scope or cycle | Owner, with Statistician | Open |
+| F-17 minimum economic thresholds and kill criteria | Substantive strategy or model work on real data | Owner, with Quant / Business Lead | Open |
+| F-03 credential isolation implementation | Any venue credential, including data-only | Owner | Open. No credential exists |
+| F-09 network and WebFetch denies for market-data hosts | Phase 1 real collection | Owner (settings are governance) | Open |
+| F-11 capture segmentation and salvage; F-12 frame v2 timing and direction (with F-27); F-26; F-33 | Phase 1 real collection | API / Execution, Reliability | Open |
+| F-37, RT-4: demo data treated as real; collectors refuse the test environment | Phase 1 real collection | API / Execution | Open |
+| F-32 collector host and alert recipient | Phase 1 real collection | Owner | Open |
+| F-21b per-gate scope and minimum-reviewer table | Phase 1 real collection | Owner | Open |
+| Raw-data backup and retention policy, plus restore smoke test | First live capture, and no later than Gate 1 | Owner | Open |
+| F-15, F-24, F-30; Step 9 S-2, S-4, S-6 per F-08 | Agents see real observations | Various | Open |
+
+**Consequence.** Until these are resolved, Phase 1 work is limited to documentation research (subject to access approval), synthetic fixtures, and deterministic infrastructure. No real observation may be shown to agents, and no real capture may begin.
+
+## Interpretation that needs owner confirmation (S-6)
+
+START_HERE.md Phase 1 lists properties to "determine" (historical depth, timestamp resolution, and so on). `docs/protected_information.md` forbids agents from inspecting real observations before the split and protected scope exist.
+
+This batch reads the requirement as follows:
+- these properties are determined from official documentation;
+- empirical confirmation comes only from deterministic collector **metadata**, produced outside agent sessions and containing no prices, quantities, outcomes, or contract identifiers. Examples: message counts, inter-arrival statistics, gap and reconnect counts, timestamp-field presence and resolution;
+- such metadata needs the owner-approved release design (F-08) before agents see it.
+
+This is a recommendation, not an approved rule.
+
+## Batch 1 (this branch): venue-neutral data foundation
+
+Done without credentials, real data, or network access:
+
+- `src/pmv/market_data/`: canonical contract identity, observations, timestamp semantics, decision-time views and feature rows, labels kept apart from observations, deterministic validation, the raw-to-normalized replay boundary, deterministic order-book reconstruction with enumerated faults (point-in-time from an `AsOfView`), a synthetic adapter, and a fail-closed Kalshi boundary. See `docs/market_data.md`.
+- Tests:
+  - `tests/unit/test_market_data_*.py`;
+  - `tests/replay/test_market_data_replay.py`: raw frames encoded and read back with the real raw format;
+  - structural boundary tests: no network imports, no wall-clock reads, and feature-side modules never import labels.
+
+No Kalshi field, endpoint, unit, fee, rule, or eligibility fact is encoded. `pmv.market_data.kalshi.REQUIRED_VERIFICATIONS` lists what must be verified first.
+
+## ACCESS REQUESTS
+
+### AR-1: Kalshi official documentation (blocking for the Kalshi adapter and F-16)
+
+- **Resources.**
+  - `docs.kalshi.com`: API reference, covering REST market, event, and series metadata; the WebSocket channels, message schemas, sequence and snapshot semantics; authentication requirements, including for public market data; rate limits; historical-data endpoints and depth; the demo environment; and any OpenAPI or AsyncAPI specification files it publishes.
+  - `kalshi.com`: the documentation, legal, and help pages for terms of service and API or developer terms; account and jurisdiction eligibility; the fee schedule and its effective dates; and the contract rule pages for BTC and gold series, covering settlement source, determination timing, rounding, ties, and voids.
+- **Why.**
+  - Phase 1 requires verification from current official sources.
+  - Gate 1 and F-16 require eligibility and terms verification before any account, credential, or collection.
+  - The Kalshi parser and `ContractSpec` builder cannot be written without verified semantics, and the batch charter forbids guessing them.
+- **What will be retrieved.** Documentation text and published schema files only. Each source is recorded in `research/sources.md` (title, URL, retrieval date, status), and rule-text SHA-256s are recorded for `VERIFIED_OFFICIAL` specs.
+- **Excluded.** No market-data API host is called, no live or historical market values are retrieved, and no account or credential is created.
+- **Example values.** Documentation may contain example payloads with market values. They are not used as data.
+- **Access.** Temporary, read-only, for the venue-verification task. Phase 12 re-verification is a new request.
+- **Hosts that must stay blocked.** The Kalshi trading and market-data API hosts, consistent with F-09.
+
+### AR-2: settlement reference-source documentation (conditional on AR-1)
+
+Once AR-1 identifies the official settlement sources for Kalshi BTC and gold contracts (for example, a CF Benchmarks index for BTC), request read-only access to that provider's **methodology documentation** domain only. The purpose is to define `resolution_source_id` semantics and the BTC/gold reference-feed requirements. No price data is requested. The domains are named after AR-1, not guessed now.
+
+## Recommended next batches
+
+1. **Venue verification (needs AR-1).** Record Kalshi sources. Draft the F-16 eligibility findings for the owner. Write the verified Kalshi parser, the `ContractSpec` builder, and the resolution parser against fixtures built from documented schemas.
+2. **Raw format v2 and collector hardening (no network needed).**
+   - F-12: monotonic receive time and message direction in frame v2, with F-27;
+   - F-11: capture segmentation and salvage;
+   - F-37 and RT-4: collectors refuse the test environment and demo data is treated as real;
+   - F-33: durability-ordering tests.
+   - carry rejected and skipped frame dispositions into the book engine, so a rejected frame breaks book continuity directly (red-team review of `books`).
+3. **Normalized-capture artifacts (no network needed).** Content-addressed, versioned normalized outputs keyed by raw capture hash plus parser identity, with a closed schema.
+4. **Owner decisions:** F-06, F-08, F-16, F-07, F-17, F-09, F-03, F-32, F-21b, and the raw-data backup policy. Real collection and agent-visible data stay blocked until they are resolved.
+5. **Point-in-time contract-spec versioning (Statistician M1; blocking before the Kalshi spec builder).** Needs the owner's identity-design decision (`docs/market_data.md`, review m4).
+6. **Exclusion ledger and policy recording (Statistician M4).** Persistent counts of exclusions and faults by reason, regime, and period, keyed by policy IDs.
+
+## Methodology recommendations for owner decision (Statistician review, 2026-10-15)
+
+These would change approved validation methodology, so they are proposals, not adopted rules. Both feed F-07.
+
+- **R1: unit of independence.**
+  - *Current state.* No unit is defined, and `spec_key` is the de facto row key.
+  - *Concern.* Decision rows inside one contract share one label. Strikes in one event share one outcome, and back-to-back windows share the price path. A fee or rule correction gives the same market a new `spec_key`.
+  - *Proposal.* Group by outcome-reference event (underlying plus reference time) for splits, cluster or block bootstrap, and effective-sample-size accounting.
+  - *Benefit.* Honest uncertainty and no cross-split leakage.
+  - *Cost.* Far fewer effective samples.
+  - *Urgency.* Blocking before the first real protected scope or cycle (F-07).
+- **R2: purge and embargo by label end.**
+  - *Proposal.* Each label ends at the later of `outcome_reference_time` and the resolution's receipt, not at `close_time`. Whole contracts and events stay on one side of a frozen boundary, and feature lookbacks are purged too.
+  - *Urgency.* Required at the Phase 2 split freeze.
+
