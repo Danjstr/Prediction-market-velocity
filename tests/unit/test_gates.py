@@ -74,6 +74,14 @@ T0 = datetime(2026, 10, 14, 3, 15, tzinfo=UTC)
 GOVERNANCE = ("CLAUDE.md", "HOLDOUT_ACCESS_LOG.md", "PROJECT_BRIEF.md", "START_HERE.md")
 REVIEW = "docs/reviews/review.md"
 CONFIG = 'schema_version = 1\nenvironment = "test"\n\n[logging]\nlevel = "INFO"\n'
+DEVELOPMENT_CONFIG = CONFIG.replace('"test"', '"development"')
+
+
+def development_config(tmp_path: Path) -> list[str]:
+    """CLI arguments for a development configuration outside the repository (RT-4)."""
+    path = tmp_path / "development.toml"
+    path.write_text(DEVELOPMENT_CONFIG, encoding="ascii")
+    return ["--config", str(path), "--environment", "development"]
 
 
 def git(repo: Path, *arguments: str) -> bytes:
@@ -496,7 +504,7 @@ def test_the_command_line_creates_from_a_closed_request_file(
     }
     path = tmp_path / "request.json"
     path.write_text(json.dumps(document), encoding="ascii")
-    config = ["--config", str(repo / "configs" / "test.toml"), "--environment", "test"]
+    config = development_config(tmp_path)
     assert main(["--repo", str(repo), "create", "--request", str(path), *config]) == 0
     output = capsys.readouterr().out
     assert "untracked and not a project decision" in output
@@ -1005,9 +1013,10 @@ def test_c2_a_project_commit_reached_only_through_a_later_merge_fails(repo: Path
 def test_cli_reports_config_errors_without_a_traceback(
     repo: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    bad = tmp_path / "test.toml"
+    bad = tmp_path / "bad.toml"
     bad.write_text(
-        'schema_version = 1\nenvironment = "test"\nsecret_value = "hunter2x"\n', encoding="ascii"
+        'schema_version = 1\nenvironment = "development"\nsecret_value = "hunter2x"\n',
+        encoding="ascii",
     )
     path = tmp_path / "request.json"
     path.write_text(
@@ -1034,11 +1043,14 @@ def test_cli_reports_config_errors_without_a_traceback(
         encoding="ascii",
     )
     arguments = ["--repo", str(repo), "create", "--request", str(path)]
-    assert main([*arguments, "--config", str(bad), "--environment", "test"]) == 1
+    assert main([*arguments, "--config", str(bad), "--environment", "development"]) == 1
     error = capsys.readouterr().err
     assert error == "ConfigError: the configuration could not be loaded or is invalid\n"
     assert (
-        main([*arguments, "--config", str(tmp_path / "missing.toml"), "--environment", "test"]) == 1
+        main(
+            [*arguments, "--config", str(tmp_path / "missing.toml"), "--environment", "development"]
+        )
+        == 1
     )
     error = capsys.readouterr().err
     assert "Traceback" not in error
@@ -1078,7 +1090,7 @@ def test_a_check_sh_timeout_fails_closed_without_a_traceback(
         ),
         encoding="ascii",
     )
-    config = ["--config", str(repo / "configs" / "test.toml"), "--environment", "test"]
+    config = development_config(tmp_path)
     assert main(["--repo", str(repo), "create", "--request", str(path), *config]) == 1
     assert (
         capsys.readouterr().err == "GateStateError: check.sh did not finish within its time limit\n"
@@ -1159,3 +1171,17 @@ def test_f20_a_replace_ref_makes_gate_evidence_identity_unknown(repo: Path) -> N
         capture_project_identity(repo)
     git(repo, "replace", "-d", head)
     assert capture_project_identity(repo).commit == head
+
+
+def test_the_create_command_refuses_the_test_environment(
+    repo: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """RT-4: gate commands refuse the test environment before reading anything."""
+    request_path = tmp_path / "request.json"
+    request_path.write_text("{}", encoding="ascii")
+    arguments = ["--repo", str(repo), "create", "--request", str(request_path)]
+    config = ["--config", str(repo / "configs" / "test.toml"), "--environment", "test"]
+    assert main([*arguments, *config]) == 1
+    error = capsys.readouterr().err
+    assert error.startswith("RefusedTestEnvironmentError: pmv.gates create refuses")
+    assert list_gate_records(repo) == []

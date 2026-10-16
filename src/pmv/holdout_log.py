@@ -42,6 +42,7 @@ from typing import Final
 
 from pmv import experiment_ledger, safe_fs
 from pmv import holdout_record as hr
+from pmv.capture_environment import RefusedTestEnvironmentError, refuse_test_environment
 from pmv.config import ConfigError, Environment, load_config
 from pmv.experiments import ExperimentError, ExperimentStore, collect_git_identity
 from pmv.gate_record import GATES_DIR, GateRecordError, LineageKey
@@ -1596,6 +1597,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         GateError,
         GateRecordError,
         ExperimentError,
+        RefusedTestEnvironmentError,
     ) as exc:
         sys.stderr.write(f"{type(exc).__name__}: {exc}\n")
         return 1
@@ -1609,6 +1611,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _record_from_cli(arguments: argparse.Namespace) -> None:
+    refuse_test_environment(Environment(arguments.environment), "pmv.holdout_log record")
     document = _load_json(arguments.request)
     config = load_config(arguments.config, Environment(arguments.environment))
     repo = Path(os.path.realpath(arguments.repo))

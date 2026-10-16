@@ -339,7 +339,12 @@ def test_stream_resets_invalidate_and_restart_sequence_expectations(
 ) -> None:
     stream = Stream().snapshot(1, seq=10).event(2, kind)
     book = stream.book()
-    assert book.faults == frozenset({BookFault.STREAM_RESET})
+    expected = (
+        BookFault.FRAME_REJECTED
+        if kind is StreamEventKind.FRAME_REJECTED
+        else BookFault.STREAM_RESET
+    )
+    assert book.faults == frozenset({expected})
     assert book.faulted_at == at(2)
     assert book.updated_at == at(1)
     # after a reset the venue may restart its sequence: a lower sequence is not a regression

@@ -164,7 +164,22 @@ def test_every_frame_has_exactly_one_recorded_disposition() -> None:
         (FrameDisposition.PARSED, None),
     ]
     assert sum(result.count(d) for d in FrameDisposition) == len(result.frames) == 9
-    assert [type(o) for o in result.observations] == [BookSnapshot, StreamEvent, Trade]
+    kinds = [
+        o.kind.value if isinstance(o, StreamEvent) else type(o).__name__
+        for o in result.observations
+    ]
+    # every rejected frame leaves a driver frame_rejected event at its own position
+    assert kinds == [
+        "BookSnapshot",
+        "frame_rejected",
+        "frame_rejected",
+        "reconnect",
+        "frame_rejected",
+        "frame_rejected",
+        "Trade",
+    ]
+    rejected = [o for o in result.observations if isinstance(o, StreamEvent)]
+    assert [o.provenance.frame_sequence for o in rejected] == [2, 3, 4, 5, 6]
     assert len(result.resolutions) == 1
     assert result.parser_id == "pmv_synthetic_v1"
 
@@ -174,7 +189,7 @@ def test_receipt_time_and_provenance_come_from_the_raw_frame() -> None:
     snapshot = result.observations[0]
     assert isinstance(snapshot, BookSnapshot)
     assert snapshot.timing == Timing(at(1), at(0.9))
-    assert snapshot.provenance == Provenance(CAPTURE_A, 0, 0, "pmv_synthetic_v1", 1)
+    assert snapshot.provenance == Provenance(CAPTURE_A, 0, 0, "pmv_synthetic_v1", 2)
     assert result.resolutions[0].received_at == at(1000)
 
 
@@ -188,8 +203,17 @@ def test_end_to_end_views_features_and_labels_stay_separated() -> None:
     a = normalize_frames(CAPTURE_A, frames_a(), SyntheticNormalizer())
     b = normalize_frames(CAPTURE_B, frames_b(), SyntheticNormalizer())
     log = merge_captures([a, b])
-    assert [type(o) for o in log] == [BookSnapshot, ReferenceTick, StreamEvent, Trade]
-    view = log.as_of(at(3), min_latency=ZERO)
+    assert [type(o) for o in log] == [
+        BookSnapshot,
+        ReferenceTick,
+        StreamEvent,
+        StreamEvent,
+        StreamEvent,
+        StreamEvent,
+        StreamEvent,
+        Trade,
+    ]
+    view = log.as_of(at(3) - timedelta(microseconds=1), min_latency=ZERO)
     assert [type(o) for o in view] == [BookSnapshot, ReferenceTick]
     policy_labels = LabelPolicy("replay_labels_v1", timedelta(seconds=1))
     # no trading status was received, so the decision is not known to be tradable
@@ -210,7 +234,13 @@ def test_end_to_end_views_features_and_labels_stay_separated() -> None:
         timedelta(seconds=1), timedelta(seconds=5), timedelta(seconds=60), "replay_validation_v1"
     )
     report = validate(capture_order(log), {KEY: SPEC}, policy)
-    assert [anomaly.kind.value for anomaly in report.anomalies] == ["stream_reconnect"]
+    assert [anomaly.kind.value for anomaly in report.anomalies] == [
+        "stream_frame_rejected",
+        "stream_frame_rejected",
+        "stream_reconnect",
+        "stream_frame_rejected",
+        "stream_frame_rejected",
+    ]
 
 
 def test_a_capture_cannot_be_merged_twice() -> None:

@@ -53,6 +53,7 @@ def test_the_package_has_the_expected_modules() -> None:
     assert MODULES == [
         "__init__",
         "books",
+        "capture_replay",
         "contracts",
         "events",
         "kalshi",

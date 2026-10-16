@@ -41,7 +41,7 @@ from types import TracebackType
 from typing import Final
 
 from pmv import safe_fs
-from pmv.config import AppConfig, RawStorageConfig
+from pmv.config import AppConfig, Environment, RawStorageConfig
 from pmv.log import fields, get_logger
 from pmv.raw_format import (
     MAGIC,
@@ -137,6 +137,10 @@ class DiskHardStopError(RawStorageError):
     def __init__(self, message: str, manifest: RawManifest | None) -> None:
         super().__init__(message)
         self.manifest = manifest
+
+
+class LegacyFormatRefusedError(RawStorageError):
+    """Raw format v1 may not start a capture outside the test environment (F-12, B08)."""
 
 
 class CatalogIndexError(RawStorageError):
@@ -674,7 +678,18 @@ class RawCaptureStore:
     # ----- capture lifecycle -----
 
     def start_capture(self, source: SourceIdentity, started_at: datetime) -> "RawCapture":
-        """Reserve a new capture ID and open an in-progress capture for ``source``."""
+        """Reserve a new capture ID and open an in-progress capture for ``source``.
+
+        Raw format v1 has no monotonic receipt time and no message direction (Step 11 F-12),
+        so it never starts a capture outside the ``test`` environment: real collection uses
+        the segmented store (``pmv.capture_store``, frame format v3). Reading and verifying
+        existing v1 captures is unaffected.
+        """
+        if self._provenance.environment is not Environment.TEST:
+            raise LegacyFormatRefusedError(
+                "raw format v1 starts captures only in the test environment; real collection "
+                "uses pmv.capture_store (frame format v3)"
+            )
         warning, hard_stop = self._thresholds()
         self._check_namespace(RESERVATIONS, IN_PROGRESS)
         free = self.free_bytes()

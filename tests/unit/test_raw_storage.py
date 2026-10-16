@@ -1142,3 +1142,29 @@ def test_normal_child_run_finalizes(root: Path) -> None:
     with open_store(root) as store:
         assert store.verify_capture(capture_id).directory_read_only
         assert capture_id in store.read_catalog().entries
+
+
+@pytest.mark.parametrize(
+    "environment", [Environment.DEVELOPMENT, Environment.SHADOW, Environment.PRODUCTION]
+)
+def test_v1_never_starts_a_capture_outside_the_test_environment(
+    root: Path, environment: Environment
+) -> None:
+    """F-12/RT-4 (B08): real collection must use frame format v2 (pmv.capture_store)."""
+    config = make_config(root)
+    provenance = RuntimeProvenance(
+        code_commit=None,
+        code_tree_dirty=None,
+        config_source_sha256="0" * 64,
+        raw_config_sha256=config.canonical_sha256(),
+        environment=environment,
+        python_version="3.13.5",
+        platform="linux-x86_64",
+        machine_label=None,
+        parents=(),
+    )
+    with RawCaptureStore(config, provenance, repo_root=REPO, free_bytes=lambda: PLENTY) as store:
+        with pytest.raises(raw_storage.LegacyFormatRefusedError, match="frame format v3"):
+            store.start_capture(SOURCE, T0)
+        assert os.listdir(root / ".capture_ids") == []
+        assert os.listdir(root / ".inprogress") == []

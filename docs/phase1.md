@@ -2,12 +2,15 @@
 
 Working record for Phase 1. The authoritative requirements are START_HERE.md (Phase 1, Gate 1, Project-Wide Controls), CLAUDE.md, and PROJECT_BRIEF.md; where this file summarizes them, they win. This is not a gate record and not an owner-decision record.
 
-## Current status and next step (as of 2026-10-16, B07)
+## Current status and next step (as of 2026-10-16, B08)
 
 - **Phase:** Phase 1. No cycle, `T0`, split, or protected scope exists. No real market observation has been acquired, captured, or released to agents. The guard refuses every real request.
-- **Strategy:** late-window, high-confidence (PROJECT_BRIEF.md §3; START_HERE.md "Strategy at a Glance"). B07 did not change it.
-- **Gate status:** Gate 0 passed. Gate 1 has not been decided. **Acquisition is not authorized.**
-- **Active branch:** `b07/phase1-acquisition-pipeline-hardening` (B07; `docs/BRANCH_TIMELINE.md`). It was branched from final B06 (`c0d2a2b`) and contains everything through B06. It integrates into `main` through one pull request; merging is the owner's decision. B06 is a preserved historical checkpoint.
+- **Strategy:** late-window, high-confidence (PROJECT_BRIEF.md §3; START_HERE.md "Strategy at a Glance"). B07 and B08 did not change it.
+- **Gate status:** Gate 0 passed. Gate 1 has not been decided. **Historical acquisition is not authorized. Live capture is not authorized.**
+- **Active branch:** `b08/prospective-capture-hardening` (B08; `docs/BRANCH_TIMELINE.md`; charter `docs/decisions/2026-10-16_b08_prospective_capture_hardening.md`).
+  - B08 was branched from final B07 (`9a6b212`) and contains everything through B07.
+  - B07 was merged into `main` by PR #6 (merge commit `2a46ffd`) and is a preserved historical checkpoint.
+  - B08 integrates through one pull request, and merging is the owner's decision.
 - **Blockers before the first historical acquisition** (`docs/external_access.md` §2):
   - a per-source owner approval naming its hosts (A-1);
   - an owner licence determination from verbatim terms (A-2);
@@ -34,17 +37,21 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
   The release tool's code is deliberately **not yet written**: RT-B3-05 requires the owner's E-U1 catalog decision and a reviewed shared catalog first (`docs/release_tool_design.md`). B07 storage never releases anything (A-8).
 - **Recommended next steps:**
   - **Owner:**
-    1. open (the sandbox cannot), review, and merge the single B07 pull request with a normal merge commit;
+    0. B08: the interpretations B8-1 to B8-7 were decided on 2026-10-16 (decision record, "Owner decisions"). What remains is the single B08 → `main` pull request: the owner opens it (the sandbox cannot; the session supplies its title and body) and merges it with a normal merge commit, if approved;
+    1. select the first historical source, and supply its terms (AR-3), so that A-1 and A-2 can be prepared (the post-B07 audit found no further source-neutral acquisition engineering worth doing before this);
     2. decide whether to approve the reader dependencies listed in decision record B7-6 (Parquet, DBN, zstd), or to defer those formats;
     3. approve a raw-data backup policy (A-3) and confirm or replace the "size class" reading (B7-7);
     4. pursue the licence terms for the first candidate source (Kalshi official historical data; AR-3);
     5. decide E-U1 (equivalence-catalog expansion), the first step before the H-2 release tool;
     6. prepare the pre-T0 checklist decisions P-1 to P-4 (START_HERE.md);
     7. optionally decide B6S-14 (independent statistical audit of the release rules before the first release; not adopted).
-  - **Agents** (no network, synthetic data only, from the active branch, in a later batch chartered by the owner):
-    - the production transport design and its review (B7-4);
-    - after owner approval, the Parquet, DBN, and zstd readers inside the G-1 worker;
-    - raw-format v2 and collector hardening (F-11, F-12, F-33, F-37).
+  - **Agents** (no network, synthetic data only, from the active branch, in a batch chartered by the owner):
+    - B08 (done; owner decisions on B8-1 to B8-7 recorded; pull request pending): raw frame format v3 and collector hardening (F-11, F-12/F-27, F-33, F-37/RT-4), order-book continuity after rejected frames, and normalized capture artifacts;
+    - before live capture is authorized: timestamp plausibility and clock-sync state (RT-B8-05, B8S-03);
+    - before real segmented-capture data is used for research: the exclusion ledger (B8S-01), trading status after a reset (B8S-02), and an end marker for sessions that are not `complete` (B8S-04);
+    - before long real sessions are normalized: memory bounds (RT-B8-06);
+    - after source selection: the production transport design and its review (B7-4), and any source-specific acquisition support;
+    - after owner approval: the Parquet, DBN, and zstd readers inside the G-1 worker.
 
 ## Owner direction for Phase 1 (batch charter, 2026-10-15)
 
@@ -82,8 +89,9 @@ From `docs/gate0_readiness.md` ("Deferred findings and deadlines") and `docs/dec
 | F-17 minimum economic thresholds and kill criteria | Substantive strategy or model work on real data | Owner, with Quant / Business Lead | Open |
 | F-03 credential isolation implementation | Any venue credential, including data-only | Owner | Open. No credential exists |
 | F-09 network and WebFetch denies for market-data hosts | Phase 1 real collection, and any agent web research (WebFetch or WebSearch) after a cycle's `T0 − m` | Owner (settings are governance) | Policy **decided** (batch 4 O-6, host classes in `docs/external_access.md`). Deterministic denies **committed** in `8517fc2` (B06), behavioral check passed 2026-10-16 |
-| F-11 capture segmentation and salvage; F-12 frame v2 timing and direction (with F-27); F-26; F-33 | Phase 1 real collection | API / Execution, Reliability | Open |
-| F-37, RT-4: demo data treated as real; collectors refuse the test environment | Phase 1 real collection | API / Execution | Open |
+| F-11 capture segmentation and salvage; F-12 frame timing and direction (with F-27); F-33 | Phase 1 real collection | API / Execution, Reliability | **Implemented in B08** on synthetic data (frame format v3) and Red-Team reviewed. Owner decided B8-1 to B8-7 on 2026-10-16. Open before live capture is authorized: timestamp plausibility and clock-sync state (RT-B8-05, B8S-03). Open before long real sessions are normalized: memory bounds (RT-B8-06) |
+| F-26 storage-event claims and restore dependency | Phase 1 real collection | API / Execution, Reliability | Open (not in B08 scope) |
+| F-37, RT-4: demo data treated as real; collectors refuse the test environment | Phase 1 real collection | API / Execution | **Implemented in B08** (B8-4 and B8-5 confirmed; B8-6 confirmed for now, revisitable after E-6). Owner-approved endpoints (`APPROVED_CAPTURE_ENDPOINTS`) are empty, and E-6 (demo accounts and keys) is open |
 | F-32 collector host and alert recipient | Phase 1 real collection | Owner | Open |
 | F-21b per-gate scope and minimum-reviewer table | Phase 1 real collection | Owner | Open |
 | Raw-data backup and retention policy, plus restore smoke test | First live capture, and no later than Gate 1 | Owner | Open |
@@ -283,6 +291,60 @@ Tests and review:
 - 376 new synthetic tests, including fault injection at every pipeline boundary and real `SIGKILL`s.
 - The independent Red-Team review is in `research/governance/b07_acquisition_pipeline_red_team_review.md`. It ran five rounds: round 1 found one BLOCKING finding (RT-B7-01, worker-to-parent channels under a denylist) and one MAJOR finding (RT-B7-02, injectable real-mode gate). Both were fixed. The final verdict at `4170b3c` is no BLOCKING and no MAJOR finding, with documented MINOR residuals. A-4 is still not satisfied.
 - No Statistician review was triggered: B07 does not touch release, holdout, `T0`, or equivalence semantics.
+
+## B08 (`b08/prospective-capture-hardening`): prospective-capture hardening
+
+**Charter (owner, 2026-10-16).** Recorded in `docs/decisions/2026-10-16_b08_prospective_capture_hardening.md`. Synthetic data only. No acquisition, live capture, network host, credential, source selection, A-1 to A-6 decision, transport, dependency, gate decision, `T0`, holdout, release code, or modeling.
+
+**Done** (`docs/raw_data.md` "Segmented prospective capture, frame format v3"; `docs/market_data.md`):
+- **F-12 with F-27:** raw frame format v3, `PMVRAW3` (the `PMVRAW2` draft is refused):
+  - hash-chained segment headers carrying the clock domain;
+  - the venue and deployment environment on every frame, matched against the segment (owner decision B8-2, as modified);
+  - payload direction, connection, and monotonic receipt time;
+  - one session-wide sequence.
+  - v1 now starts captures only in `test`.
+- **F-11:** bounded, immutable segments, plus the following:
+  - recovery quarantines and never resumes;
+  - deterministic salvage (`longest_valid_frame_prefix_v1`), which never modifies quarantined bytes;
+  - chain reading never bridges a gap.
+- **F-33:** a real process is killed at every named durable boundary.
+- **F-37 and RT-4:**
+  - environment authorization that the store re-derives;
+  - demo data is protected like real data and refused by every segmented-capture loader;
+  - the approved-endpoint registry is empty, so live capture refuses;
+  - record-creating CLIs refuse `--environment test`.
+- **Order-book continuity:** rejected frames break every book (`frame_rejected`), and solicited snapshots never recover one (RT-B2-03).
+- **Normalized artifacts:** deterministic and content-addressed by derivation. They carry per-file digests, a session cross-check, and re-derivation (`verify_artifact`).
+
+**Reviews:**
+- Independent Reliability / Red-Team (`research/governance/b08_prospective_capture_red_team_review.md`):
+  - round 1 found **BLOCKING** RT-B8-01 (artifact integrity) and **MAJOR** RT-B8-02 (a re-issuable authorization);
+  - both were fixed and re-verified in round 2;
+  - the round-2 MINORs RT-B8-12 to RT-B8-14 were fixed afterwards, and round 3 verified them.
+- Statistician (`research/governance/b08_statistician_review.md`): PASS WITH CONDITIONS, with no look-ahead.
+- Cold-start review: `research/governance/b08_cold_start_review.md`.
+
+**Still open.** The authoritative list is the decision record, "Outcome" → "Residuals and conditions":
+- **Before live capture is authorized:**
+  - RT-B8-05 and B8S-03: timestamp plausibility and clock-sync state;
+  - the RT-B8-12 residual: a writer may wait up to about 1 s under lock contention.
+- **Before long real sessions are normalized:** RT-B8-06, memory bounds.
+- **Before real segmented-capture data is used for research:**
+  - B8S-01: the exclusion ledger;
+  - B8S-02: trading status after a reset;
+  - B8S-04: an end marker for a session that is not `complete`.
+- **Before experiments on segmented-capture artifacts:**
+  - B8S-05: pin the parser version;
+  - record `artifact_digest` and load with `expected_digest` (the RT-B8-01 residual).
+- **Before a real venue parser:** B8S-06, parser tests for the skip list and for solicited replies.
+- **Before any `APPROVED_CAPTURE_ENDPOINTS` entry:** re-review RT-B8-13.
+- **B8S-07 (note):** concurrent connections in one session share book keys. That is conservative today; revisit if a session ever multiplexes feeds.
+- **F-26:** not in B08 scope.
+
+**Not changed:**
+- `src/pmv/acquisition/` (the B07 review still covers it).
+- Gate 1 is still undecided.
+- Historical acquisition and live capture are still not authorized.
 
 ## Recommended next batches
 

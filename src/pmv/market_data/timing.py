@@ -13,10 +13,10 @@ is always ``received_at``. It is never ``source_time``: an event the exchange st
 ``t`` was not observable to PMV before PMV received it, so using the source clock would let
 information leak backwards in time.
 
-Known limit: ``received_at`` is a wall clock, and the raw v1 frame records clock
-regressions as events rather than carrying a monotonic receive time (Step 11 F-12 tracks
-frame v2 timing). Decision-time views order by ``received_at`` with deterministic
-tie-breaks; a recorded clock regression is flagged by validation, never repaired.
+Known limit: ``received_at`` is a wall clock. Raw frame v3 (``pmv.capture_format``, B08)
+also records a monotonic receipt time, kept beside the observations in the normalized
+artifact, but decision-time views order by ``received_at`` with deterministic tie-breaks;
+a recorded clock regression is flagged by validation, never repaired.
 """
 
 from dataclasses import dataclass

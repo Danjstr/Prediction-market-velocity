@@ -63,6 +63,16 @@ LEGACY = (
 ).encode()
 LEGACY_SHA = sha256_hex(LEGACY)
 CONFIG = 'schema_version = 1\nenvironment = "test"\n\n[logging]\nlevel = "INFO"\n'
+DEVELOPMENT_CONFIG = CONFIG.replace('"test"', '"development"')
+
+
+def development_config(tmp_path: Path) -> list[str]:
+    """CLI arguments for a development configuration outside the repository (RT-4)."""
+    path = tmp_path / "development.toml"
+    path.write_text(DEVELOPMENT_CONFIG, encoding="ascii")
+    return ["--config", str(path), "--environment", "development"]
+
+
 LEDGER = hr.LEDGER_PATH
 LOG = hr.LOG_PATH
 
@@ -793,7 +803,7 @@ def test_the_command_line_verifies_and_reports_status_without_tracebacks(
     log_args = ["--repo", str(repo)]
     request = tmp_path / "request.json"
     request.write_text('{"action": "correct", "arguments": {"extra": 1}}', encoding="ascii")
-    config = ["--config", str(repo / "configs/test.toml"), "--environment", "test"]
+    config = development_config(tmp_path)
     assert main([*log_args, "record", "--request", str(request), *config]) == 1
     error = capsys.readouterr().err
     assert error.startswith("HoldoutLogError: ")
@@ -947,7 +957,7 @@ def test_the_cli_never_echoes_a_secret_shaped_enum_value(
         '"protected_end": "2026-12-01T00:00:00.000000Z", "attested": true}}',
         encoding="ascii",
     )
-    config = ["--config", str(repo / "configs/test.toml"), "--environment", "test"]
+    config = development_config(tmp_path)
     assert main(["--repo", str(repo), "record", "--request", str(request), *config]) == 1
     captured = capsys.readouterr()
     assert shaped not in captured.err + captured.out
@@ -1000,3 +1010,18 @@ def test_the_docs_state_the_local_git_anchoring_limit() -> None:
     text = (REPO / "docs" / "holdout_access.md").read_text(encoding="utf-8")
     assert "not a complete external notarization" in text
     assert "BEFORE ANY REAL PROTECTED-HOLDOUT REVEAL IN PHASE 7" in text
+
+
+def test_the_record_command_refuses_the_test_environment(
+    repo: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """RT-4: holdout-log commands that create records refuse the test environment."""
+    request = tmp_path / "request.json"
+    request.write_text('{"action": "correct", "arguments": {}}', encoding="ascii")
+    ledger_before = (repo / LEDGER).read_bytes() if (repo / LEDGER).exists() else None
+    config = ["--config", str(repo / "configs/test.toml"), "--environment", "test"]
+    assert main(["--repo", str(repo), "record", "--request", str(request), *config]) == 1
+    error = capsys.readouterr().err
+    assert error.startswith("RefusedTestEnvironmentError: pmv.holdout_log record refuses")
+    after = (repo / LEDGER).read_bytes() if (repo / LEDGER).exists() else None
+    assert after == ledger_before

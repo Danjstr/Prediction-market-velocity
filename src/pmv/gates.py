@@ -34,6 +34,7 @@ from typing import Final
 
 from pmv import experiment_ledger as ledger
 from pmv import safe_fs
+from pmv.capture_environment import RefusedTestEnvironmentError, refuse_test_environment
 from pmv.config import ConfigError, Environment, load_config
 from pmv.experiments import (
     ExperimentError,
@@ -1097,7 +1098,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "This file is untracked and not a project decision until you review and commit "
                 "it yourself. The tool never stages, commits, or pushes.\n"
             )
-    except (GateError, GateRecordError, ExperimentError, RawStorageError) as exc:
+    except (
+        GateError,
+        GateRecordError,
+        ExperimentError,
+        RawStorageError,
+        RefusedTestEnvironmentError,
+    ) as exc:
         # These messages are fixed text written by PMV and never echo content.
         sys.stderr.write(f"{type(exc).__name__}: {exc}\n")
         return 1
@@ -1114,6 +1121,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _create_from_cli(arguments: argparse.Namespace) -> CreatedRecord:
+    refuse_test_environment(Environment(arguments.environment), "pmv.gates create")
     repo = Path(os.path.realpath(arguments.repo))
     request = _load_request(arguments.request)
     config = load_config(arguments.config, Environment(arguments.environment))

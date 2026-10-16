@@ -104,6 +104,8 @@ These are recorded, **not** resolved. Each must be done before the event named.
 | Before Phase 4.5, Phase 8, and live trading | F-39 sizing and monitoring; re-verify venue terms; separate trading-credential environment |
 | Later / non-blocking | F-34 duplicated helpers; F-36 launcher exclusion; F-38 cycle abandonment; F-41 audit process; Python patch-version pin |
 
+*Status note (B08, 2026-10-16; this record is otherwise historical).* F-11, F-12 (with F-27), F-33, F-37, and RT-4 were implemented on synthetic data in B08 and reviewed, with documented residuals (`docs/phase1.md`, "B08"; `docs/decisions/2026-10-16_b08_prospective_capture_hardening.md`). F-26 and the other "Before Phase 1 real collection" items stay open, and live capture is not authorized.
+
 The complete audit, with every finding's evidence, is the Step 11 synthesis kept outside the repository. Step 9's own deferred register is in `docs/protected_information.md` ("Phase 0 status").
 
 ## Known boundaries carried into Gate 0
