@@ -46,6 +46,8 @@ No observation may become the protected evaluation set for a cycle after its val
 
 Each cycle's split must include any purge or embargo interval needed at both ends of its protected evaluation interval, including where labels or lookbacks could overlap an earlier consumed interval or a later future interval.
 
+Where these documents, the agent files, or the hash-pinned Holdout Rules restatement in HOLDOUT_ACCESS_LOG.md state the split as an oldest/newest approximately 70%/30% division (for example "the development 70%", "the oldest approximately 70%", "the protected 30%", "the final 30%", "the newest approximately 30%"), they mean the cycle's development pool and protected evaluation set as fixed by its frozen split, whatever their actual shares. This never designates the newest share of a historical dataset as protected.
+
 A consumed protected set may not be reused to repair or validate the candidate or cycle that consumed it. In a later, explicitly new cycle with a genuinely untouched future protected set, previously consumed data may be used as historical development data, but it remains permanently tagged as previously exposed or consumed and can never regain untouched-evaluation status.
 
 ## Protection of Holdout-Eligible Data
@@ -55,6 +57,8 @@ Before outcome-dependent inspection begins, the protected evaluation set must be
 - a prospective future protected period, quarantined as it accumulates.
 
 The split-formation rule must be recorded before inspection and must not be selected after looking at candidate holdout outcomes.
+
+The prospective protected period is the required formation for the first cycle and the preferred formation thereafter (owner decision H-1, `docs/decisions/2026-10-16_phase1_batch4_acquisition_safety_decisions.md`). Its start `T0` and margin `m` are declared in advance so that `T0 − m` is later than every registered prior exposure of the protected observable families and every development model's training cutoff (`docs/exposure_register.md`). `T0`, `m`, `C0`, the embargo granularity, the power floor, and the end `T_end` or an outcome-blind stopping rule are recorded at cycle registration, before any release to agents, and are never changed on protected information; after `T0 − m` they change only mechanically under a preregistered technical contingency. Historical data may serve as development data in chronological train/development partitions; no period or observation exposed to development, historical or PMV-captured, may later be promoted into a protected holdout. Release of real observations to agents is owner-controlled, fails closed, and is cut per row and per equivalent observable (H-2).
 
 Phase 1 may use only a declared development, discovery, or pilot subset for outcome-dependent work. Data inspected during Phase 1 is development-only for that cycle.
 
@@ -226,9 +230,9 @@ Define:
 
 Finalize the exact split manifest for the existing cycle, following the split-formation method recorded in Phase 1:
 - reference the existing cycle_id;
-- identify an immutable dataset snapshot or dataset version;
-- record the snapshot creation/freeze time;
-- allocate approximately 70% to development and approximately 30% to the protected holdout, from that snapshot or, under a prospective protected period, across the planned collection span;
+- identify an immutable dataset snapshot or dataset version, or, for a prospective protected period, the declared protected interval, `T0`, `m`, `C0`, and the end rule recorded at cycle registration;
+- record the snapshot creation/freeze time (for a prospective period, the cycle registration time);
+- allocate approximately 70% to development and approximately 30% to the protected holdout, from that snapshot or, under a prospective protected period, across the planned PMV-capture span `[C0, T_end]` (historical development data is outside this ratio; the power floor for the preregistered primary estimand is a minimum, met by lengthening the protected span, never by an earlier `T0`, and any deviation is recorded);
 - convert the allocation into explicit immutable partition boundaries, using UTC timestamp boundaries when appropriate to the data;
 - explicitly identify any purge/embargo interval at both ends of the protected interval;
 - hash or version the split definition;
@@ -1154,6 +1158,11 @@ Use the strongest models where mistakes are expensive.
 - low-risk delegated work.
 
 Do not spend frontier-model inference on mechanical tasks unnecessarily.
+
+**Local resource discipline (owner instruction, 2026-10-16).** The owner's development machine is a Chromebook with limited RAM:
+- specialist and research agents may run in parallel;
+- heavy full-repository quality-gate runs (`./scripts/check.sh`) wait until specialist and background work has finished;
+- multiple heavy test processes are not run at the same time unless there is a stated reason; targeted tests during development are preferred.
 
 ---
 

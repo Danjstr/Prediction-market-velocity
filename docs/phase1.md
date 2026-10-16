@@ -32,12 +32,12 @@ From `docs/gate0_readiness.md` ("Deferred findings and deadlines") and `docs/dec
 | Item | Must be resolved before | Owner | Status |
 |---|---|---|---|
 | F-16 venue and jurisdiction eligibility, and whether in-scope gold contracts exist | Any venue account or credential, or any real collection or trading integration | Owner, with API / Execution research | Open. Batch 2 documentation findings are in `research/kalshi/venue_verification.md` §5. The terms, Developer Agreement, and eligibility could not be retrieved (AR-3). No gold event-contract series is documented (E-1). |
-| F-06 prospective holdout as the default formation | Agents see any real observation | Owner | Open |
-| F-08 release architecture (trusted collector plus release by receipt time) | Agents see any real observation | Owner | Open. This batch is compatible: availability is defined by receipt time |
-| F-07 power-based holdout size and unit of independence | First real protected scope or cycle | Owner, with Statistician | Open |
+| F-06 prospective holdout as the default formation | Agents see any real observation | Owner | **Decided** (batch 4 H-1): prospective. `T0`, `m`, and the cycle conditions are not yet declared |
+| F-08 release architecture (trusted collector plus release by receipt time) | Agents see any real observation | Owner | **Decided** (batch 4 H-2): owner-controlled, fail-closed, per-row release. The release tool is not built |
+| F-07 power-based holdout size and unit of independence | First real protected scope or cycle | Owner, with Statistician | Unit of independence **decided** (batch 4 H-6). Power floor and holdout size open, fixed per cycle before `T0` (H-1) |
 | F-17 minimum economic thresholds and kill criteria | Substantive strategy or model work on real data | Owner, with Quant / Business Lead | Open |
 | F-03 credential isolation implementation | Any venue credential, including data-only | Owner | Open. No credential exists |
-| F-09 network and WebFetch denies for market-data hosts | Phase 1 real collection | Owner (settings are governance) | Open |
+| F-09 network and WebFetch denies for market-data hosts | Phase 1 real collection, and any agent web research (WebFetch or WebSearch) after a cycle's `T0 − m` | Owner (settings are governance) | Policy **decided** (batch 4 O-6, host classes in `docs/external_access.md`). Deterministic denies in `.claude/settings.json` not yet committed |
 | F-11 capture segmentation and salvage; F-12 frame v2 timing and direction (with F-27); F-26; F-33 | Phase 1 real collection | API / Execution, Reliability | Open |
 | F-37, RT-4: demo data treated as real; collectors refuse the test environment | Phase 1 real collection | API / Execution | Open |
 | F-32 collector host and alert recipient | Phase 1 real collection | Owner | Open |
@@ -200,6 +200,14 @@ Each is documentation only. Any data acquisition is a separate request under H-2
 Once AR-1 identifies the official settlement sources for Kalshi BTC and gold contracts (for example, a CF Benchmarks index for BTC), request read-only access to that provider's **methodology documentation** domain only. The purpose is to define `resolution_source_id` semantics and the BTC/gold reference-feed requirements. No price data is requested. The domains are named after AR-1, not guessed now.
 
 **Status after batch 2:** still conditional. The docs.kalshi.com pages link to CF Benchmarks documentation (`docs.cfbenchmarks.com`) for the BRTI passthrough. They do **not** state that any contract settles on BRTI or on any averaging window. Gold settlement sources are undocumented. AR-2 is not raised until the contract terms (AR-3) name the settlement sources.
+
+## Batch 4 (`phase1/acquisition-safety-decisions`): owner decisions and acquisition safety
+
+Governance and policy only. No real market dataset was acquired or inspected, and no code changed. Owner decisions H-1 to H-8, O-3, O-5, O-6 (as clarified), and O-9 are recorded in `docs/decisions/2026-10-16_phase1_batch4_acquisition_safety_decisions.md`. The batch also:
+- replaced the CLAUDE.md "do not inspect real market observations at all" rule with five observation classes;
+- reconciled the "oldest 70% / newest 30%" wording with the prospective holdout;
+- added the host-class rule and the historical acquisition gate (`docs/external_access.md`);
+- created the exposure register (`docs/exposure_register.md`).
 
 ## Recommended next batches
 

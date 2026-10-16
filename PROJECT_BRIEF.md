@@ -142,14 +142,16 @@ External work must be checked for:
 
 ## 7. Train / Test Design
 
-Use a **chronological** split. Never randomly shuffle the time series.
+Use **chronological** development and evaluation. Never randomly shuffle the time series.
 
-| Segment | Share (approx.) | Purpose |
-|---|---|---|
-| Oldest | 70% | Development / training |
-| Newest | 30% | Protected final out-of-sample holdout |
+| Segment | Purpose |
+|---|---|
+| Development pool: historical data, and PMV capture before the protected interval's start minus its margin | Development / training, in chronological train/development partitions |
+| Protected evaluation set: a **prospective** protected interval for the first cycle (preferred thereafter), starting at a declared future time `T0`, with `T0 − m` later than every registered prior exposure of the protected observable families and every recorded development-model training cutoff | Protected final out-of-sample holdout |
 
-### Within the development 70%
+For a prospective holdout, the approximate 70% development / 30% protected design target applies to the PMV-capture span, not to historical development data. The power requirement is a floor: where the ~30% target falls short of it, the protected span is lengthened (never by an earlier `T0`), and the deviation is recorded. "The development 70%" and "the final 30%" below and elsewhere mean the development pool and the protected evaluation set of the frozen split. Owner record: `docs/decisions/2026-10-16_phase1_batch4_acquisition_safety_decisions.md` (H-1).
+
+### Within the development pool
 Use rolling/walk-forward validation for:
 - feature selection;
 - model selection;
@@ -161,11 +163,11 @@ Use rolling/walk-forward validation for:
 ### Holdout protection
 - The final 30% must remain untouched until the model and strategy are frozen.
 - The final 30% must not become a repeatedly queried validation set.
-- The split is frozen once as explicit immutable partition boundaries on an identified dataset snapshot. Approximately 70/30 is the design target; later-arriving data never moves the frozen boundaries.
+- The split is frozen once as explicit immutable partition boundaries on an identified dataset snapshot or, for a prospective holdout, on the declared protected interval. Approximately 70/30 is the design target as defined above; later-arriving data never moves the frozen boundaries.
 - Opening the holdout requires explicit user approval for the specific frozen candidate, in addition to the technical release gates.
 - Once outcome-dependent information from the holdout has been revealed, it is consumed and can never again serve as untouched data for a changed candidate.
 - No observation may become protected evaluation data after its values, outcomes, or outcome-dependent derivatives have been exposed to development.
-- Historical data from any source, once exposed to development, stays development data permanently. When development relies on historical data, the formation of the protected set (a quarantined, unexamined snapshot, or a prospective protected period) is decided for each cycle before any outcome-dependent inspection.
+- Historical data from any source, once exposed to development, stays development data permanently, and no period or observation that has been exposed to development, historical or PMV-captured, may later be promoted into a protected holdout. When development relies on historical data, the formation of the protected set (a quarantined, unexamined snapshot, or a prospective protected period) is decided for each cycle before any outcome-dependent inspection. The prospective protected period is required for the first cycle and is the preferred formation thereafter (H-1).
 - Each holdout is evaluated once, against a preregistered evaluation plan with PASS, FAIL, and INCONCLUSIVE criteria. Any authorized evaluation that reveals outcomes consumes the holdout; only PASS permits the evaluated frozen candidate to continue.
 
 ### Leakage control

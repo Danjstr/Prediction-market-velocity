@@ -6,6 +6,8 @@
 
 **Limitation:** this record is procedural. The system does not cryptographically prove who approved it (F-42 in `docs/decisions/2026-10-14_phase0_step11_owner_decisions.md`).
 
+**Status update (2026-10-16, batch 4).** The owner took decisions H-1 to H-8, O-3, O-5, O-6 (as clarified), and O-9 in `docs/decisions/2026-10-16_phase1_batch4_acquisition_safety_decisions.md`, and approved the O-7 wording edits there. Where that record differs from the recommendations below, it governs. This record is otherwise kept as written.
+
 **This is not a gate record.** It passes no gate. It declares no cycle, split, or protected scope. It does not relax the information embargo, the data-access guard, credential isolation, or any risk or execution control.
 
 ## Decisions taken by the owner
