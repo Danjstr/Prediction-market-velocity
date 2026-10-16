@@ -82,9 +82,12 @@ Listed oldest first, and appended at each timeline update.
 | `1aa6c52` | Post-B07 status correction (PR #6, final B07 `9a6b212`), the B08 charter record, and B08 designation |
 | `222a7e7` | Prospective-capture hardening: F-11, F-12/F-27, F-33, F-37/RT-4, book continuity, normalized artifacts (Red-Team round 1 subject) |
 | `7190f7f` | Red-Team round 1 remediation (RT-B8-01 to RT-B8-10) and the Statistician review |
-| `6dc2b51` | Round 2 follow-ups (RT-B8-12 to RT-B8-14) and B08 status docs. **Final reviewed capture code**: Red-Team round 3 verdict, no BLOCKING and no MAJOR finding |
+| `6dc2b51` | Round 2 follow-ups (RT-B8-12 to RT-B8-14) and B08 status docs (Red-Team round 3: no BLOCKING and no MAJOR finding) |
 | `d52b46a` | Red-Team round 3 verdict recorded, residual rows, and timeline update |
-| (the commit adding this row) | Cold-start review (`research/governance/b08_cold_start_review.md`) and its documentation fixes, plus the `check.sh` result. Its hash is the branch tip; see `git ls-remote` |
+| `43c4283` | Cold-start review and its documentation fixes, plus the `check.sh` result (state presented for the owner's review of B8-1 to B8-7) |
+| `b3e8269` | Owner decisions on B8-1 to B8-7. Modified B8-2: per-frame environment identity, frame format v3 |
+| `c2eca25` | Red-Team re-review of the B8-2 change recorded, and RT-B8-15 closed. **Final reviewed capture code** |
+| (the commit adding this row) | RT-B8-15 verification, `check.sh` result, and cold-start refresh. Its hash is the branch tip; see `git ls-remote` |
 
 ## Ancestry verification for B08 (2026-10-16)
 

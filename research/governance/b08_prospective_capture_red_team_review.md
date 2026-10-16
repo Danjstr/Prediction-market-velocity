@@ -241,3 +241,26 @@
 - **MAJOR open? NO.**
 - **New MINOR:** RT-B8-15, which existed before this change and does not affect any loader. Earlier carried-forward MINOR findings (RT-B8-05, RT-B8-06) are unchanged.
 - **Recommendation: proceed.** The owner's modified B8-2 is implemented faithfully and fails closed for every frame kind. RT-B8-15 may be fixed now (it is small) or carried forward before any tool consumes manifest fields.
+
+## RT-B8-15 verification
+
+**Disposition: RT-B8-15 resolved.** Subject: commit `c2eca25`, reviewed against `b3e8269`.
+
+`_verify_finalized` now compares the following manifest fields with the verified segment header, and checks the header's session against the requested session:
+- `segment_id`;
+- `venue_environment` and `deployment_environment`;
+- `clock_domain`;
+- `source`;
+- `time.session_started_at`.
+
+Results:
+- Re-running `$TMPDIR/rt8/r9_manifest.py` (a manifest relabelled `production`/`production` on a synthetic segment) now gives "refused: a manifest's identity does not match its segment header", where before it was accepted.
+- The capture suites all pass (186: `tests/unit/test_capture_*.py`, `tests/integration/test_capture_replay.py`, `tests/failure_injection/test_capture_crash_points.py`), including the new `test_a_relabelled_manifest_is_refused`.
+- No regressions found.
+
+Hardening note, not a finding: the inner `time` object of the manifest is not itself schema-validated. A manifest with no `time.session_started_at` raises `KeyError` instead of `CaptureIntegrityError`. That still fails closed.
+
+**Verdict:**
+- No unresolved BLOCKING? YES.
+- MAJOR open? NO.
+- RT-B8-15 is closed. RT-B8-05 and RT-B8-06 remain carried forward as MINOR.

@@ -98,7 +98,7 @@ The owner reviewed B8-1 to B8-7 explicitly, before the B08 pull request, and dec
   - No look-ahead. Availability is still the wall-clock receipt time, and every new continuity rule is conservative.
   - No effect on protected data, `T0`, the split, or the holdout.
 - **Cold-start review:** `research/governance/b08_cold_start_review.md`. Verdict: YES with conditions. Its nine MINOR documentation findings were fixed (see that file, "Coordinator dispositions").
-- **Quality gate:** `./scripts/check.sh` passed on 2026-10-16 (2305 passed, 8 skipped). The 8 skips are the owner-run sentinel probes in `tests/integration/test_information_embargo.py`.
+- **Quality gate:** `./scripts/check.sh` passed on 2026-10-16: 2305 passed and 8 skipped before the owner decisions, and 2322 passed and 8 skipped after the B8-2 modification and RT-B8-15 (at `c2eca25`). The 8 skips are the owner-run sentinel probes in `tests/integration/test_information_embargo.py`.
 - **Models used:** development and review used Claude Opus 5.5 (`claude-opus-5-5`). Nothing in B08 trains or selects a predictive model, and no cycle exists.
 
 ### Residuals and conditions (requirements carried forward, not decided here)
@@ -116,6 +116,7 @@ The owner reviewed B8-1 to B8-7 explicitly, before the B08 pull request, and dec
 | Artifact digest | Code that relies on an artifact records `artifact_digest` and loads with `expected_digest` | Experiments on segmented-capture artifacts |
 | RT-B8-13 | Fixed: real captures always use the account's protected location. Re-review it with any registry change | Any `APPROVED_CAPTURE_ENDPOINTS` entry |
 | RT-B8-12 (residual) | Under heavy lock contention a collector may wait up to about 1 s before it gives up on a new segment and ends the session. That failure is closed. Monitoring readers should not hold segment locks | Live capture is authorized |
+| RT-B8-15 (residual) | A manifest missing its inner `time.session_started_at` raises `KeyError`, not an integrity error. This still fails closed. Map it to an integrity error at the next change to `capture_store` | Next `capture_store` change |
 | RT-B8-01 (residual) | A local writer who rewrites all three artifact files consistently is detected only through a recorded `artifact_digest` (`expected_digest`) or `verify_artifact` | Experiments on segmented-capture artifacts |
 
 ## Open owner inputs carried forward
