@@ -7,13 +7,31 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
 - **Phase:** Phase 1. No cycle, `T0`, split, or protected scope exists. No real market observation has been acquired, captured, or released to agents. The guard refuses every real request.
 - **Strategy:** late-window, high-confidence (PROJECT_BRIEF.md §3; START_HERE.md "Strategy at a Glance").
 - **Gate status:** Gate 0 passed. Gate 1 has not been decided.
-- **Active branch:** `b06/governance-continuity-sync` (B06; `docs/BRANCH_TIMELINE.md`). It contains batch 4 (B05, `a1752b4`) and the B06 governance continuity sync (`docs/decisions/2026-10-16_b06_governance_continuity_sync.md`). It integrates into `main` through one pull request; merging is the owner's decision.
+- **Active branch:** `b06/governance-continuity-sync` (B06; `docs/BRANCH_TIMELINE.md`). It contains batch 4 (B05, `a1752b4`), the B06 governance continuity sync (`docs/decisions/2026-10-16_b06_governance_continuity_sync.md`), and the B06 acquisition-readiness tooling (`docs/acquisition_readiness.md`). It integrates into `main` through one pull request; merging is the owner's decision.
 - **Owner actions pending outside agent sessions** (`docs/owner_actions/README.md`):
   1. apply the F-09 host-class settings patch. This is a priority blocker for any historical acquisition;
   2. apply the agent-file split-wording patch.
-- **Blockers before the first historical acquisition** (`docs/external_access.md` §2): a per-source owner approval naming its hosts (A-1); an owner licence determination from verbatim terms (A-2); the raw backup policy and a synthetic restore test (A-3); a reviewed safe-parsing acquisition tool with passing fault-injection fixtures (A-4); provenance and source-quality entries (A-5, A-6); committed F-09 denies.
+- **Blockers before the first historical acquisition** (`docs/external_access.md` §2):
+  - a per-source owner approval naming its hosts (A-1);
+  - an owner licence determination from verbatim terms (A-2);
+  - the raw backup policy and a restore test on the real backup medium (A-3);
+  - a reviewed safe-parsing acquisition tool with passing fault-injection fixtures (A-4);
+  - provenance and source-quality entries (A-5, A-6);
+  - committed F-09 denies.
+- **A-4 status (B06):** the source-neutral building blocks and every named fault-injection fixture exist, tested on synthetic data only. The Reliability / Red-Team review and its re-verification are in `research/governance/b06_acquisition_tooling_red_team_review.md`. **A-4 is not satisfied.** Still missing:
+  - parser process isolation with resource limits;
+  - pinned, reviewed Parquet and DBN readers;
+  - the fetcher, with redirect re-checks and size caps;
+  - the end-to-end pipeline into the protected raw store (`docs/acquisition_readiness.md`).
 - **Blockers before agents see any real observation:** a registered cycle with `T0` and `m` (which first requires the pre-T0 owner checklist P-1 to P-4 in START_HERE.md); and the H-2 per-row release tool, built, reviewed, and approved through an owner governance change (`docs/protected_information.md`).
-- **Recommended next step:** after the owner applies the F-09 patch, a no-network engineering batch to build and test the deterministic acquisition and safe-parsing tool against synthetic fixtures (A-4), together with the raw backup and restore policy (A-3). In parallel, the owner may pursue the licence terms for the first candidate source (Kalshi official historical data; AR-3).
+- **Recommended next steps:**
+  - **Owner:**
+    1. review and merge the B06 pull request;
+    2. apply the F-09 settings patch and the agent-file patch on the active branch;
+    3. approve a raw-data backup policy (A-3);
+    4. pursue the licence terms for the first candidate source (Kalshi official historical data; AR-3).
+  - **Agents (no network, synthetic data only, from the active branch):** close the remaining A-4 gaps (parser process isolation, pinned readers, fetcher design with redirect re-checks, the pipeline into the protected raw store), then request a fresh Red-Team review.
+  - F-09 is required before any acquisition, collection, or post-`T0 − m` web research. It does not gate no-network tooling work.
 
 ## Owner direction for Phase 1 (batch charter, 2026-10-15)
 
@@ -58,7 +76,7 @@ From `docs/gate0_readiness.md` ("Deferred findings and deadlines") and `docs/dec
 | Raw-data backup and retention policy, plus restore smoke test | First live capture, and no later than Gate 1 | Owner | Open |
 | F-15, F-24, F-30; Step 9 S-2, S-4, S-6 per F-08 | Agents see real observations | Various | Open |
 
-**Consequence.** Until these are resolved, Phase 1 work is limited to documentation research (subject to access approval), synthetic fixtures, and deterministic infrastructure. No real observation may be shown to agents, and no real capture may begin.
+**Consequence.** Until these are resolved, Phase 1 work is limited to documentation research (subject to access approval), synthetic fixtures, and deterministic infrastructure. No real observation may be shown to agents, and no real capture may begin. The S-6 collection rule in `docs/protected_information.md` allows collection in principle; it does not override these prerequisites.
 
 ## Interpretation that needs owner confirmation (S-6)
 
@@ -71,7 +89,7 @@ This batch reads the requirement as follows:
 
 This is a recommendation, not an approved rule.
 
-## Batch 1 (this branch): venue-neutral data foundation
+## Batch 1 (B02, `phase1/kalshi-data-foundation`): venue-neutral data foundation
 
 Done without credentials, real data, or network access:
 
@@ -233,6 +251,8 @@ Governance and policy only. No real market dataset was acquired or inspected, an
 Full rulings and the pre-T0 checklist are in the decision record.
 
 ## Recommended next batches
+
+*Historical lists from batches 1 and 2. They are superseded by "Current status and next step" at the top of this file. F-06 and F-08 have since been decided (batch 4 H-1 and H-2).*
 
 1. **Venue verification: done as far as `docs.kalshi.com` allows (batch 2).** The verified parser, `ContractSpec` builder, and resolution parser remain blocked by E-2, UR-4, UR-6, and UR-7 (see "Batch 2" above).
 2. **Raw format v2 and collector hardening (no network needed).**
