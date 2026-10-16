@@ -22,7 +22,7 @@ Old branches keep their original names. Their B-numbers are assigned here only; 
 | B03 | `phase1/kalshi-venue-verification` | B02 (branched at `856083e`) | `4ca18e0` | Historical checkpoint. Merged by PR #3 (`c074e9b`) | Phase 1 batch 2: Kalshi venue verification (documentation) |
 | B04 | `phase1/historical-data-strategy` | B03 (branched at `c074e9b`) | `012afa0` | Historical checkpoint. Merged by PR #4 (`ad169a2`) | Phase 1 batch 3: historical data strategy |
 | B05 | `phase1/acquisition-safety-decisions` | B04 (branched at `ad169a2`) | `a1752b4` | Historical checkpoint. Pushed; no PR; not merged. Wholly contained in B06 and integrated through B06's pull request | Phase 1 batch 4: owner decisions on acquisition safety and holdout formation |
-| B06 | `b06/governance-continuity-sync` | B05 (branched at `a1752b4`) | Last recorded head: see "B06 commits" | **CURRENT ACTIVE GROUND-TRUTH BRANCH** | Recovery of the interrupted batch 4 follow-up; owner rulings; strategy objective; phase roadmap; tax requirement; branch continuity; Phase 1 acquisition-readiness tooling |
+| B06 | `b06/governance-continuity-sync` | B05 (branched at `a1752b4`) | Last recorded: `acc8e2b`; tip = timeline-update commit | **CURRENT ACTIVE GROUND-TRUTH BRANCH** | Recovery of the interrupted batch 4 follow-up; owner rulings; strategy objective; phase roadmap; tax requirement; branch continuity; Phase 1 acquisition-readiness tooling |
 
 PR numbers come from the merge-commit subjects on `main`.
 
@@ -32,7 +32,10 @@ Listed oldest first, and appended at each timeline update.
 
 | Commit | Content |
 |---|---|
-| (first B06 commit) | Governance continuity sync |
+| `25da6a4` | Governance continuity sync and interrupted-session recovery |
+| `8310db3` | Cold-start reconstruction fixes |
+| `acc8e2b` | Phase 1 acquisition-readiness tooling (synthetic data only) |
+| (the commit adding this row) | Timeline update. Its hash is the branch tip; see `git ls-remote` |
 
 ## Ancestry verification (2026-10-16)
 
