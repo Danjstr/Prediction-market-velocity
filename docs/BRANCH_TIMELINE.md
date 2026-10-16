@@ -10,7 +10,8 @@ Old branches keep their original names. Their B-numbers are assigned here only; 
 
 - Parent: B05 `phase1/acquisition-safety-decisions` at `a1752b4`.
 - Head: the pushed tip of `origin/b06/governance-continuity-sync`. A commit cannot contain its own hash, so the "Last recorded head" below is the newest commit recorded at the last timeline update. Verify the tip with `git ls-remote origin refs/heads/b06/governance-continuity-sync`.
-- Integration: one pull request into `main`. Merging is the owner's decision. Until the owner designates a successor, every new development branch starts from this branch's tip.
+- Integration: one pull request into `main`. Merging is the owner's decision.
+- PR status (2026-10-16): **not yet opened.** The sandbox has no `gh` or GitHub credential, so the owner opens the single B06 → `main` pull request in the GitHub UI. Owner-applied patches from `docs/owner_actions/` join this same branch and pull request. Until the owner designates a successor, every new development branch starts from this branch's tip.
 
 ## Timeline
 
@@ -22,7 +23,7 @@ Old branches keep their original names. Their B-numbers are assigned here only; 
 | B03 | `phase1/kalshi-venue-verification` | B02 (branched at `856083e`) | `4ca18e0` | Historical checkpoint. Merged by PR #3 (`c074e9b`) | Phase 1 batch 2: Kalshi venue verification (documentation) |
 | B04 | `phase1/historical-data-strategy` | B03 (branched at `c074e9b`) | `012afa0` | Historical checkpoint. Merged by PR #4 (`ad169a2`) | Phase 1 batch 3: historical data strategy |
 | B05 | `phase1/acquisition-safety-decisions` | B04 (branched at `ad169a2`) | `a1752b4` | Historical checkpoint. Pushed; no PR; not merged. Wholly contained in B06 and integrated through B06's pull request | Phase 1 batch 4: owner decisions on acquisition safety and holdout formation |
-| B06 | `b06/governance-continuity-sync` | B05 (branched at `a1752b4`) | Last recorded: `acc8e2b`; tip = timeline-update commit | **CURRENT ACTIVE GROUND-TRUTH BRANCH** | Recovery of the interrupted batch 4 follow-up; owner rulings; strategy objective; phase roadmap; tax requirement; branch continuity; Phase 1 acquisition-readiness tooling |
+| B06 | `b06/governance-continuity-sync` | B05 (branched at `a1752b4`) | Last recorded: `a978a77`; tip = timeline-update commit | **CURRENT ACTIVE GROUND-TRUTH BRANCH** | Recovery of the interrupted batch 4 follow-up; owner rulings; strategy objective; phase roadmap; tax requirement; branch continuity; Phase 1 acquisition-readiness tooling |
 
 PR numbers come from the merge-commit subjects on `main`.
 
@@ -35,6 +36,10 @@ Listed oldest first, and appended at each timeline update.
 | `25da6a4` | Governance continuity sync and interrupted-session recovery |
 | `8310db3` | Cold-start reconstruction fixes |
 | `acc8e2b` | Phase 1 acquisition-readiness tooling (synthetic data only) |
+| `f9c5262` | Timeline update |
+| `18240ae` | Acquisition tooling Red-Team rounds 4 and 4b remediation (continuation) |
+| `de1fecf` | H-2 release-tool design and governed deferral |
+| `a978a77` | Continuation record and cold-start review fixes |
 | (the commit adding this row) | Timeline update. Its hash is the branch tip; see `git ls-remote` |
 
 ## Ancestry verification (2026-10-16)
