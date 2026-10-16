@@ -172,6 +172,10 @@ def authorize_capture(
     - Demo and production: the exact host and endpoint must be an approved endpoint for
       that venue environment, and the store root must be inside the protected raw
       location (demo is protected like real data, F-37).
+
+    ``protected_base`` is an additional location a synthetic (``test``) store must stay
+    out of; the account's real protected location is always refused too. Demo and
+    production stores are checked against the real protected location only (RT-B8-13).
     """
     if not isinstance(deployment_environment, Environment):
         raise CaptureEnvironmentError("unknown deployment environment")
@@ -181,8 +185,8 @@ def authorize_capture(
         raise CaptureEnvironmentError("endpoint_id must be a lowercase identifier")
     if not isinstance(store_root, Path) or not store_root.is_absolute():
         raise CaptureEnvironmentError("the store root must be an absolute path")
-    inside_protected = protected_raw_root_problem(store_root, protected_base) is None
     if deployment_environment is Environment.TEST:
+        inside_protected = protected_raw_root_problem(store_root, protected_base) is None
         if venue_environment is not VenueEnvironment.SYNTHETIC:
             raise RefusedTestEnvironmentError(
                 "the test environment captures synthetic data only (RT-4)"
@@ -214,7 +218,9 @@ def authorize_capture(
                 "no owner-approved capture endpoint matches this host and environment; "
                 "live capture is not authorized"
             )
-        if not inside_protected:
+        # Always the account's real protected location, never a caller-supplied base
+        # (RT-B8-13). Read at call time, so tests can substitute a temporary base.
+        if protected_raw_root_problem(store_root, PROTECTED_RAW_BASE) is not None:
             raise CaptureEnvironmentError(
                 "real and demo captures are written only inside the protected raw location"
             )

@@ -45,7 +45,8 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
     6. prepare the pre-T0 checklist decisions P-1 to P-4 (START_HERE.md);
     7. optionally decide B6S-14 (independent statistical audit of the release rules before the first release; not adopted).
   - **Agents** (no network, synthetic data only, from the active branch, in a batch chartered by the owner):
-    - B08, in progress: raw-format v2 and collector hardening (F-11, F-12/F-27, F-33, F-37/RT-4), order-book continuity after rejected frames, and normalized capture artifacts;
+    - B08 (done, pending owner review): raw-format v2 and collector hardening (F-11, F-12/F-27, F-33, F-37/RT-4), order-book continuity after rejected frames, and normalized capture artifacts;
+    - before real v2 data is used: the exclusion-ledger and status-after-reset requirements B8S-01 and B8S-02, and the remaining capture items (RT-B8-05, RT-B8-06, B8S-03, B8S-04);
     - after source selection: the production transport design and its review (B7-4), and any source-specific acquisition support;
     - after owner approval: the Parquet, DBN, and zstd readers inside the G-1 worker.
 
@@ -85,8 +86,9 @@ From `docs/gate0_readiness.md` ("Deferred findings and deadlines") and `docs/dec
 | F-17 minimum economic thresholds and kill criteria | Substantive strategy or model work on real data | Owner, with Quant / Business Lead | Open |
 | F-03 credential isolation implementation | Any venue credential, including data-only | Owner | Open. No credential exists |
 | F-09 network and WebFetch denies for market-data hosts | Phase 1 real collection, and any agent web research (WebFetch or WebSearch) after a cycle's `T0 − m` | Owner (settings are governance) | Policy **decided** (batch 4 O-6, host classes in `docs/external_access.md`). Deterministic denies **committed** in `8517fc2` (B06), behavioral check passed 2026-10-16 |
-| F-11 capture segmentation and salvage; F-12 frame v2 timing and direction (with F-27); F-26; F-33 | Phase 1 real collection | API / Execution, Reliability | Open |
-| F-37, RT-4: demo data treated as real; collectors refuse the test environment | Phase 1 real collection | API / Execution | Open |
+| F-11 capture segmentation and salvage; F-12 frame v2 timing and direction (with F-27); F-33 | Phase 1 real collection | API / Execution, Reliability | **Implemented in B08** on synthetic data and Red-Team reviewed (interpretations B8-1 to B8-3 await owner confirmation). Open before real collection: timestamp plausibility and clock-sync state (RT-B8-05, B8S-03), and memory bounds for long sessions (RT-B8-06) |
+| F-26 storage-event claims and restore dependency | Phase 1 real collection | API / Execution, Reliability | Open (not in B08 scope) |
+| F-37, RT-4: demo data treated as real; collectors refuse the test environment | Phase 1 real collection | API / Execution | **Implemented in B08** (interpretations B8-4 to B8-6). Owner-approved endpoints (`APPROVED_CAPTURE_ENDPOINTS`) are empty, and E-6 (demo accounts and keys) is open |
 | F-32 collector host and alert recipient | Phase 1 real collection | Owner | Open |
 | F-21b per-gate scope and minimum-reviewer table | Phase 1 real collection | Owner | Open |
 | Raw-data backup and retention policy, plus restore smoke test | First live capture, and no later than Gate 1 | Owner | Open |
@@ -286,6 +288,49 @@ Tests and review:
 - 376 new synthetic tests, including fault injection at every pipeline boundary and real `SIGKILL`s.
 - The independent Red-Team review is in `research/governance/b07_acquisition_pipeline_red_team_review.md`. It ran five rounds: round 1 found one BLOCKING finding (RT-B7-01, worker-to-parent channels under a denylist) and one MAJOR finding (RT-B7-02, injectable real-mode gate). Both were fixed. The final verdict at `4170b3c` is no BLOCKING and no MAJOR finding, with documented MINOR residuals. A-4 is still not satisfied.
 - No Statistician review was triggered: B07 does not touch release, holdout, `T0`, or equivalence semantics.
+
+## B08 (`b08/prospective-capture-hardening`): prospective-capture hardening
+
+**Charter (owner, 2026-10-16).** Recorded in `docs/decisions/2026-10-16_b08_prospective_capture_hardening.md`. Synthetic data only. No acquisition, live capture, network host, credential, source selection, A-1 to A-6 decision, transport, dependency, gate decision, `T0`, holdout, release code, or modeling.
+
+**Done** (`docs/raw_data.md` "Segmented prospective capture, frame format v2"; `docs/market_data.md`):
+- **F-12 with F-27:** raw frame format v2, `PMVRAW2`:
+  - hash-chained segment headers carrying the venue environment and clock domain;
+  - payload direction, connection, and monotonic receipt time;
+  - one session-wide sequence.
+  - v1 now starts captures only in `test`.
+- **F-11:** bounded, immutable segments, plus the following:
+  - recovery quarantines and never resumes;
+  - deterministic salvage (`longest_valid_frame_prefix_v1`), which never modifies quarantined bytes;
+  - chain reading never bridges a gap.
+- **F-33:** a real process is killed at every named durable boundary.
+- **F-37 and RT-4:**
+  - environment authorization that the store re-derives;
+  - demo data is protected like real data and refused by every v2 loader;
+  - the approved-endpoint registry is empty, so live capture refuses;
+  - record-creating CLIs refuse `--environment test`.
+- **Order-book continuity:** rejected frames break every book (`frame_rejected`), and solicited snapshots never recover one (RT-B2-03).
+- **Normalized artifacts:** deterministic and content-addressed by derivation. They carry per-file digests, a session cross-check, and re-derivation (`verify_artifact`).
+
+**Reviews:**
+- Independent Reliability / Red-Team (`research/governance/b08_prospective_capture_red_team_review.md`):
+  - round 1 found **BLOCKING** RT-B8-01 (artifact integrity) and **MAJOR** RT-B8-02 (a re-issuable authorization);
+  - both were fixed and re-verified in round 2;
+  - the round-2 MINORs RT-B8-12 to RT-B8-14 were fixed afterwards, and round 3 verified them.
+- Statistician (`research/governance/b08_statistician_review.md`): PASS WITH CONDITIONS, with no look-ahead.
+- Cold-start review: `research/governance/b08_cold_start_review.md`.
+
+**Still open** (decision record, "Outcome"):
+- RT-B8-05 and B8S-03: timestamp plausibility and clock-sync state, before live capture.
+- RT-B8-06: memory bounds for long sessions.
+- B8S-01 and B8S-02: the exclusion ledger and trading status after a reset, before real v2 data is used.
+- B8S-04: the end of a session that is not `complete`.
+- F-26.
+
+**Not changed:**
+- `src/pmv/acquisition/` (the B07 review still covers it).
+- Gate 1 is still undecided.
+- Historical acquisition and live capture are still not authorized.
 
 ## Recommended next batches
 

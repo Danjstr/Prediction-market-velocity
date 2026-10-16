@@ -291,9 +291,15 @@ def test_a_crash_after_the_quarantine_record_completes_the_quarantine(root: Path
     assert '"reason":"requested"' in record
 
 
-def test_a_crash_after_the_quarantine_move_needs_no_recovery(root: Path) -> None:
+def test_a_crash_after_the_quarantine_move_is_tightened_by_recovery(root: Path) -> None:
+    """RT-B8-14: files were read-only before the move; recovery tightens the directory."""
     assert crash(root, "quarantine.moved", "quarantine") == 70
     with open_store(root) as store:
+        name = segment_id(only_session(root), 0)
+        directory = root / "capture" / "v2" / "quarantine" / name
+        assert all(os.stat(p).st_mode & 0o777 == 0o400 for p in directory.iterdir())
+        assert [(r.name, r.outcome) for r in store.recover()] == [(name, RecoveryOutcome.TIGHTENED)]
+        assert os.stat(directory).st_mode & 0o777 == 0o500
         assert store.recover() == []
         name = segment_id(only_session(root), 0)
         assert store.salvage(name).tail is TailDisposition.NONE

@@ -94,3 +94,56 @@
 - **No unresolved BLOCKING? NO.** RT-B8-01 is open: normalized artifacts accept corrupted or relabelled content as valid.
 - **MAJOR open? YES.** RT-B8-02: `CaptureAuthorization` can be forged with `dataclasses.replace`, and neither the store nor the loaders re-validate it.
 - **Recommendation: revise.** Fix RT-B8-01 and RT-B8-02, each with a regression test (the reproductions above translate directly into tests), then request a focused re-review. The MINOR findings may be fixed now or carried forward with an owner-visible note. RT-B8-05 should also go to the Statistician, because receipt-time availability depends on caller-supplied `observed_at`. Nothing in this review authorizes live capture, and no gate status changes.
+
+## Re-verification (round 2)
+
+- **Subject:** commit `7190f7f`, reviewed against `222a7e7` (`git diff 222a7e7 7190f7f -- src tests docs`).
+- **Data and scope:** synthetic only, with no network access. `src/pmv/acquisition/` is still untouched: the diff from `9a6b212` to `7190f7f` is empty.
+- **Tests:** these targeted tests all passed (245 tests): the capture format, environment, store, replay, and crash-point tests, plus the books and v1 replay tests. I did not run `check.sh` or the full suite.
+- **Reproductions:** I re-ran `$TMPDIR/rt8/r1_replace.py`, `r2_artifact.py`, and `r3_modes.py`, and added three new scripts there:
+  - `r4_round2.py`: consistent rewrites of an artifact;
+  - `r5_race.py`: a reader racing a writer's rollover;
+  - `r6_base.py`: the protected-location check against a caller-chosen base.
+
+### Dispositions of round-1 findings
+
+| ID | Round-1 | Disposition | Evidence |
+|---|---|---|---|
+| RT-B8-01 | BLOCKING | **Resolved** (one residual, documented) | `r2`: changing a price in `observations.json` alone is refused ("an artifact file does not match its record"). `r4`: dropping a rejected frame together with its item is refused even when `artifact.json` is recomputed to match ("frames are not one contiguous sequence"). Relabelling the venue or deployment environment changes the derivation key, so `load_artifact` refuses it ("not stored under its own key"), and it is also cross-checked against `read_session`. Residual: a local writer who rewrites the observations and the record consistently is still ACCEPTED by `load_artifact` when no digest is passed. `expected_digest` refuses it and `verify_artifact` refuses it (`r4`). This residual is stated in the module docstring and in `docs/market_data.md`. It needs deliberate tampering plus a recomputed hash, the same class of attack as rewriting raw segments by hand, so I accept it. The bit-rot and partial-corruption path that made RT-B8-01 BLOCKING is now closed. |
+| RT-B8-02 | MAJOR | **Resolved** (latent residual, see RT-B8-13) | `r1`: `dataclasses.replace` now raises `TypeError`. `start_session` re-runs `authorize_capture` using the store's own deployment environment and root, so a development or production store refuses synthetic data and refuses any endpoint not in the registry, which is empty. `_require_use` refuses data written by the `test` deployment for RESEARCH. The test deployment also refuses roots that resolve into the real `PROTECTED_RAW_BASE`. Forging is now possible only through private `object.__setattr__` or `object.__new__`, which is out of scope like other in-process tampering. |
+| RT-B8-03 | MINOR | Resolved (crash window, see RT-B8-14) | `r3`: the quarantined directory is now 0o500 and its files 0o400. |
+| RT-B8-04 | MINOR | Resolved (new race, see RT-B8-12) | `r3`: an abandoned session now reads as `truncated`. |
+| RT-B8-05 | MINOR | Partly resolved; remainder deferred and documented | Stores outside `test` now require `clock_domain == read_clock_domain()`. Plausibility checks on `observed_at` and `monotonic_ns` are deferred: `r3` still accepts a year-ahead `observed_at` and a foreign monotonic value. This remains open for the Statistician and must be done before real collection. |
+| RT-B8-06 | MINOR | Open (not addressed) | Unchanged. `verify_artifact` now holds two copies of a normalized session in memory, which makes the memory problem slightly worse. Carry this forward. |
+| RT-B8-07 | MINOR | Resolved | `maintain()` rolls the segment over once its duration has elapsed, even with no new frames, and then syncs. A quiet feed now produces header-only segments, bounded by `MAX_SEGMENT_INDEX`. |
+| RT-B8-08 | MINOR | Resolved (documented) | B8-6 is rescoped to v2. v1 data is test data. |
+| RT-B8-09 | MINOR | Resolved | The reader now checks that every event naming a connection names an open one. The session reservation's clock domain, deployment environment, and segment policy are validated strictly. |
+| RT-B8-10 | MINOR | Resolved (documented) | The collector contract is now in the `append_inbound` docstring and in `docs/raw_data.md`. |
+| RT-B8-11 | MINOR | Open (expected) | `docs/phase1.md` and `docs/gate0_readiness.md` still list the items as Open. Update them when B08 closes. `docs/market_data.md` still says "content-addressed" and "a dropped … observation is detected", but the Integrity and Loading bullets now state the limits, so this wording is acceptable. |
+
+### New findings introduced by, or visible after, the fixes
+
+| ID | Severity | Location | Description | Synthetic reproduction | Recommended fix |
+|---|---|---|---|---|---|
+| RT-B8-12 | MINOR | `capture_store._is_live` (new), `CaptureSession._open_segment` | **A concurrent reader can end a live capture.** `read_session` now probes the lock of the next open segment with `flock(LOCK_SH \| LOCK_NB)`. If that probe overlaps the window between the writer's `mkdir` and its `flock(LOCK_EX \| LOCK_NB)` during rollover, the writer raises "another process holds the new segment's lock". The session is abandoned, which ends the capture. This fails closed: segment N stays finalized, the empty segment N+1 is quarantined by `recover()`, and the chain reads `truncated`. But a status read, such as monitoring or normalizing an open session, can interrupt live collection. `recover()` could already do this, but it is meant to run only at startup. The reverse case, a live writer reported as `truncated` during that window, is only a transient misreport. | `r5_race.py` holds the reader's shared lock across the writer's rollover. Result: "writer failed during rollover: CaptureIntegrityError another process holds the new segment's lock", and the session reads `truncated`. | In `_open_segment`, retry the `LOCK_EX` acquisition for a short bounded time. The identity check that follows still detects a concurrent quarantine. Alternatively, take the lock before the directory becomes visible in `open/`. Add a test where a reader probe overlaps the writer. |
+| RT-B8-13 | MINOR (latent; must be fixed before any `APPROVED_CAPTURE_ENDPOINTS` entry) | `authorize_capture` (non-test branch), `CaptureStore.start_session` | **The protected-location check outside `test` uses a base the caller chooses.** The authorization carries the caller's `protected_base`, and `start_session` re-validates against that same base. With a registry entry present, a development or production session starts on a root outside the real `PROTECTED_RAW_BASE` if the caller simply passes a nearby base. `load_config` does enforce the real base for configs it loads, but `CaptureStore` accepts any `RawStorageConfig`. Today the empty registry refuses every such session, so this is latent. | `r6_base.py`, with a hypothetical endpoint monkeypatched into the registry: "production session started OUTSIDE the real protected base". | Outside `test`, ignore the caller's `protected_base` and check against `PROTECTED_RAW_BASE`; keep the parameter as a seam only for tests. Alternatively, have `CaptureStore.__init__` refuse a root outside the real protected location when the provenance environment is not `test`. |
+| RT-B8-14 | MINOR | `CaptureStore._quarantine_locked` / `_make_read_only` | `_make_read_only` runs after the `quarantine.moved` fault point. A crash at that point leaves the quarantined segment at 0700/0600, and neither `reconcile()` nor `recover()` tightens or reports quarantined segments. Separately, `FsIntegrityError` from `_open_file` inside `_make_read_only` is not wrapped by `_fs_errors`, and it is raised after the move has already happened. | Code reading. The quarantine crash tests do not check modes. | Make the files read-only before the move, or have `reconcile()` tighten and report quarantined segments. Wrap the call in `_fs_errors`. Assert the modes in the quarantine crash-point tests. |
+
+### Round-2 verdict
+
+- **No unresolved BLOCKING? YES.** RT-B8-01 is resolved. Its residual (a consistent rewrite of all three files, detectable only with a recorded digest or by re-derivation) is documented and accepted.
+- **MAJOR open? NO.** RT-B8-02 is resolved.
+- **Open MINOR findings:**
+  - carried forward or deferred: RT-B8-05 (timestamp plausibility), RT-B8-06 (memory), and RT-B8-11 (status documents);
+  - new: RT-B8-12, RT-B8-13, and RT-B8-14.
+
+  None of them lets ambiguous, corrupt, or unauthorized data be accepted.
+- **Recommendation: proceed with conditions.**
+  - B08 meets the charter's Red-Team bar.
+  - These must be fixed before any live capture is authorized:
+    - RT-B8-13, before any entry is added to `APPROVED_CAPTURE_ENDPOINTS`;
+    - RT-B8-05, the remaining plausibility checks on `observed_at` and `monotonic_ns`;
+    - RT-B8-12, before any process reads sessions while a collector is running.
+  - RT-B8-06 and RT-B8-14 may be fixed now or carried forward, recorded in the failure register or the B08 decision record.
+  - Callers that rely on an artifact should record `artifact_digest` and pass `expected_digest` when they load it.
+  - Nothing here authorizes live capture or changes any gate status.

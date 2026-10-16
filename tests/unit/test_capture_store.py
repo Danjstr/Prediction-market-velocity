@@ -772,3 +772,29 @@ def test_events_must_name_an_open_connection_when_read(root: Path, store: Captur
     read = store.read_session(session.session_id)
     with pytest.raises(CaptureIntegrityError, match="closed connection"):
         list(store.iter_frames(read))
+
+
+def test_a_readers_lock_probe_never_ends_a_live_capture(tmp_path: Path) -> None:
+    """RT-B8-12: the writer waits out a reader's brief shared lock on a new segment."""
+    import fcntl
+    import threading
+
+    directory = tmp_path / "segment"
+    directory.mkdir()
+    writer = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+    reader = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        fcntl.flock(reader, fcntl.LOCK_SH)
+        release = threading.Timer(0.05, lambda: fcntl.flock(reader, fcntl.LOCK_UN))
+        release.start()
+        assert capture_store._lock_new_segment(writer)
+        release.join()
+        # a lock that is never released still fails closed
+        other = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            assert not capture_store._lock_new_segment(other, attempts=3, pause=0.001)
+        finally:
+            os.close(other)
+    finally:
+        os.close(writer)
+        os.close(reader)

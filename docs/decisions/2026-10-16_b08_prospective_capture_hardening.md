@@ -57,6 +57,37 @@ Git records F-11, F-12, F-27, F-26, F-33, F-37, and RT-4 by title only (`docs/ga
 - No real market observation was accessed, no venue or data host was contacted, and no credential or account was used or created.
 - PROJECT_BRIEF.md, START_HERE.md, CLAUDE.md, `.claude/`, and the hash-pinned HOLDOUT_ACCESS_LOG.md body were not modified.
 
+## Outcome (2026-10-16)
+
+### Reviews
+
+- **Independent Reliability / Red-Team** (`research/governance/b08_prospective_capture_red_team_review.md`):
+  - **Round 1** (`222a7e7`):
+    - **BLOCKING** RT-B8-01: normalized artifacts had no content integrity. A changed price, a deleted rejection, or a relabelled environment loaded as valid.
+    - **MAJOR** RT-B8-02: `dataclasses.replace` could re-issue a test `CaptureAuthorization` as production.
+    - MINOR RT-B8-03 to RT-B8-11.
+  - **Round 2** (`7190f7f`): RT-B8-01 and RT-B8-02 were fixed and verified, with no unresolved BLOCKING and no MAJOR finding. It raised MINOR RT-B8-12 (a reader's lock probe could end a live capture), RT-B8-13 (the real-capture protected-location check used a caller-supplied base; latent while the registry is empty), and RT-B8-14 (a crash window in quarantine).
+  - **Round 3:** RT-B8-12 to RT-B8-14 were fixed and verified. See the review file.
+- **Statistician** (`research/governance/b08_statistician_review.md`; development self-review): **PASS WITH CONDITIONS.**
+  - No look-ahead. Availability is still the wall-clock receipt time, and every new continuity rule is conservative.
+  - No effect on protected data, `T0`, the split, or the holdout.
+- **Cold-start review:** `research/governance/b08_cold_start_review.md`.
+- **Models used:** development and review used Claude Opus 5.5 (`claude-opus-5-5`). Nothing in B08 trains or selects a predictive model, and no cycle exists.
+
+### Residuals and conditions (requirements carried forward, not decided here)
+
+| ID | What | Must be done before |
+|---|---|---|
+| RT-B8-05 / B8S-03 | Plausibility checks on the caller-supplied `observed_at` and payload `monotonic_ns`: `observed_at` against `written_at`, queue delay, and a stamp taken at the socket read. Record clock-sync state (NTP or adjtimex error). The F-12 clock-offset measurement plan, with `max_clock_error` frozen before use | Live capture is authorized |
+| RT-B8-06 | Memory bounds for long sessions: normalization and `verify_artifact` hold a whole session, and artifact writes have no size cap. Consider per-segment artifacts | Long real sessions are normalized |
+| B8S-01 | Extend the M4 exclusion ledger to v2 loss: unusable-book time by fault, rejection rate per parser version, and session status and unreachable segments, stratified by volatility, time remaining, venue, and period. Alert on a rising rejection rate | Real v2 artifacts are used for research |
+| B8S-02 | After any reset or rejected frame, treat trading status as unknown (the contract as not tradable) until the next status update. Flag feature windows that contain a reset | Feature or simulation code consumes v2 artifacts |
+| B8S-04 | A session that does not end `complete` needs an explicit end marker, or decision times capped at its last frame | Real v2 artifacts are used for research |
+| B8S-05 | Pin the parser version per experiment, and record every version that was generated | Experiments on v2 artifacts |
+| B8S-06 | Parser tests for the skip list and for identifying command replies (`solicited`) | A real venue parser (after AR-1 verification) |
+| Artifact digest | Code that relies on an artifact records `artifact_digest` and loads with `expected_digest` | Experiments on v2 artifacts |
+| RT-B8-13 | Fixed: real captures always use the account's protected location. Re-review it with any registry change | Any `APPROVED_CAPTURE_ENDPOINTS` entry |
+
 ## Open owner inputs carried forward
 
 Unchanged by B08, and not decided here:

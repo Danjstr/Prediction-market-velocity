@@ -104,7 +104,12 @@ There are no defaults. A crash can damage only the open segment.
 A segment is accepted exactly when its directory is in `segments/`.
 
 **Recovery** never resumes a segment:
-- `recover()` moves every unlocked directory in `open/` to `quarantine/`, with a closed-schema record, whatever it contains. The quarantined segment is then made read-only (files 0400, directory 0500; RT-B8-03).
+- `recover()` moves every unlocked directory in `open/` to `quarantine/`, with a closed-schema record, whatever it contains.
+- A quarantined segment is read-only (RT-B8-03, RT-B8-14):
+  - its files become 0400 before the move;
+  - its directory becomes 0500 after the move, because moving a directory to a new parent needs write permission on the directory itself;
+  - `recover()` tightens a directory a crash left writable (`tightened`).
+- The writer retries its lock on a new segment for about a second, so a reader's brief lock probe never ends a live capture (RT-B8-12).
 - A live (locked) segment is never touched.
 - A session whose open segment was quarantined has ended. The collector starts a new session.
 - Interrupted salvage or artifact writes leave `.staging-*` directories. These are reported (`stale_staging`), never read, renamed, or deleted by the tool.
@@ -157,7 +162,7 @@ Rules:
 
 ### Environment boundaries (F-37, RT-4)
 
-`pmv.capture_environment.authorize_capture` is the only producer of the `CaptureAuthorization` a session needs. The authorization is immutable and cannot be re-issued with `dataclasses.replace`. The store re-runs `authorize_capture` from its own deployment environment and root before any session starts (RT-B8-02).
+`pmv.capture_environment.authorize_capture` is the only producer of the `CaptureAuthorization` a session needs. The authorization is immutable and cannot be re-issued with `dataclasses.replace`. The store re-runs `authorize_capture` from its own deployment environment and root before any session starts (RT-B8-02). Demo and production roots are always checked against the account's real protected location, never a caller-supplied base (RT-B8-13).
 
 | Deployment | May capture | Store root |
 |---|---|---|

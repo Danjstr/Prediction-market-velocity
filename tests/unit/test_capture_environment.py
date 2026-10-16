@@ -148,6 +148,7 @@ def test_an_approved_endpoint_binds_its_exact_host_and_environment(
         VenueEnvironment.PRODUCTION, "feed.approved.example", "unit_ws", "docs/decisions/x.md"
     )
     monkeypatch.setattr(capture_environment, "APPROVED_CAPTURE_ENDPOINTS", frozenset({entry}))
+    monkeypatch.setattr(capture_environment, "PROTECTED_RAW_BASE", protected)
     granted = authorize(
         Environment.PRODUCTION,
         VenueEnvironment.PRODUCTION,
@@ -188,6 +189,7 @@ def test_demo_is_protected_like_real_data(
 ) -> None:
     entry = CaptureEndpoint(VenueEnvironment.DEMO, "demo.feed.example", "unit_ws", "d.md")
     monkeypatch.setattr(capture_environment, "APPROVED_CAPTURE_ENDPOINTS", frozenset({entry}))
+    monkeypatch.setattr(capture_environment, "PROTECTED_RAW_BASE", protected)
     granted = authorize(
         Environment.DEVELOPMENT, VenueEnvironment.DEMO, protected, protected, "demo.feed.example"
     )
@@ -281,3 +283,34 @@ def test_commands_refuse_the_test_environment() -> None:
         refuse_test_environment(Environment.TEST, "pmv.example command")
     for environment in (Environment.DEVELOPMENT, Environment.SHADOW, Environment.PRODUCTION):
         refuse_test_environment(environment, "pmv.example command")
+
+
+def test_real_captures_ignore_a_caller_supplied_protected_base(
+    tmp_path: Path, protected: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """RT-B8-13: only the account's real protected location counts for real data."""
+    entry = CaptureEndpoint(VenueEnvironment.PRODUCTION, "feed.approved.example", "unit_ws", "x")
+    monkeypatch.setattr(capture_environment, "APPROVED_CAPTURE_ENDPOINTS", frozenset({entry}))
+    monkeypatch.setattr(capture_environment, "PROTECTED_RAW_BASE", protected)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    with pytest.raises(CaptureEnvironmentError, match="only inside the protected"):
+        authorize(
+            Environment.PRODUCTION,
+            VenueEnvironment.PRODUCTION,
+            outside,
+            outside,  # a caller claiming its own root is the protected base
+            "feed.approved.example",
+        )
+
+
+def test_synthetic_stores_also_avoid_the_real_protected_location(
+    tmp_path: Path, protected: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(capture_environment, "PROTECTED_RAW_BASE", protected)
+    inside = protected / "synthetic"
+    inside.mkdir()
+    elsewhere = tmp_path / "unrelated-base"
+    elsewhere.mkdir()
+    with pytest.raises(CaptureEnvironmentError, match="never write the protected"):
+        authorize(Environment.TEST, VenueEnvironment.SYNTHETIC, inside, elsewhere)

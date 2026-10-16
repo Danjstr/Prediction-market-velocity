@@ -796,6 +796,21 @@ class CaptureStore:
         opened = self._fds[OPEN]
         for name in sorted(os.listdir(opened)):
             results.append(self._recover_one(opened, name))
+        # A crash between the quarantine move and its final chmod leaves the directory
+        # writable; tighten it (its files were made read-only before the move).
+        quarantine = self._fds[QUARANTINE]
+        for name in sorted(os.listdir(quarantine)):
+            if SEGMENT_ID.fullmatch(name) is None:
+                results.append(RecoveryResult(None, RecoveryOutcome.UNEXPECTED_ENTRY))
+                continue
+            directory = _open_dir(quarantine, name)
+            try:
+                if stat.S_IMODE(os.fstat(directory).st_mode) != 0o500:
+                    _make_read_only(directory, directory=False)
+                    _make_read_only(directory, directory=True)
+                    results.append(RecoveryResult(name, RecoveryOutcome.TIGHTENED))
+            finally:
+                os.close(directory)
         # An interrupted salvage or artifact write leaves a staging directory. It is never
         # read, renamed, or deleted by the tool; it is reported for the owner.
         for name in sorted(os.listdir(self._fds[SALVAGE])):
@@ -877,12 +892,17 @@ class CaptureStore:
                 "segment_id": name,
             }
         )
-        try:
-            _write_new_file(segment_fd, QUARANTINE_RECORD, record)
-        except FileExistsError:
+        if safe_fs.exists(segment_fd, QUARANTINE_RECORD):
+            # An earlier interrupted quarantine wrote its record; keep that record if valid.
             _validate_quarantine(_read_small(segment_fd, QUARANTINE_RECORD), name)
+        else:
+            _write_new_file(segment_fd, QUARANTINE_RECORD, record)
         os.fsync(segment_fd)
         self._fault("quarantine.record_written")
+        # Files become read-only before the move. The directory can only follow after it:
+        # moving a directory to a new parent needs write permission on the directory
+        # itself. recover() tightens a directory a crash left writable (RT-B8-14).
+        _make_read_only(segment_fd, directory=False)
         opened, quarantine = self._fds[OPEN], self._fds[QUARANTINE]
         self._check_namespace(OPEN, QUARANTINE)
         if not safe_fs.same_entry(opened, name, identity):
@@ -892,7 +912,7 @@ class CaptureStore:
         os.fsync(opened)
         self._check_namespace(OPEN, QUARANTINE)
         self._fault("quarantine.moved")
-        _make_read_only(segment_fd)
+        _make_read_only(segment_fd, directory=True)
         _log.warning("capture.segment_quarantined", extra=fields(name=name, reason=reason.value))
 
     # ----- salvage (F-11) -----
@@ -1437,16 +1457,34 @@ def _open_root(root: Path, repo_root: Path) -> int:
         raise
 
 
-def _make_read_only(directory: int) -> None:
-    """Make a quarantined segment's files 0400 and its directory 0500 (RT-B8-03)."""
-    for name in os.listdir(directory):
-        fd = _open_file(directory, name)
+def _make_read_only(fd: int, *, directory: bool) -> None:
+    """Make a quarantined segment's files 0400, or its directory 0500 (RT-B8-03)."""
+    if directory:
+        os.fchmod(fd, 0o500)
+    else:
+        for name in os.listdir(fd):
+            file_fd = _open_file(fd, name)
+            try:
+                os.fchmod(file_fd, 0o400)
+            finally:
+                os.close(file_fd)
+    os.fsync(fd)
+
+
+def _lock_new_segment(fd: int, attempts: int = 200, pause: float = 0.005) -> bool:
+    """Take the writer's exclusive lock on a just-created segment directory.
+
+    A reader's brief shared probe (``_is_live``) may hold the lock for an instant, so the
+    writer retries for about a second instead of abandoning the session (RT-B8-12).
+    """
+    for _attempt in range(attempts):
         try:
-            os.fchmod(fd, 0o400)
-        finally:
-            os.close(fd)
-    os.fchmod(directory, 0o500)
-    os.fsync(directory)
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            time.sleep(pause)
+            continue
+        return True
+    return False
 
 
 def _is_live(opened: int, name: str) -> bool:
@@ -1914,9 +1952,7 @@ class CaptureSession:
         try:
             os.fchmod(segment_fd, 0o700)
             _check_dir(segment_fd, store._device, store._uid, name)
-            try:
-                fcntl.flock(segment_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
+            if not _lock_new_segment(segment_fd):
                 raise CaptureIntegrityError(
                     "another process holds the new segment's lock"
                 ) from None
