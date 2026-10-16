@@ -196,6 +196,13 @@ def segment_dir(root: Path, session_id: str, index: int) -> Path:
     )
 
 
+def writable(path: Path) -> Path:
+    """Let a test tamper with a read-only file (and its directory)."""
+    path.parent.chmod(0o700)
+    path.chmod(0o600)
+    return path
+
+
 def mode(path: Path) -> int:
     return stat.S_IMODE(path.stat().st_mode)
 
@@ -500,11 +507,48 @@ def test_sessions_need_a_matching_authorization(root: Path, tmp_path: Path) -> N
         )
         with pytest.raises(CaptureEnvironmentError, match="another endpoint"):
             store.start_session(grant(root), other_source, WIDE, T0)
+
+
+def test_a_real_store_trusts_only_its_own_boot_identity(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """RT-B8-05: outside tests the clock domain is read, never a caller's claim."""
+    monkeypatch.setattr(capture_store, "read_clock_domain", lambda: DOMAIN)
     with (
         open_store(root, environment=Environment.DEVELOPMENT) as development,
         pytest.raises(CaptureEnvironmentError, match="another deployment"),
     ):
         development.start_session(grant(root), SOURCE, WIDE, T0)
+    monkeypatch.setattr(capture_store, "read_clock_domain", lambda: "f" * 32)
+    with pytest.raises(CaptureStoreError, match="boot's identity"):
+        open_store(root, environment=Environment.DEVELOPMENT)
+
+
+def test_the_boot_identity_is_read_strictly(tmp_path: Path) -> None:
+    good = tmp_path / "boot_id"
+    good.write_text("3D8A4C02-18db-41e6-988b-0817f251530f\n", encoding="ascii")
+    assert capture_store.read_clock_domain(good) == "3d8a4c0218db41e6988b0817f251530f"
+    bad = tmp_path / "bad"
+    bad.write_text("not-a-boot-id\n", encoding="ascii")
+    with pytest.raises(CaptureStoreError, match="boot identity"):
+        capture_store.read_clock_domain(bad)
+
+
+def test_a_session_re_derives_its_authorization(
+    root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """RT-B8-02: the store re-runs the environment rules itself."""
+    with open_store(root) as store:
+        granted = grant(root)
+        # a rule tightened after the grant still applies at session start
+        monkeypatch.setattr(
+            capture_store,
+            "authorize_capture",
+            lambda **_kw: (_ for _ in ()).throw(CaptureEnvironmentError("re-derived")),
+        )
+        with pytest.raises(CaptureEnvironmentError, match="re-derived"):
+            store.start_session(granted, SOURCE, WIDE, T0)
+        assert os.listdir(layout(root) / "sessions") == []
 
 
 def test_the_store_root_must_be_outside_the_repository(tmp_path: Path) -> None:
@@ -563,6 +607,10 @@ def test_recovery_quarantines_and_salvage_keeps_every_complete_frame(
     assert [(r.name, r.outcome) for r in results] == [(name, RecoveryOutcome.QUARANTINED)]
     assert os.listdir(layout(root) / "open") == []
     quarantined = layout(root) / "quarantine" / name / "segment.pmvraw.partial"
+    # quarantined segments are read-only (RT-B8-03)
+    assert mode(quarantined) == 0o400
+    assert mode(quarantined.parent) == 0o500
+    writable(quarantined)
     # tear the last frame, as an interrupted write would
     data = quarantined.read_bytes()
     quarantined.write_bytes(data[:-3])
@@ -589,7 +637,7 @@ def test_salvage_is_repeatable_and_detects_a_changed_input(root: Path, store: Ca
     first = store.salvage(name)
     again = store.salvage(name)
     assert again.document == first.document
-    quarantined = layout(root) / "quarantine" / name / "segment.pmvraw.partial"
+    quarantined = writable(layout(root) / "quarantine" / name / "segment.pmvraw.partial")
     quarantined.write_bytes(quarantined.read_bytes()[:-1])
     with pytest.raises(CaptureIntegrityError, match="differs"):
         store.salvage(name)
@@ -599,7 +647,7 @@ def test_salvage_refuses_when_nothing_is_valid(root: Path, store: CaptureStore) 
     session = abandoned(store, root, [b"a"])
     store.recover()
     name = segment_id(session.session_id, 0)
-    quarantined = layout(root) / "quarantine" / name / "segment.pmvraw.partial"
+    quarantined = writable(layout(root) / "quarantine" / name / "segment.pmvraw.partial")
     quarantined.write_bytes(MAGIC + b"\x00\x00")
     with pytest.raises(SalvageRefusedError, match="nothing can be salvaged"):
         store.salvage(name)
@@ -682,3 +730,45 @@ def test_segment_reader_accepts_only_whole_finalized_objects(
     session_id = capture(store, root, [b"x"])
     data = (segment_dir(root, session_id, 0) / "segment.pmvraw").read_bytes()
     assert len(list(SegmentReader(io.BytesIO(data), len(data)).frames())) == 5
+
+
+def test_a_dead_open_segment_is_not_reported_open(root: Path, store: CaptureStore) -> None:
+    """RT-B8-04: without a live writer, an open segment means the chain is truncated."""
+    session = start(store, root)
+    connection = session.open_connection()
+    receive(session, b"x", connection, 0)
+    assert store.read_session(session.session_id).status is SessionStatus.OPEN
+    session._abandon()
+    assert store.read_session(session.session_id).status is SessionStatus.TRUNCATED
+
+
+def test_maintain_rolls_over_a_stalled_segment(root: Path) -> None:
+    """RT-B8-07: a quiet feed still gets bounded segments."""
+    clock = Monotonic()
+    policy = SegmentPolicy(
+        max_segment_bytes=10**8, max_segment_frames=10**6, max_segment_duration_ns=10**6
+    )
+    with open_store(root, monotonic=clock) as store:
+        session = start(store, root, policy)
+        session.open_connection()
+        assert session.segment_index == 0
+        clock.now += 10**7
+        session.maintain()
+        assert session.segment_index == 1
+        session.close()
+        read = store.read_session(session.session_id)
+        assert read.status is SessionStatus.COMPLETE
+        assert len(read.segments) == 2
+
+
+def test_events_must_name_an_open_connection_when_read(root: Path, store: CaptureStore) -> None:
+    """RT-B8-09: the reader enforces the writer's connection discipline for every event."""
+    session = start(store, root)
+    session.open_connection()
+    # bypass the writer's own check to plant a gap event on a never-opened connection;
+    # the manifest stays consistent, so only the reader's rule can refuse it
+    session._write_event(EventType.GAP, 7)
+    session.close()
+    read = store.read_session(session.session_id)
+    with pytest.raises(CaptureIntegrityError, match="closed connection"):
+        list(store.iter_frames(read))

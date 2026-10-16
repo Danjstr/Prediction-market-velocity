@@ -92,11 +92,13 @@ A normalized capture records its parser identity and version. A parser fix is a 
 - **Dispositions.** Every frame gets one of `segment_header`, `parsed`, `skipped`, `rejected`, `outbound`, `stream_event`, or `session_end`, in sequence order.
 - **Outbound messages** are never parsed as observations.
 - **Book continuity.** Rolling over to a new segment does not break books. A connection opening or closing does.
-- **Loader refusals.** A demo-tagged session or artifact is refused for every use, and a synthetic one outside tests (RT-B2-09).
+- **Loader refusals.** A demo-tagged session or artifact is refused for every use, a synthetic one outside tests (RT-B2-09), and anything written by the `test` deployment for research (RT-B8-02).
 
 `persist_artifact` writes a **content-addressed normalized artifact** into the capture store, under the same protected root as the raw bytes. Nothing is released (A-7, A-8).
 - **Files.** `observations.json` holds the frame dispositions with each frame's connection and monotonic time, and the observations. `labels.json` holds the resolutions, a separate channel.
-- **Key.** The SHA-256 of the derivation: driver version, session, every input segment's SHA-256 and size, session status, and parser identity and version.
+- **Key.** The SHA-256 of the derivation: driver version, session, every input segment's SHA-256 and size, session status, venue and deployment environments, and parser identity and version.
+- **Integrity (RT-B8-01).** A third file, `artifact.json`, records the SHA-256 and size of both content files and is checked on every read. Decoding requires one contiguous frame sequence from 0, one segment header per input segment, and a session end consistent with the status.
+- **Loading.** `load_artifact` also checks the artifact against the session as the store reads it now: segments, status, and environments. Pass `expected_digest` (`artifact_digest`, recorded wherever the artifact is used) to detect a consistently rewritten artifact. `verify_artifact` re-derives every byte from the raw segments.
 - **Determinism.** No creation time or commit is stored, so the same derivation always yields identical bytes. Writing it again is a no-op, and a different result under the same key is an integrity failure, never a replacement.
 - **Decoding** re-derives the key and the canonical bytes. It also checks that every frame accounts for exactly its own items, so a dropped, added, or moved observation is detected.
 

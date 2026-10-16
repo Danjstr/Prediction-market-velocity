@@ -66,7 +66,11 @@ from types import TracebackType
 from typing import BinaryIO, Final
 
 from pmv import safe_fs
-from pmv.capture_environment import CaptureAuthorization, CaptureEnvironmentError
+from pmv.capture_environment import (
+    CaptureAuthorization,
+    CaptureEnvironmentError,
+    authorize_capture,
+)
 from pmv.capture_format import (
     MAGIC,
     MAX_PAYLOAD_BYTES,
@@ -86,7 +90,7 @@ from pmv.capture_format import (
     scan_prefix,
     summarize_segment,
 )
-from pmv.config import RawStorageConfig
+from pmv.config import Environment, RawStorageConfig
 from pmv.integrity import (
     FormatError,
     canonical_json,
@@ -604,6 +608,10 @@ class CaptureStore:
             raise CaptureStoreError("provenance does not describe this raw storage configuration")
         if re.fullmatch(r"[0-9a-f]{32}", clock_domain or "") is None:
             raise CaptureStoreError("clock_domain must be 32 lowercase hex digits")
+        if provenance.environment is not Environment.TEST and clock_domain != read_clock_domain():
+            # Outside tests the domain is this boot's identity, never a caller's claim
+            # (RT-B8-05).
+            raise CaptureStoreError("clock_domain is not this boot's identity")
         self._config = config
         self._provenance = provenance
         self._clock_domain = clock_domain
@@ -684,6 +692,16 @@ class CaptureStore:
             raise TypeError("source must be a SourceIdentity")
         if authorization.endpoint_id != source.endpoint_id:
             raise CaptureEnvironmentError("the authorization is for another endpoint")
+        # The authorization is evidence, not trust: re-derive it from this store's own
+        # deployment environment and root (RT-B8-02).
+        authorize_capture(
+            deployment_environment=self._provenance.environment,
+            venue_environment=authorization.venue_environment,
+            host=authorization.host,
+            endpoint_id=source.endpoint_id,
+            store_root=self._root_path,
+            protected_base=authorization.protected_base,
+        )
         if not isinstance(policy, SegmentPolicy):
             raise TypeError("policy must be a SegmentPolicy")
         warning, hard_stop = self._thresholds()
@@ -740,10 +758,28 @@ class CaptureStore:
             or record["schema"] != "pmv.capture.session"
             or record["schema_version"] != 1
             or record["session_id"] != session_id
-            or record["clock_domain"] is None
+            or not isinstance(record["clock_domain"], str)
+            or re.fullmatch(r"[0-9a-f]{32}", record["clock_domain"]) is None
+            or record["deployment_environment"] not in {item.value for item in Environment}
             or not is_timestamp(record["session_started_at"])
+            or not is_timestamp_id(session_id)
         ):
             raise CaptureIntegrityError("the session reservation is malformed")
+        try:
+            policy = _mapping(record["segment_policy"])
+            SegmentPolicy(
+                _as_int(policy["max_segment_bytes"]),
+                _as_int(policy["max_segment_frames"]),
+                _as_int(policy["max_segment_duration_ns"]),
+            )
+            if set(policy) != {
+                "max_segment_bytes",
+                "max_segment_frames",
+                "max_segment_duration_ns",
+            }:
+                raise ValueError("segment policy keys")
+        except (KeyError, ValueError):
+            raise CaptureIntegrityError("the session reservation is malformed") from None
         try:
             VenueEnvironment(_as_str(record["venue_environment"]))
         except ValueError:
@@ -856,6 +892,7 @@ class CaptureStore:
         os.fsync(opened)
         self._check_namespace(OPEN, QUARANTINE)
         self._fault("quarantine.moved")
+        _make_read_only(segment_fd)
         _log.warning("capture.segment_quarantined", extra=fields(name=name, reason=reason.value))
 
     # ----- salvage (F-11) -----
@@ -1051,9 +1088,7 @@ class CaptureStore:
                 status = SessionStatus.ENDS_WITH_SALVAGE
                 break
             status = (
-                SessionStatus.OPEN
-                if safe_fs.exists(self._fds[OPEN], name)
-                else SessionStatus.TRUNCATED
+                SessionStatus.OPEN if _is_live(self._fds[OPEN], name) else SessionStatus.TRUNCATED
             )
             break
         reached = {ref.index for ref in refs}
@@ -1117,6 +1152,8 @@ class CaptureStore:
                                 if frame.connection not in opened:
                                     raise CaptureIntegrityError("closing a connection not open")
                                 opened.discard(frame.connection)
+                            elif frame.connection is not None and frame.connection not in opened:
+                                raise CaptureIntegrityError("an event names a closed connection")
                             yield ref.index, frame
                     except CaptureFormatError as exc:
                         raise CaptureIntegrityError(
@@ -1400,6 +1437,35 @@ def _open_root(root: Path, repo_root: Path) -> int:
         raise
 
 
+def _make_read_only(directory: int) -> None:
+    """Make a quarantined segment's files 0400 and its directory 0500 (RT-B8-03)."""
+    for name in os.listdir(directory):
+        fd = _open_file(directory, name)
+        try:
+            os.fchmod(fd, 0o400)
+        finally:
+            os.close(fd)
+    os.fchmod(directory, 0o500)
+    os.fsync(directory)
+
+
+def _is_live(opened: int, name: str) -> bool:
+    """Whether an open segment still has a live writer holding its lock (RT-B8-04)."""
+    try:
+        fd = _open_dir(opened, name)
+    except FileNotFoundError:
+        return False
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return True
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        return False
+    finally:
+        os.close(fd)
+
+
 def _read_object(parent: int, name: str, limit: int = MAX_SALVAGE_INPUT_BYTES) -> bytes:
     fd = _open_file(parent, name)
     try:
@@ -1613,7 +1679,13 @@ class CaptureSession:
         source_timestamp: datetime | None = None,
         malformed: bool = False,
     ) -> None:
-        """Append bytes received from the source, exactly as delivered."""
+        """Append bytes received from the source, exactly as delivered.
+
+        If this raises after the frame was written (for example a rollover or a
+        regression-event write failed), the frame is on disk: the session is no longer
+        open, and recovery and salvage keep the frame. A collector treats any exception
+        as "the session ended; start a new one" (RT-B8-10).
+        """
         self._append(
             payload,
             Direction.INBOUND,
@@ -1645,6 +1717,14 @@ class CaptureSession:
         self._check_disk()
         self._write_event(event_type, connection)
         self._maybe_rollover()
+
+    def maintain(self) -> None:
+        """Periodic upkeep for a collector: roll over a segment that has outlived its
+        duration bound even when no frame arrives, then sync (RT-B8-07)."""
+        self._require_open()
+        self._maybe_rollover()
+        if self._state is _State.OPEN:
+            self.sync()
 
     def sync(self) -> None:
         """Make every frame written so far durable (a checkpoint; does not finalize)."""

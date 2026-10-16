@@ -46,7 +46,7 @@ Git records F-11, F-12, F-27, F-26, F-33, F-37, and RT-4 by title only (`docs/ga
 | B8-3 | **Venue sequence numbers are not raw-frame fields.** The raw layer never parses payloads, so a venue's own sequence stays inside the payload and is extracted by the normalizer. | `docs/raw_data.md`; CLAUDE.md "Preserve raw data" |
 | B8-4 | **Raw format v1 no longer starts captures outside the `test` environment.** F-12 must be done before real collection, and v1 lacks monotonic time and direction. Reading and verifying v1 captures is unchanged. | `docs/gate0_readiness.md` (F-12 deadline) |
 | B8-5 | **RT-4 "gate commands"** means the CLIs that create project records (`python -m pmv.gates create`, `python -m pmv.holdout_log record`). They refuse `--environment test`. Read-only verification commands are unchanged. | `docs/decisions/2026-10-14_phase0_step11_owner_decisions.md` (RT-4) |
-| B8-6 | **Demo data is protected like real data and never used as data.** Demo captures are written only inside the protected raw location, and every loader refuses them, for every use. | RT-B2-09; F-37 title ("demo data treated as real") |
+| B8-6 | **Demo data is protected like real data and never used as data.** Demo captures are written only inside the protected raw location, and every v2 loader refuses them, for every use. v1 captures carry no environment identity, and v1 starts new captures only in `test` (B8-4), so v1 data is test data (RT-B8-08). | RT-B2-09; F-37 title ("demo data treated as real") |
 | B8-7 | **Snapshots that answer a PMV command are never a recovery point** (`BookSnapshot.solicited`), until a recorded test proves such replies are sequence-consistent. | `research/kalshi/red_team_review.md` RT-B2-03 |
 
 ## Not changed

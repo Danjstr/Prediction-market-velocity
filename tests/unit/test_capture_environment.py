@@ -208,8 +208,23 @@ def test_authorizations_cannot_be_constructed_directly(tmp_path: Path) -> None:
             "x.example",
             "unit_ws",
             tmp_path,
+            tmp_path,
             object(),
         )
+
+
+def test_authorizations_cannot_be_reissued_or_mutated(tmp_path: Path, protected: Path) -> None:
+    """RT-B8-02: a test authorization cannot be turned into a production one."""
+    import dataclasses
+
+    root = tmp_path / "store"
+    root.mkdir()
+    granted = authorize(Environment.TEST, VenueEnvironment.SYNTHETIC, root, protected)
+    with pytest.raises(TypeError):
+        dataclasses.replace(granted, deployment_environment=Environment.PRODUCTION)  # type: ignore[type-var]
+    with pytest.raises(AttributeError):
+        granted._deployment = Environment.PRODUCTION
+    assert granted.deployment_environment is Environment.TEST
 
 
 def test_inputs_are_validated(tmp_path: Path, protected: Path) -> None:

@@ -6,6 +6,7 @@ missing, duplicate, out-of-order, and solicited frames, and the normalized-artif
 lineage, determinism, idempotency, and data-use rules.
 """
 
+import hashlib
 import json
 import os
 from collections.abc import Callable, Iterator, Sequence
@@ -33,12 +34,14 @@ from pmv.market_data.capture_replay import (
     ArtifactError,
     Disposition,
     NormalizedSession,
+    artifact_digest,
     artifact_key,
     decode_artifact,
     encode_artifact,
     load_artifact,
     normalize_session,
     persist_artifact,
+    verify_artifact,
 )
 from pmv.market_data.contracts import ContractSpec, Underlying, Verification, YesRegion
 from pmv.market_data.events import BookLevel, Outcome, StreamEvent, StreamEventKind
@@ -356,6 +359,8 @@ def test_a_restart_after_an_uncertain_last_frame_inherits_nothing(
     store.recover()
     name = segment_id(first.session_id, 0)
     partial = root / "capture" / "v2" / "quarantine" / name / "segment.pmvraw.partial"
+    partial.parent.chmod(0o700)
+    partial.chmod(0o600)
     partial.write_bytes(partial.read_bytes()[:-2])  # the last delta is torn
     store.salvage(name)
     old = normalized(store, first.session_id)
@@ -563,3 +568,112 @@ def test_normalizing_needs_an_intact_chain(root: Path, store: CaptureStore) -> N
     with pytest.raises(CaptureIntegrityError):
         normalize_session(store, read, SyntheticNormalizer(), use=DataUse.TEST)
     assert not (root / "capture" / "v2" / "normalized" / session.session_id).exists()
+
+
+# ----- RT-B8-01 / RT-B8-02 regressions (artifact integrity, environment labels) -----
+
+
+def rewrite(root: Path, session_id: str, key: str, files: dict[str, bytes]) -> None:
+    """Overwrite a stored artifact's files in place, as a local writer could."""
+    directory = root / "capture" / "v2" / "normalized" / session_id / key
+    directory.chmod(0o700)
+    for name, data in files.items():
+        path = directory / name
+        if path.exists():
+            path.chmod(0o600)
+        path.write_bytes(data)
+
+
+def reencode(document: dict[str, Any]) -> bytes:
+    return json.dumps(document, sort_keys=True, separators=(",", ":")).encode() + b"\n"
+
+
+def with_record(files: dict[str, bytes], key: str) -> dict[str, bytes]:
+    """Recompute the artifact record so it matches tampered content (a consistent forgery)."""
+    record = json.loads(files["artifact.json"])
+    for name in ("labels.json", "observations.json"):
+        record["files"][name] = {
+            "sha256": hashlib.sha256(files[name]).hexdigest(),
+            "size_bytes": len(files[name]),
+        }
+    record["key"] = key
+    return {**files, "artifact.json": reencode(record)}
+
+
+def stored(
+    store: CaptureStore, root: Path, steps: Sequence[Step]
+) -> tuple[str, str, dict[str, bytes]]:
+    session = run(store, root, steps)
+    key, written = persist_artifact(store, normalized(store, session.session_id))
+    assert written
+    return session.session_id, key, store.read_artifact(session.session_id, key)
+
+
+def test_a_changed_value_is_caught_by_the_record_digest_or_re_derivation(
+    root: Path, store: CaptureStore
+) -> None:
+    session_id, key, files = stored(store, root, [("in", snapshot(1)), ("in", delta(2))])
+    digest = artifact_digest(files)
+    document = json.loads(files["observations.json"])
+    snapshot_entry = next(o for o in document["observations"] if o["type"] == "book_snapshot")
+    snapshot_entry["bids"][0][0] = 49
+    changed = {**files, "observations.json": reencode(document)}
+    rewrite(root, session_id, key, changed)
+    with pytest.raises(ArtifactError, match="does not match its record"):
+        load_artifact(store, session_id, key, use=DataUse.TEST)
+    # a consistent forgery (record rewritten too) passes the record check, but not a
+    # digest recorded elsewhere, and not re-derivation from the raw segments
+    rewrite(root, session_id, key, with_record(changed, key))
+    with pytest.raises(ArtifactError, match="recorded digest"):
+        load_artifact(store, session_id, key, use=DataUse.TEST, expected_digest=digest)
+    with pytest.raises(ArtifactError, match="re-derivation"):
+        verify_artifact(store, session_id, key, SyntheticNormalizer(), use=DataUse.TEST)
+
+
+def test_a_deleted_rejection_is_detected(root: Path, store: CaptureStore) -> None:
+    _session_id, key, files = stored(
+        store, root, [("in", snapshot(1)), ("bad", delta(2)), ("in", delta(3))]
+    )
+    document = json.loads(files["observations.json"])
+    rejected = next(f for f in document["frames"] if f[2] == "rejected")
+    document["frames"].remove(rejected)
+    document["observations"] = [
+        o
+        for o in document["observations"]
+        if not (o["type"] == "stream_event" and o["kind"] == "frame_rejected")
+    ]
+    document["counts"]["rejected"] -= 1
+    forged = with_record({**files, "observations.json": reencode(document)}, key)
+    with pytest.raises(ArtifactError, match="contiguous"):
+        decode_artifact(forged)
+
+
+def test_a_relabelled_environment_is_refused(root: Path, store: CaptureStore) -> None:
+    session_id, key, files = stored(store, root, [("in", snapshot(1))])
+    document = json.loads(files["observations.json"])
+    document["venue_environment"] = "production"
+    forged = with_record({**files, "observations.json": reencode(document)}, key)
+    with pytest.raises(ArtifactError, match="key does not match"):
+        decode_artifact(forged)
+    # re-keyed consistently and stored under its new key: the session and the test
+    # deployment still refuse it
+    relabelled = replace(
+        normalized(store, session_id), venue_environment=VenueEnvironment.PRODUCTION
+    )
+    new_key, new_files = encode_artifact(relabelled)
+    store.write_artifact(session_id, new_key, new_files)
+    with pytest.raises(CaptureEnvironmentError, match="never research data"):
+        load_artifact(store, session_id, new_key, use=DataUse.RESEARCH)
+    with pytest.raises(CaptureEnvironmentError, match="only for research"):
+        load_artifact(store, session_id, new_key, use=DataUse.TEST)
+
+
+def test_an_artifact_must_match_its_sessions_current_chain(root: Path, store: CaptureStore) -> None:
+    session_id, key, _files = stored(store, root, [("in", snapshot(1))])
+    stale = replace(normalized(store, session_id), deployment_environment="development")
+    stale_key, stale_files = encode_artifact(stale)
+    store.write_artifact(session_id, stale_key, stale_files)
+    with pytest.raises(ArtifactError, match="current chain"):
+        load_artifact(store, session_id, stale_key, use=DataUse.TEST)
+    assert load_artifact(store, session_id, key, use=DataUse.TEST).session_id == session_id
+    assert verify_artifact(store, session_id, key, SyntheticNormalizer(), use=DataUse.TEST)

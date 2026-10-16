@@ -24,7 +24,7 @@ constants is out of scope, as for every code-level control.
 """
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Final
@@ -77,20 +77,71 @@ APPROVED_CAPTURE_ENDPOINTS: Final[frozenset[CaptureEndpoint]] = frozenset()
 _ISSUED: Final = object()
 
 
-@dataclass(frozen=True, slots=True)
 class CaptureAuthorization:
-    """Proof that ``authorize_capture`` accepted one session's environment and endpoint."""
+    """Proof that ``authorize_capture`` accepted one session's environment and endpoint.
 
-    deployment_environment: Environment
-    venue_environment: VenueEnvironment
-    host: str
-    endpoint_id: str
-    store_root: Path
-    _token: object = field(repr=False, compare=False)
+    It is deliberately not a dataclass, so ``dataclasses.replace`` cannot re-issue it with
+    other fields (RT-B8-02). The capture store does not trust it either: it re-runs
+    ``authorize_capture`` from these fields and its own deployment environment before any
+    session starts.
+    """
 
-    def __post_init__(self) -> None:
-        if self._token is not _ISSUED:
+    __slots__ = (
+        "_deployment",
+        "_endpoint_id",
+        "_host",
+        "_protected_base",
+        "_store_root",
+        "_venue",
+    )
+
+    def __init__(
+        self,
+        deployment_environment: Environment,
+        venue_environment: VenueEnvironment,
+        host: str,
+        endpoint_id: str,
+        store_root: Path,
+        protected_base: Path,
+        token: object,
+    ) -> None:
+        if token is not _ISSUED:
             raise CaptureEnvironmentError("capture authorizations come from authorize_capture")
+        self._deployment = deployment_environment
+        self._venue = venue_environment
+        self._host = host
+        self._endpoint_id = endpoint_id
+        self._store_root = store_root
+        self._protected_base = protected_base
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if hasattr(self, "_protected_base"):
+            raise AttributeError("capture authorizations are immutable")
+        object.__setattr__(self, name, value)
+
+    @property
+    def deployment_environment(self) -> Environment:
+        return self._deployment
+
+    @property
+    def venue_environment(self) -> VenueEnvironment:
+        return self._venue
+
+    @property
+    def host(self) -> str:
+        return self._host
+
+    @property
+    def endpoint_id(self) -> str:
+        return self._endpoint_id
+
+    @property
+    def store_root(self) -> Path:
+        return self._store_root
+
+    @property
+    def protected_base(self) -> Path:
+        return self._protected_base
 
 
 def is_reserved_test_host(host: str) -> bool:
@@ -138,7 +189,11 @@ def authorize_capture(
             )
         if not is_reserved_test_host(host):
             raise CaptureEnvironmentError("synthetic captures use reserved test hosts only")
-        if inside_protected or _resolves_inside(store_root, protected_base):
+        if (
+            inside_protected
+            or _resolves_inside(store_root, protected_base)
+            or _resolves_inside(store_root, PROTECTED_RAW_BASE)
+        ):
             raise CaptureEnvironmentError("synthetic captures never write the protected raw store")
     else:
         if venue_environment is VenueEnvironment.SYNTHETIC:
@@ -164,7 +219,13 @@ def authorize_capture(
                 "real and demo captures are written only inside the protected raw location"
             )
     return CaptureAuthorization(
-        deployment_environment, venue_environment, host, endpoint_id, store_root, _ISSUED
+        deployment_environment,
+        venue_environment,
+        host,
+        endpoint_id,
+        store_root,
+        protected_base,
+        _ISSUED,
     )
 
 

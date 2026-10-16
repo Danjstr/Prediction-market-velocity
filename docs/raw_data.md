@@ -104,7 +104,7 @@ There are no defaults. A crash can damage only the open segment.
 A segment is accepted exactly when its directory is in `segments/`.
 
 **Recovery** never resumes a segment:
-- `recover()` moves every unlocked directory in `open/` to `quarantine/`, with a closed-schema record, whatever it contains.
+- `recover()` moves every unlocked directory in `open/` to `quarantine/`, with a closed-schema record, whatever it contains. The quarantined segment is then made read-only (files 0400, directory 0500; RT-B8-03).
 - A live (locked) segment is never touched.
 - A session whose open segment was quarantined has ended. The collector starts a new session.
 - Interrupted salvage or artifact writes leave `.staging-*` directories. These are reported (`stale_staging`), never read, renamed, or deleted by the tool.
@@ -123,7 +123,7 @@ A segment is accepted exactly when its directory is in `segments/`.
 | Status | Meaning |
 |---|---|
 | `complete` | The last segment ends with `session_closed` |
-| `open` | The next segment is still open |
+| `open` | The next segment is still open and its writer holds the lock. An open segment without a live writer reads as `truncated` until `recover()` runs (RT-B8-04) |
 | `ends_with_salvage` | The chain ends at a salvaged prefix |
 | `truncated` | The chain ends at a missing, quarantined but unsalvaged, or never-opened segment |
 
@@ -148,14 +148,16 @@ Event types:
 
 Rules:
 - **Ordering.** One `sequence` counter covers a whole session, across segments. Sequence, not any clock, is the ordering authority. Regressions of any clock are recorded as events, never repaired or reordered.
-- **Monotonic time.** `monotonic_ns` is `CLOCK_MONOTONIC`. It is comparable only within one `clock_domain` (the boot identity, `/proc/sys/kernel/random/boot_id`). It measures intervals and order within a session, and it is never a timestamp.
+- **Monotonic time.** `monotonic_ns` is `CLOCK_MONOTONIC`. It is comparable only within one `clock_domain` (the boot identity, `/proc/sys/kernel/random/boot_id`). It measures intervals and order within a session, and it is never a timestamp. Outside the `test` environment the store refuses any clock domain other than the boot identity it reads itself (RT-B8-05).
+- **Upkeep.** A collector calls `CaptureSession.maintain()` periodically: it rolls over a segment that has outlived its duration bound even when no frame arrives, then syncs (RT-B8-07).
+- **Exceptions after a write.** If `append_*` raises after its frame was written (a rollover or a regression event failed), the frame is on disk and the session has ended. Recovery and salvage keep the frame. A collector treats any exception as "start a new session" (RT-B8-10).
 - **Environment identity** is carried by each segment's hash-chained header, which every frame of that segment sits behind (interpretation B8-2).
 - **Venue sequence numbers** stay inside payloads. The raw layer never parses payloads (B8-3).
 - **Outbound frames** hold application-level messages PMV sent (for example subscriptions). Handshake and authentication material never passes through the store (F-03).
 
 ### Environment boundaries (F-37, RT-4)
 
-`pmv.capture_environment.authorize_capture` is the only producer of the `CaptureAuthorization` a session needs:
+`pmv.capture_environment.authorize_capture` is the only producer of the `CaptureAuthorization` a session needs. The authorization is immutable and cannot be re-issued with `dataclasses.replace`. The store re-runs `authorize_capture` from its own deployment environment and root before any session starts (RT-B8-02).
 
 | Deployment | May capture | Store root |
 |---|---|---|
@@ -164,14 +166,16 @@ Rules:
 | `shadow`, `production` | `production`, from an approved endpoint | Inside the protected raw location |
 
 - Demo data is protected like real data and is never loaded as data, for any use (`require_data_use`; RT-B2-09).
-- Synthetic data is loaded only for tests. Production data is loaded only for research, and that still happens only through the H-2 release path.
+- Synthetic data is loaded only for tests. Production data is loaded only for research, and that still happens only through the H-2 release path. Nothing written by the `test` deployment is ever research data, whatever its label.
+- These loader rules apply to v2 sessions and artifacts. v1 captures carry no environment identity. v1 starts new captures only in the `test` environment, so every v1 capture in a store is test data (RT-B8-08).
 - The CLIs that create project records (`python -m pmv.gates create` and `python -m pmv.holdout_log record`) refuse `--environment test` (RT-4).
 
 ### Limits
 
 - **Process crashes only.** Fault-injection tests kill a real process at every named boundary (`capture_store.FAULT_POINTS`). They do not model power loss.
 - **Durability.** A frame is durable after `sync()` or segment finalization. Frames written before a process crash are kept by the kernel and are salvageable.
-- **Memory.** Salvage and the normalized-artifact reader hold one object in memory, bounded by `MAX_SEGMENT_BYTES` plus one frame, and by 1 GiB respectively. Normalization holds one session's observations in memory.
+- **Memory.** Salvage and the normalized-artifact reader hold one object in memory, bounded by `MAX_SEGMENT_BYTES` plus one frame, and by 1 GiB respectively. Normalization holds one session's observations in memory, and artifact writes have no size cap. Bounding these, for example with per-segment artifacts, is open (RT-B8-06) and must be decided before long real sessions are normalized.
+- **Timestamps are the collector's.** `observed_at` and the payload `monotonic_ns` are caller-supplied and only checked for form. Plausibility checks are open before live capture: `observed_at` against `written_at`, queue delay, and clock-sync state (RT-B8-05; Statistician B8S-03).
 - **No index.** The directory tree is authoritative. Listing sessions walks `segments/`.
 - **F-26 is still open:** storage-event claims and their restore dependency.
 - **Not proven by tests.** Session records and segment manifests do not prove where bytes came from beyond PMV's own records; the collector must be trusted for that (live capture is not authorized).

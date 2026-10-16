@@ -32,9 +32,17 @@ A **normalized artifact** is two canonical JSON files under
 - ``labels.json``: the official resolutions, a separate channel that never enters an
   observation log.
 
+A third file, ``artifact.json``, records the SHA-256 and size of both, and is checked on
+every read; ``artifact_digest`` (its SHA-256) is the reference to record wherever an
+artifact is used. ``load_artifact`` also checks the artifact against the session as the
+store reads it now, and ``verify_artifact`` re-derives every byte from the raw segments.
+A local writer who rewrites all three files consistently is detected only by a recorded
+digest or by re-derivation (RT-B8-01).
+
 ``key`` is the SHA-256 of the derivation: this driver's identity and version, the session,
 the exact SHA-256 and size of every input segment's bytes, why the readable chain ends
-(its ``SessionStatus``), and the parser identity and version. The files contain no
+(its ``SessionStatus``), the venue and deployment environments, and the parser identity
+and version. The files contain no
 wall-clock creation time and no code commit, so generation is deterministic and
 idempotent: the same derivation always yields identical bytes, and a different result
 under the same key is an integrity failure, never a replacement. A parser fix is a new
@@ -53,7 +61,7 @@ from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from typing import Final
 
-from pmv.capture_environment import DataUse, require_data_use
+from pmv.capture_environment import CaptureEnvironmentError, DataUse, require_data_use
 from pmv.capture_format import (
     Direction,
     EventFrame,
@@ -111,18 +119,22 @@ __all__ = [
     "Disposition",
     "FrameEntry",
     "NormalizedSession",
+    "artifact_digest",
     "artifact_key",
     "decode_artifact",
     "encode_artifact",
     "load_artifact",
     "normalize_session",
     "persist_artifact",
+    "verify_artifact",
 ]
 
 DRIVER_ID: Final = "pmv_capture_replay"
 DRIVER_VERSION: Final = 1
 OBSERVATIONS_FILE: Final = "observations.json"
 LABELS_FILE: Final = "labels.json"
+RECORD_FILE: Final = "artifact.json"
+RECORD_SCHEMA: Final = "pmv.normalized.artifact_record"
 OBSERVATIONS_SCHEMA: Final = "pmv.normalized.capture"
 LABELS_SCHEMA: Final = "pmv.normalized.labels"
 SCHEMA_VERSION: Final = 1
@@ -158,6 +170,7 @@ class FrameEntry:
 class NormalizedSession:
     session_id: str
     venue_environment: VenueEnvironment
+    deployment_environment: str
     session_status: SessionStatus
     segments: tuple[tuple[int, str, str, int], ...]
     """``(index, kind, sha256, size_bytes)`` of every input segment, in chain order."""
@@ -179,7 +192,7 @@ def normalize_session(
     store: CaptureStore, read: SessionRead, normalizer: Normalizer, *, use: DataUse
 ) -> NormalizedSession:
     """Normalize the readable chain of one session. Fails closed on any contract breach."""
-    require_data_use(read.venue_environment, use)
+    _require_use(read.venue_environment, read.deployment_environment, use)
     parser_id, parser_version = normalizer.parser_id, normalizer.parser_version
     if parser_id == STREAM_PARSER_ID:
         raise NormalizationContractError("the stream-event parser identity is reserved")
@@ -246,6 +259,7 @@ def normalize_session(
     return NormalizedSession(
         session_id=session_id,
         venue_environment=read.venue_environment,
+        deployment_environment=read.deployment_environment,
         session_status=read.status,
         segments=_segments(read),
         parser_id=parser_id,
@@ -316,6 +330,8 @@ def artifact_key(read: SessionRead, normalizer: Normalizer) -> str:
     """The content address of one derivation (see the module docstring)."""
     return _key(
         read.session_id,
+        read.venue_environment,
+        read.deployment_environment,
         _segments(read),
         read.status,
         normalizer.parser_id,
@@ -325,6 +341,8 @@ def artifact_key(read: SessionRead, normalizer: Normalizer) -> str:
 
 def _key(
     session_id: str,
+    venue: VenueEnvironment,
+    deployment: str,
     segments: Sequence[tuple[int, str, str, int]],
     status: SessionStatus,
     parser_id: str,
@@ -340,6 +358,8 @@ def _key(
                 "segments": [list(segment) for segment in segments],
                 "session_id": session_id,
                 "session_status": status.value,
+                "venue_environment": venue.value,
+                "deployment_environment": deployment,
             }
         )
     )
@@ -349,6 +369,8 @@ def encode_artifact(session: NormalizedSession) -> tuple[str, dict[str, bytes]]:
     """Return ``(key, files)`` with deterministic canonical bytes."""
     key = _key(
         session.session_id,
+        session.venue_environment,
+        session.deployment_environment,
         session.segments,
         session.session_status,
         session.parser_id,
@@ -356,6 +378,7 @@ def encode_artifact(session: NormalizedSession) -> tuple[str, dict[str, bytes]]:
     )
     observations = {
         "counts": {item.value: session.count(item) for item in Disposition},
+        "deployment_environment": session.deployment_environment,
         "driver": {"id": DRIVER_ID, "version": DRIVER_VERSION},
         "frames": [
             [
@@ -386,10 +409,39 @@ def encode_artifact(session: NormalizedSession) -> tuple[str, dict[str, bytes]]:
         "schema_version": SCHEMA_VERSION,
         "session_id": session.session_id,
     }
-    return key, {
+    files = {
         LABELS_FILE: canonical_json(labels) + b"\n",
         OBSERVATIONS_FILE: canonical_json(observations) + b"\n",
     }
+    files[RECORD_FILE] = _record(key, files)
+    return key, files
+
+
+def _record(key: str, files: Mapping[str, bytes]) -> bytes:
+    """The artifact record: the SHA-256 and size of each content file (RT-B8-01)."""
+    return (
+        canonical_json(
+            {
+                "files": {
+                    name: {"sha256": sha256_hex(files[name]), "size_bytes": len(files[name])}
+                    for name in (LABELS_FILE, OBSERVATIONS_FILE)
+                },
+                "key": key,
+                "schema": RECORD_SCHEMA,
+                "schema_version": SCHEMA_VERSION,
+            }
+        )
+        + b"\n"
+    )
+
+
+def artifact_digest(files: Mapping[str, bytes]) -> str:
+    """SHA-256 of an artifact's record, which binds both content files.
+
+    Record it wherever the artifact is used (for example an experiment manifest): it is
+    the reference a later reader checks the artifact against.
+    """
+    return sha256_hex(files[RECORD_FILE])
 
 
 def persist_artifact(store: CaptureStore, session: NormalizedSession) -> tuple[str, bool]:
@@ -399,25 +451,84 @@ def persist_artifact(store: CaptureStore, session: NormalizedSession) -> tuple[s
 
 
 def load_artifact(
-    store: CaptureStore, session_id: str, key: str, *, use: DataUse
+    store: CaptureStore,
+    session_id: str,
+    key: str,
+    *,
+    use: DataUse,
+    expected_digest: str | None = None,
 ) -> NormalizedSession:
-    """Read, fully validate, and decode one artifact; refuse demo and misused synthetic."""
-    session = decode_artifact(store.read_artifact(session_id, key))
-    if session.session_id != session_id:
-        raise ArtifactError("the artifact belongs to another session")
-    require_data_use(session.venue_environment, use)
+    """Read, validate, and decode one artifact, and check it against its session.
+
+    Checks, in order: each content file against the artifact record; the derivation key;
+    the canonical form, frame contiguity, and item accounting; then the session as the
+    store reads it now (same segments, status, and environments); then the data use.
+    ``expected_digest``, when given, must equal ``artifact_digest``: a record kept
+    elsewhere (for example in an experiment manifest) detects a rewritten artifact.
+    ``verify_artifact`` additionally re-derives every byte.
+    """
+    files = store.read_artifact(session_id, key)
+    if expected_digest is not None and (
+        RECORD_FILE not in files or artifact_digest(files) != expected_digest
+    ):
+        raise ArtifactError("the artifact does not match its recorded digest")
+    session = decode_artifact(files)
+    if session.session_id != session_id or encode_artifact(session)[0] != key:
+        raise ArtifactError("the artifact is not stored under its own key")
+    # Refusing a demo or misused label needs no trust in the label; accepting one does,
+    # so the session cross-check follows.
+    _require_use(session.venue_environment, session.deployment_environment, use)
+    read = store.read_session(session_id)
+    if (
+        session.segments != _segments(read)
+        or session.session_status is not read.status
+        or session.venue_environment is not read.venue_environment
+        or session.deployment_environment != read.deployment_environment
+    ):
+        raise ArtifactError("the artifact does not match its session's current chain")
     return session
 
 
+def verify_artifact(
+    store: CaptureStore, session_id: str, key: str, normalizer: Normalizer, *, use: DataUse
+) -> NormalizedSession:
+    """Load an artifact and re-derive it from the raw segments; every byte must match."""
+    session = load_artifact(store, session_id, key, use=use)
+    fresh = normalize_session(store, store.read_session(session_id), normalizer, use=use)
+    if encode_artifact(fresh) != (key, store.read_artifact(session_id, key)):
+        raise ArtifactError("the artifact differs from a re-derivation of its raw segments")
+    return session
+
+
+def _require_use(venue: VenueEnvironment, deployment: str, use: DataUse) -> None:
+    """Environment rules for loading data: demo never, synthetic for tests only, and
+    nothing written by the test deployment is ever research data (RT-B8-02)."""
+    require_data_use(venue, use)
+    if use is DataUse.RESEARCH and deployment == "test":
+        raise CaptureEnvironmentError("data written by the test environment is never research data")
+
+
 def decode_artifact(files: Mapping[str, bytes]) -> NormalizedSession:
-    if set(files) != {LABELS_FILE, OBSERVATIONS_FILE}:
-        raise ArtifactError("an artifact has exactly an observations file and a labels file")
+    if set(files) != {LABELS_FILE, OBSERVATIONS_FILE, RECORD_FILE}:
+        raise ArtifactError("an artifact has exactly its record, observations, and labels files")
+    record = _document(files[RECORD_FILE])
+    _closed(record, {"files", "key", "schema", "schema_version"})
+    if (record["schema"], record["schema_version"]) != (RECORD_SCHEMA, SCHEMA_VERSION):
+        raise ArtifactError("unsupported artifact record schema")
+    listed = _obj(record["files"])
+    if set(listed) != {LABELS_FILE, OBSERVATIONS_FILE}:
+        raise ArtifactError("the artifact record lists other files")
+    for name in (LABELS_FILE, OBSERVATIONS_FILE):
+        entry = _closed(_obj(listed[name]), {"sha256", "size_bytes"})
+        if entry != {"sha256": sha256_hex(files[name]), "size_bytes": len(files[name])}:
+            raise ArtifactError("an artifact file does not match its record")
     top = _document(files[OBSERVATIONS_FILE])
     labels = _document(files[LABELS_FILE])
     _closed(
         top,
         {
             "counts",
+            "deployment_environment",
             "driver",
             "frames",
             "key",
@@ -449,11 +560,17 @@ def decode_artifact(files: Mapping[str, bytes]) -> NormalizedSession:
         status = SessionStatus(_text(top["session_status"]))
     except ValueError:
         raise ArtifactError("an artifact session status is invalid") from None
-    key = _key(session_id, segments, status, parser_id, parser_version)
-    if top["key"] != key or labels["key"] != key:
-        raise ArtifactError("an artifact's key does not match its derivation")
     try:
         environment = VenueEnvironment(_text(top["venue_environment"]))
+    except ValueError:
+        raise ArtifactError("an artifact venue environment is invalid") from None
+    deployment = _text(top["deployment_environment"])
+    if deployment not in ("development", "test", "shadow", "production"):
+        raise ArtifactError("an artifact deployment environment is invalid")
+    key = _key(session_id, environment, deployment, segments, status, parser_id, parser_version)
+    if top["key"] != key or labels["key"] != key or record["key"] != key:
+        raise ArtifactError("an artifact's key does not match its derivation")
+    try:
         frames = tuple(_frame(item) for item in _list(top["frames"]))
         observations = tuple(_decode_observation(item) for item in _list(top["observations"]))
         resolutions = tuple(_decode_resolution(item) for item in _list(labels["resolutions"]))
@@ -462,6 +579,7 @@ def decode_artifact(files: Mapping[str, bytes]) -> NormalizedSession:
     session = NormalizedSession(
         session_id,
         environment,
+        deployment,
         status,
         segments,
         parser_id,
@@ -470,12 +588,43 @@ def decode_artifact(files: Mapping[str, bytes]) -> NormalizedSession:
         observations,
         resolutions,
     )
+    _check_frames(session)
     _check_items(session)
     if top["counts"] != {item.value: session.count(item) for item in Disposition}:
         raise ArtifactError("an artifact's counts do not match its frames")
     if encode_artifact(session)[1] != dict(files):
         raise ArtifactError("an artifact is not in canonical form")
     return session
+
+
+def _check_frames(session: NormalizedSession) -> None:
+    """Frames cover the whole readable chain: sequences 0, 1, 2, ... with no gap, one
+    segment header per input segment, each at its segment's first sequence (RT-B8-01)."""
+    if [frame.sequence for frame in session.frames] != list(range(len(session.frames))):
+        raise ArtifactError("an artifact's frames are not one contiguous sequence")
+    headers = [f for f in session.frames if f.disposition is Disposition.SEGMENT_HEADER]
+    if [h.segment_index for h in headers] != [segment[0] for segment in session.segments]:
+        raise ArtifactError("an artifact's segment headers do not match its segments")
+    current = None
+    for frame in session.frames:
+        if frame.disposition is Disposition.SEGMENT_HEADER:
+            current = frame.segment_index
+        elif frame.segment_index != current:
+            raise ArtifactError("a frame is attributed to the wrong segment")
+    ends = [f for f in session.frames if f.disposition is Disposition.SESSION_END]
+    if len(ends) > 1 or (ends and session.frames[-1] is not ends[0]):
+        raise ArtifactError("a session end must be the artifact's last frame")
+    # A complete session ends with session_closed; a salvaged one may (crash after the
+    # close, before finalization); an open or truncated chain cannot.
+    allowed = (
+        {1}
+        if session.session_status is SessionStatus.COMPLETE
+        else {0, 1}
+        if session.session_status is SessionStatus.ENDS_WITH_SALVAGE
+        else {0}
+    )
+    if len(ends) not in allowed:
+        raise ArtifactError("an artifact's session end does not match its status")
 
 
 def _check_items(session: NormalizedSession) -> None:
