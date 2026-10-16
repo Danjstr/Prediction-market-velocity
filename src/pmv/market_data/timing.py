@@ -13,7 +13,7 @@ is always ``received_at``. It is never ``source_time``: an event the exchange st
 ``t`` was not observable to PMV before PMV received it, so using the source clock would let
 information leak backwards in time.
 
-Known limit: ``received_at`` is a wall clock. Raw frame v2 (``pmv.capture_format``, B08)
+Known limit: ``received_at`` is a wall clock. Raw frame v3 (``pmv.capture_format``, B08)
 also records a monotonic receipt time, kept beside the observations in the normalized
 artifact, but decision-time views order by ``received_at`` with deterministic tie-breaks;
 a recorded clock regression is flagged by validation, never repaired.

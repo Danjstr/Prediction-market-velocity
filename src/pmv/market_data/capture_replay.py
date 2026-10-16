@@ -1,4 +1,4 @@
-"""Replay of v2 capture sessions into normalized artifacts (B08).
+"""Replay of segmented (frame format v3) capture sessions into normalized artifacts (B08).
 
 ``normalize_session`` drives a venue ``Normalizer`` over the readable chain of one capture
 session (``pmv.capture_store``). Every frame gets exactly one recorded disposition, in raw

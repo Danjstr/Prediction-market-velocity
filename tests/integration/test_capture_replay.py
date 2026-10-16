@@ -358,7 +358,7 @@ def test_a_restart_after_an_uncertain_last_frame_inherits_nothing(
     first._abandon()
     store.recover()
     name = segment_id(first.session_id, 0)
-    partial = root / "capture" / "v2" / "quarantine" / name / "segment.pmvraw.partial"
+    partial = root / "capture" / "v3" / "quarantine" / name / "segment.pmvraw.partial"
     partial.parent.chmod(0o700)
     partial.chmod(0o600)
     partial.write_bytes(partial.read_bytes()[:-2])  # the last delta is torn
@@ -553,7 +553,7 @@ def test_normalizing_needs_an_intact_chain(root: Path, store: CaptureStore) -> N
     read = store.read_session(session.session_id)
     target = (
         root
-        / "capture/v2/segments/unit_source/unit_feed"
+        / "capture/v3/segments/unit_source/unit_feed"
         / session.session_id[0:4]
         / session.session_id[4:6]
         / session.session_id[6:8]
@@ -567,7 +567,7 @@ def test_normalizing_needs_an_intact_chain(root: Path, store: CaptureStore) -> N
     target.write_bytes(bytes(data))
     with pytest.raises(CaptureIntegrityError):
         normalize_session(store, read, SyntheticNormalizer(), use=DataUse.TEST)
-    assert not (root / "capture" / "v2" / "normalized" / session.session_id).exists()
+    assert not (root / "capture" / "v3" / "normalized" / session.session_id).exists()
 
 
 # ----- RT-B8-01 / RT-B8-02 regressions (artifact integrity, environment labels) -----
@@ -575,7 +575,7 @@ def test_normalizing_needs_an_intact_chain(root: Path, store: CaptureStore) -> N
 
 def rewrite(root: Path, session_id: str, key: str, files: dict[str, bytes]) -> None:
     """Overwrite a stored artifact's files in place, as a local writer could."""
-    directory = root / "capture" / "v2" / "normalized" / session_id / key
+    directory = root / "capture" / "v3" / "normalized" / session_id / key
     directory.chmod(0o700)
     for name, data in files.items():
         path = directory / name

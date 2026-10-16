@@ -682,13 +682,13 @@ class RawCaptureStore:
 
         Raw format v1 has no monotonic receipt time and no message direction (Step 11 F-12),
         so it never starts a capture outside the ``test`` environment: real collection uses
-        the segmented v2 store (``pmv.capture_store``). Reading and verifying existing v1
-        captures is unaffected.
+        the segmented store (``pmv.capture_store``, frame format v3). Reading and verifying
+        existing v1 captures is unaffected.
         """
         if self._provenance.environment is not Environment.TEST:
             raise LegacyFormatRefusedError(
                 "raw format v1 starts captures only in the test environment; real collection "
-                "uses pmv.capture_store (frame format v2)"
+                "uses pmv.capture_store (frame format v3)"
             )
         warning, hard_stop = self._thresholds()
         self._check_namespace(RESERVATIONS, IN_PROGRESS)

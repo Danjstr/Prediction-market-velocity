@@ -1,4 +1,8 @@
-"""Tests for raw frame format v2 (F-12, F-27): schema, version refusal, prefix scanning."""
+"""Tests for raw frame format v3 (F-12, F-27; owner decision B8-2 as modified).
+
+Covers the closed schemas, the per-frame environment identity, version refusal (v1 and the
+superseded v2 draft), and prefix scanning for salvage.
+"""
 
 import hashlib
 import io
@@ -10,6 +14,7 @@ import pytest
 
 from pmv.capture_format import (
     MAGIC,
+    V2_DRAFT_MAGIC,
     CaptureFormatError,
     Direction,
     EventFrame,
@@ -65,6 +70,8 @@ def opened(sequence: int, connection: int = 0) -> bytes:
         connection=connection,
         written_at=WALL,
         monotonic_ns=6,
+        venue_environment=VenueEnvironment.SYNTHETIC,
+        deployment_environment="test",
     )
 
 
@@ -79,6 +86,8 @@ def inbound(sequence: int, payload: bytes = b'{"x":1}', **overrides: object) -> 
         "source_timestamp": None,
         "malformed": False,
         "written_at": WALL,
+        "venue_environment": VenueEnvironment.SYNTHETIC,
+        "deployment_environment": "test",
     }
     values.update(overrides)
     return encode_payload(**values)  # type: ignore[arg-type]  # test helper forwards typed fields
@@ -91,6 +100,8 @@ def closed(sequence: int) -> bytes:
         connection=None,
         written_at=LATER,
         monotonic_ns=99,
+        venue_environment=VenueEnvironment.SYNTHETIC,
+        deployment_environment="test",
     )
 
 
@@ -130,8 +141,8 @@ def test_a_complete_segment_round_trips_exactly() -> None:
     assert (summary.first_sequence, summary.last_sequence) == (0, 4)
 
 
-def test_v1_and_v2_are_never_read_as_each_other() -> None:
-    v2 = segment(opened(1))
+def test_v1_the_v2_draft_and_v3_are_never_read_as_each_other() -> None:
+    v3 = segment(opened(1))
     v1 = V1_MAGIC + encode_payload_frame(
         sequence=0,
         payload=b"x",
@@ -140,17 +151,33 @@ def test_v1_and_v2_are_never_read_as_each_other() -> None:
         source_timestamp=None,
         malformed=False,
     )
-    assert detect_format(v2) == 2
+    v2_draft = V2_DRAFT_MAGIC + v3[len(MAGIC) :]
+    assert detect_format(v3) == 3
+    assert detect_format(v2_draft) == 2
     assert detect_format(v1) == 1
-    assert detect_format(b"PMVRAW3\n") is None
-    with pytest.raises(CaptureFormatError, match="PMVRAW2 magic"):
+    assert detect_format(b"PMVRAW4\n") is None
+    with pytest.raises(CaptureFormatError, match="PMVRAW3 magic"):
         read(v1)
+    with pytest.raises(CaptureFormatError, match="superseded v2 draft"):
+        read(v2_draft)
+    assert scan_prefix(v2_draft).header is None  # never salvaged as v3
     with pytest.raises(RawFormatError, match="PMVRAW1 magic"):
-        list(FrameReader(io.BytesIO(v2), len(v2)).frames())
-    # a v1 frame inside a v2 object is refused by its frame_version
-    v1_frame_in_v2 = MAGIC + encode_segment_header(header()) + v1[len(V1_MAGIC) :]
+        list(FrameReader(io.BytesIO(v3), len(v3)).frames())
+    # a v1 frame inside a v3 object is refused by its frame_version
+    v1_frame_in_v3 = MAGIC + encode_segment_header(header()) + v1[len(V1_MAGIC) :]
     with pytest.raises(CaptureFormatError, match="frame_version"):
-        read(v1_frame_in_v2)
+        read(v1_frame_in_v3)
+
+
+def test_a_v2_draft_frame_without_environment_is_refused() -> None:
+    """A frame shaped like the v2 draft (frame_version 2, no environment) is refused."""
+    header_length, _payload_length = struct.unpack_from(">IQ", inbound(1), 0)
+    draft = json.loads(inbound(1)[12 : 12 + header_length])
+    draft["frame_version"] = 2
+    del draft["venue_environment"]
+    del draft["deployment_environment"]
+    with pytest.raises(CaptureFormatError, match="frame_version"):
+        read(segment(raw_frame(draft, b'{"x":1}')))
 
 
 def test_the_first_frame_must_be_the_only_segment_header() -> None:
@@ -194,7 +221,7 @@ def test_segment_headers_are_strict(overrides: dict[str, object], message: str) 
 
 def test_unknown_or_extra_header_keys_are_refused() -> None:
     document = header().to_json() | {"extra": 1}
-    with pytest.raises(CaptureFormatError, match="v2 schema"):
+    with pytest.raises(CaptureFormatError, match="v3 schema"):
         read(MAGIC + raw_frame(document))
     unknown_environment = header().to_json() | {"venue_environment": "staging"}
     with pytest.raises(CaptureFormatError, match="venue_environment"):
@@ -228,6 +255,8 @@ def test_connection_events_must_name_a_connection() -> None:
             connection=None,
             written_at=WALL,
             monotonic_ns=1,
+            venue_environment=VenueEnvironment.SYNTHETIC,
+            deployment_environment="test",
         )
 
 
@@ -313,3 +342,111 @@ def test_a_prefix_is_itself_a_valid_segment() -> None:
     prefix = (good + b"\x00\x00\x00")[: scan.valid_bytes]
     assert prefix == good
     assert len(read(prefix)) == 3
+
+
+# ----- per-frame environment identity (owner decision B8-2, as modified) -----
+
+
+def frame_headers(data: bytes) -> list[dict[str, object]]:
+    """Decode every frame header of an object (no validation), in order."""
+    headers: list[dict[str, object]] = []
+    offset = len(MAGIC)
+    while offset < len(data):
+        header_length, payload_length = struct.unpack_from(">IQ", data, offset)
+        start = offset + 12
+        headers.append(json.loads(data[start : start + header_length]))
+        offset = start + header_length + payload_length
+    return headers
+
+
+def relabel(frame: bytes, **changes: str) -> bytes:
+    """Re-encode one frame with changed environment fields (a forged relabelling)."""
+    header_length, _payload_length = struct.unpack_from(">IQ", frame, 0)
+    document = json.loads(frame[12 : 12 + header_length])
+    document.update(changes)
+    return raw_frame(document, frame[12 + header_length :])
+
+
+def test_every_frame_kind_carries_the_environment_identity() -> None:
+    data = segment(
+        opened(1),
+        inbound(2),
+        inbound(3, b"out", direction=Direction.OUTBOUND),
+        encode_event(
+            sequence=4,
+            event_type=EventType.GAP,
+            connection=0,
+            written_at=WALL,
+            monotonic_ns=7,
+            venue_environment=VenueEnvironment.SYNTHETIC,
+            deployment_environment="test",
+        ),
+        closed(5),
+    )
+    kinds = set()
+    for document in frame_headers(data):
+        kinds.add(document["kind"])
+        assert document["venue_environment"] == "synthetic"
+        assert document["deployment_environment"] == "test"
+        assert document["frame_version"] == 3
+    assert kinds == {"segment", "payload", "event"}
+    for frame in read(data)[1:]:
+        assert isinstance(frame, PayloadFrame | EventFrame)
+        assert frame.venue_environment is VenueEnvironment.SYNTHETIC
+        assert frame.deployment_environment == "test"
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"venue_environment": "production"},
+        {"venue_environment": "demo"},
+        {"deployment_environment": "production"},
+        {"deployment_environment": "development"},
+    ],
+)
+def test_a_frame_whose_environment_differs_from_its_segment_is_refused(
+    changes: dict[str, str],
+) -> None:
+    good = segment(opened(1), inbound(2))
+    forged = segment(opened(1), relabel(inbound(2), **changes))
+    with pytest.raises(CaptureFormatError, match="environment differs"):
+        read(forged)
+    # salvage never keeps it, nor anything after it
+    scan = scan_prefix(forged + inbound(3))
+    assert scan.valid_bytes == len(good) - len(inbound(2))
+    assert scan.tail is TailDisposition.INVALID_FRAME
+
+
+def test_a_relabelled_segment_does_not_make_its_frames_match() -> None:
+    """Changing only the segment header's environment leaves every frame mismatched."""
+    production = header(venue_environment=VenueEnvironment.PRODUCTION)
+    with pytest.raises(CaptureFormatError, match="environment differs"):
+        read(segment(opened(1), first=production))
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"venue_environment": "staging"}, "venue_environment"),
+        ({"deployment_environment": "staging"}, "deployment_environment"),
+        ({"venue_environment": None}, "venue_environment"),
+    ],
+)
+def test_unknown_frame_environments_are_refused(changes: dict[str, object], message: str) -> None:
+    header_length, _payload = struct.unpack_from(">IQ", inbound(2), 0)
+    document = json.loads(inbound(2)[12 : 12 + header_length])
+    document.update(changes)
+    with pytest.raises(CaptureFormatError, match=message):
+        read(segment(opened(1), raw_frame(document, b'{"x":1}')))
+    with pytest.raises(CaptureFormatError, match="VenueEnvironment"):
+        inbound(2, venue_environment="synthetic")
+
+
+def test_serialization_is_deterministic() -> None:
+    first = segment(opened(1), inbound(2, b"\x00bytes"), closed(3))
+    second = segment(opened(1), inbound(2, b"\x00bytes"), closed(3))
+    assert first == second
+    assert hashlib.sha256(first).hexdigest() == hashlib.sha256(second).hexdigest()
+    summary = summarize_segment(io.BytesIO(first), len(first))
+    assert summary.sha256 == hashlib.sha256(first).hexdigest()

@@ -8,8 +8,8 @@ Venue-neutral data contracts between raw captures and research. Implementation: 
 
 | Layer | Module | Holds |
 |---|---|---|
-| Raw | `pmv.raw_format`, `pmv.raw_storage` (v1, test only for new captures); `pmv.capture_format`, `pmv.capture_store` (v2, segmented) | Byte-exact payloads, receipt, monotonic, and source timestamps, direction, operational events (`docs/raw_data.md`) |
-| Normalization boundary | `market_data.replay` (v1 captures), `market_data.capture_replay` (v2 sessions and normalized artifacts) | Venue `Normalizer` protocol; one recorded disposition per raw frame |
+| Raw | `pmv.raw_format`, `pmv.raw_storage` (v1, test only for new captures); `pmv.capture_format`, `pmv.capture_store` (frame format v3, segmented) | Byte-exact payloads, receipt, monotonic, and source timestamps, direction, operational events (`docs/raw_data.md`) |
+| Normalization boundary | `market_data.replay` (v1 captures), `market_data.capture_replay` (segmented sessions and normalized artifacts) | Venue `Normalizer` protocol; one recorded disposition per raw frame |
 | Observations | `market_data.events` | Book snapshots and deltas, trades, trading status, reference ticks, stream events |
 | Contract identity | `market_data.contracts` | `ContractSpec` and its `spec_key` |
 | Decision-time views and features | `market_data.point_in_time` | `ObservationLog`, `AsOfView`, `FeatureRow` |
@@ -35,7 +35,7 @@ Stream events (reconnect, gap, rate limit, clock regression, disk pressure) are 
 - Raising availability this way only ever delays use.
 - The order of a log is `(effective availability, capture_id, frame_sequence, item_index)`. The cross-capture tie-break is deterministic, but it is not evidence of which simultaneous receipt came first.
 
-**Clocks (B08).** `received_at` is a wall clock: for v2 sessions it is the payload frame's `observed_at`. Frame v2 (F-12) also records each frame's `CLOCK_MONOTONIC` time and its clock domain. The normalized artifact keeps it per frame, but observations and views still order by effective availability on the wall clock. Validation flags receive-time regressions and never reorders. No offset between PMV's clock and any venue's is measured yet (F-12 timing analysis, `LabelPolicy.max_clock_error`).
+**Clocks (B08).** `received_at` is a wall clock: for segmented sessions it is the payload frame's `observed_at`. Frame format v3 (F-12) also records each frame's `CLOCK_MONOTONIC` time and its clock domain. The normalized artifact keeps it per frame, but observations and views still order by effective availability on the wall clock. Validation flags receive-time regressions and never reorders. No offset between PMV's clock and any venue's is measured yet (F-12 timing analysis, `LabelPolicy.max_clock_error`).
 
 ## Contract identity
 
@@ -85,9 +85,9 @@ Official resolutions (`labels.ResolutionRecord`) leave the boundary in a separat
 
 A normalized capture records its parser identity and version. A parser fix is a new version and a new result. It never mutates an earlier one.
 
-### v2 sessions and normalized artifacts (B08)
+### Segmented sessions and normalized artifacts (B08)
 
-`capture_replay.normalize_session(store, read, normalizer, use=...)` normalizes the readable chain of one v2 session.
+`capture_replay.normalize_session(store, read, normalizer, use=...)` normalizes the readable chain of one segmented (v3) session.
 - **Identity.** The session is the capture: provenance is `(session_id, sequence, item_index)`.
 - **Dispositions.** Every frame gets one of `segment_header`, `parsed`, `skipped`, `rejected`, `outbound`, `stream_event`, or `session_end`, in sequence order.
 - **Outbound messages** are never parsed as observations.
@@ -271,5 +271,5 @@ The owner's process change P1 (`docs/decisions/2026-10-16_phase1_batch3_historic
 ## Not yet done (see `docs/phase1.md`)
 
 - The Kalshi parser, contract-spec builder, and resolution parser, pending official documentation (ACCESS REQUEST AR-1).
-- Persistence of normalized v1 captures as artifacts (v2 sessions have content-addressed artifacts since B08; v1 is test-only for new captures).
+- Persistence of normalized v1 captures as artifacts (segmented sessions have content-addressed artifacts since B08; v1 is test-only for new captures).
 - Wiring a real-data loader through the protected-information controls (F-08).

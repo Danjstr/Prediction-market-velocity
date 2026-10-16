@@ -1164,7 +1164,7 @@ def test_v1_never_starts_a_capture_outside_the_test_environment(
         parents=(),
     )
     with RawCaptureStore(config, provenance, repo_root=REPO, free_bytes=lambda: PLENTY) as store:
-        with pytest.raises(raw_storage.LegacyFormatRefusedError, match="frame format v2"):
+        with pytest.raises(raw_storage.LegacyFormatRefusedError, match="frame format v3"):
             store.start_capture(SOURCE, T0)
         assert os.listdir(root / ".capture_ids") == []
         assert os.listdir(root / ".inprogress") == []

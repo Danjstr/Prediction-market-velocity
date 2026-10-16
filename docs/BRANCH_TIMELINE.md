@@ -12,7 +12,7 @@ Old branches keep their original names. Their B-numbers are assigned here only; 
 - **Parent:** B07 `b07/phase1-acquisition-pipeline-hardening`, at its final commit `9a6b212d191c68d177f63beb11d289c669639f92`. B08 was branched directly from that commit, not from `main`, even though `main` already contained B07 through merge commit `2a46ffd` (PR #6).
 - **Purpose:** Phase 1 prospective-capture hardening, on synthetic data only:
   - F-11: segmentation and salvage;
-  - F-12 with F-27: raw frame format v2;
+  - F-12 with F-27: raw frame format v3 (per-frame environment identity, owner decision B8-2);
   - F-33: durability ordering;
   - F-37 and RT-4: test and demo boundaries;
   - order-book continuity after rejected frames;

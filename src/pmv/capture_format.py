@@ -1,26 +1,39 @@
-"""PMV raw frame format v2 (``pmv.raw.frames`` v2), for segmented prospective capture.
+"""PMV raw frame format v3 (``pmv.raw.frames`` v3), for segmented prospective capture.
 
 Step 11 F-12 (with F-27) requires monotonic receipt time and message direction before real
 collection; F-11 requires bounded segments. Version 1 (``pmv.raw_format``) has neither, so
-v2 is a new format with its own magic. A v1 object is never read as v2, or the reverse:
-each reader checks its own magic and frame version and refuses anything else
+the segmented format is a separate format with its own magic.
+
+**Version history.** Version 2 (``PMVRAW2``) was an unreleased B08 draft that carried the
+environment identity only in each segment's header. Owner decision B8-2 (as modified)
+requires it on **every** frame header (Kalshi Red-Team RT-B2-09), which changes the closed
+frame schemas, so the result is version 3 (``PMVRAW3``, frame version 3). A version-2
+object is recognised and refused, never reinterpreted. A v1 object is never read as v3, or
+the reverse: each reader checks its own magic and frame version and refuses anything else
 (``detect_format`` dispatches explicitly).
 
-A v2 object is one **segment** of a capture **session**: the magic line ``PMVRAW2\\n``,
+A v3 object is one **segment** of a capture **session**: the magic line ``PMVRAW3\\n``,
 then frames. The framing is v1's: a 4-byte big-endian header length, an 8-byte big-endian
 payload length, the header as canonical JSON, then the payload bytes. Frame kinds:
 
 - ``segment`` (exactly once, first): the segment header. It names the session and the
-  segment index, the source and its venue environment (RT-B2-09: every frame belongs to an
-  object that carries its environment identity), the monotonic clock domain, and, after
-  the first segment, the SHA-256 and last sequence of the previous segment. Segments are
-  therefore hash-chained, and a missing, replaced, or reordered segment is detectable.
+  segment index, the source, the monotonic clock domain, and, after the first segment, the
+  SHA-256 and last sequence of the previous segment. Segments are therefore hash-chained,
+  and a missing, replaced, or reordered segment is detectable.
 - ``payload``: the exact application-level bytes, with ``direction`` (``inbound`` from the
   source, ``outbound`` from PMV), the ``connection`` index within the session, the wall
   time ``observed_at`` (inbound: delivered to PMV; outbound: handed by PMV to its client
   layer), the monotonic time ``monotonic_ns`` at that moment, an optional caller-supplied
   ``source_timestamp`` (inbound only), and ``malformed`` (inbound only).
 - ``event``: an operational event with an empty payload.
+
+**Every** frame header, of every kind, carries the environment identity: the
+``venue_environment`` (``synthetic``, ``demo``, ``production``) and the
+``deployment_environment`` (``test``, ``development``, ``shadow``, ``production``). Each
+frame's values must equal its segment header's, or the object is refused (and a scan for
+salvage stops before the first frame that differs). The identity is part of the canonical
+frame header, so it is covered by the segment's SHA-256, by the hash chain, and by the
+manifest.
 
 One ``sequence`` counter covers every frame of a session, across its segments: it starts
 at 0 and increases by exactly 1. Sequence, not any clock, is the ordering authority.
@@ -58,6 +71,7 @@ __all__ = [
     "MAGIC",
     "MAX_HEADER_BYTES",
     "MAX_PAYLOAD_BYTES",
+    "V2_DRAFT_MAGIC",
     "CaptureFormatError",
     "Direction",
     "EventFrame",
@@ -74,15 +88,17 @@ __all__ = [
     "encode_event",
     "encode_payload",
     "encode_segment_header",
+    "same_environment",
     "scan_prefix",
     "summarize_segment",
 ]
 
-MAGIC: Final = b"PMVRAW2\n"
+MAGIC: Final = b"PMVRAW3\n"
+V2_DRAFT_MAGIC: Final = b"PMVRAW2\n"
 V1_MAGIC: Final = b"PMVRAW1\n"
 FORMAT_NAME: Final = "pmv.raw.frames"
-FORMAT_VERSION: Final = 2
-FRAME_VERSION: Final = 2
+FORMAT_VERSION: Final = 3
+FRAME_VERSION: Final = 3
 MAX_HEADER_BYTES: Final = 65_536
 MAX_PAYLOAD_BYTES: Final = 67_108_864
 PREFIX: Final = struct.Struct(">IQ")
@@ -90,7 +106,7 @@ CLOCK_DOMAIN: Final = re.compile(r"[0-9a-f]{32}")
 
 
 class CaptureFormatError(FormatError):
-    """A v2 object or frame is malformed. Messages never contain payload bytes."""
+    """A v3 object or frame is malformed. Messages never contain payload bytes."""
 
 
 class ByteStream(Protocol):
@@ -149,9 +165,11 @@ _SEGMENT_KEYS: Final = frozenset(
         "written_at",
     }
 )
+_ENVIRONMENT_KEYS: Final = frozenset({"deployment_environment", "venue_environment"})
 _PAYLOAD_KEYS: Final = frozenset(
     {
         "connection",
+        "deployment_environment",
         "direction",
         "frame_version",
         "kind",
@@ -161,11 +179,22 @@ _PAYLOAD_KEYS: Final = frozenset(
         "payload_sha256",
         "sequence",
         "source_timestamp",
+        "venue_environment",
         "written_at",
     }
 )
 _EVENT_KEYS: Final = frozenset(
-    {"connection", "event_type", "frame_version", "kind", "monotonic_ns", "sequence", "written_at"}
+    {
+        "connection",
+        "deployment_environment",
+        "event_type",
+        "frame_version",
+        "kind",
+        "monotonic_ns",
+        "sequence",
+        "venue_environment",
+        "written_at",
+    }
 )
 
 
@@ -258,6 +287,8 @@ class PayloadFrame:
     malformed: bool
     written_at: str
     payload: bytes
+    venue_environment: VenueEnvironment
+    deployment_environment: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -267,17 +298,21 @@ class EventFrame:
     connection: int | None
     written_at: str
     monotonic_ns: int
+    venue_environment: VenueEnvironment
+    deployment_environment: str
 
 
 Frame = SegmentHeader | PayloadFrame | EventFrame
 
 
 def detect_format(prefix: bytes) -> int | None:
-    """1 or 2 for a PMV raw object's leading bytes, otherwise None. Never guesses."""
-    if prefix[: len(MAGIC)] == MAGIC:
-        return 2
-    if prefix[: len(V1_MAGIC)] == V1_MAGIC:
-        return 1
+    """1, 2, or 3 for a PMV raw object's leading bytes, otherwise None. Never guesses.
+
+    2 is the unreleased B08 draft: it is recognised so it can be refused by name.
+    """
+    for magic, version in ((MAGIC, 3), (V2_DRAFT_MAGIC, 2), (V1_MAGIC, 1)):
+        if prefix[: len(magic)] == magic:
+            return version
     return None
 
 
@@ -296,14 +331,17 @@ def encode_payload(
     source_timestamp: str | None,
     malformed: bool,
     written_at: str,
+    venue_environment: VenueEnvironment,
+    deployment_environment: str,
 ) -> bytes:
     """Encode one payload frame around the exact ``payload`` bytes."""
     if type(payload) is not bytes:
         raise TypeError("payload must be bytes")
     if len(payload) > MAX_PAYLOAD_BYTES:
-        raise CaptureFormatError("payload exceeds the v2 limit")
+        raise CaptureFormatError("payload exceeds the v3 limit")
     header: dict[str, object] = {
         "connection": _count(connection, "connection"),
+        "deployment_environment": deployment_environment,
         "direction": Direction(direction).value,
         "frame_version": FRAME_VERSION,
         "kind": "payload",
@@ -313,6 +351,7 @@ def encode_payload(
         "payload_sha256": hashlib.sha256(payload).hexdigest(),
         "sequence": _count(sequence, "sequence"),
         "source_timestamp": source_timestamp,
+        "venue_environment": _venue_value(venue_environment),
         "written_at": written_at,
     }
     _check_payload_header(header, "payload frame")
@@ -326,14 +365,18 @@ def encode_event(
     connection: int | None,
     written_at: str,
     monotonic_ns: int,
+    venue_environment: VenueEnvironment,
+    deployment_environment: str,
 ) -> bytes:
     header: dict[str, object] = {
         "connection": connection,
+        "deployment_environment": deployment_environment,
         "event_type": EventType(event_type).value,
         "frame_version": FRAME_VERSION,
         "kind": "event",
         "monotonic_ns": _count(monotonic_ns, "monotonic_ns"),
         "sequence": _count(sequence, "sequence"),
+        "venue_environment": _venue_value(venue_environment),
         "written_at": written_at,
     }
     _check_event_header(header, "event frame")
@@ -341,7 +384,7 @@ def encode_event(
 
 
 class SegmentReader:
-    """Validate one complete v2 segment object of known ``size`` while reading it.
+    """Validate one complete v3 segment object of known ``size`` while reading it.
 
     ``frames()`` checks the magic, every length, the closed header schemas, that the first
     frame (and only the first) is the segment header, sequence continuity from the header,
@@ -364,8 +407,13 @@ class SegmentReader:
         return self._hash.hexdigest()
 
     def frames(self) -> Iterator[Frame]:
-        if self._take(len(MAGIC)) != MAGIC:
-            raise CaptureFormatError("the object does not start with the PMVRAW2 magic")
+        magic = self._take(len(MAGIC))
+        if magic == V2_DRAFT_MAGIC:
+            raise CaptureFormatError(
+                "the object is the superseded v2 draft (no per-frame environment); refused"
+            )
+        if magic != MAGIC:
+            raise CaptureFormatError("the object does not start with the PMVRAW3 magic")
         closed = False
         index = 0
         while self._remaining:
@@ -404,8 +452,10 @@ class SegmentReader:
             if index != 0:
                 raise CaptureFormatError(f"frame {index}: a segment header must be first")
             self.header = frame
-        elif index == 0:
+        elif index == 0 or self.header is None:
             raise CaptureFormatError("frame 0: the first frame must be the segment header")
+        elif not same_environment(frame, self.header):
+            raise CaptureFormatError(f"frame {index}: its environment differs from its segment's")
         return frame
 
     def _take(self, count: int) -> bytes:
@@ -557,7 +607,11 @@ def scan_prefix(data: bytes) -> PrefixScan:
             )
         except FormatError:
             return _scan_end(header, valid, frames, last, total, TailDisposition.INVALID_FRAME)
-        if isinstance(frame, SegmentHeader) != (frames == 0):
+        if isinstance(frame, SegmentHeader) != (frames == 0) or (
+            header is not None
+            and not isinstance(frame, SegmentHeader)
+            and not same_environment(frame, header)
+        ):
             return _scan_end(header, valid, frames, last, total, TailDisposition.INVALID_FRAME)
         if isinstance(frame, SegmentHeader):
             header = frame
@@ -588,7 +642,7 @@ def _sequence_of(frame: Frame) -> int:
 def _encode(header: Mapping[str, object], payload: bytes) -> bytes:
     header_bytes = canonical_json(header)
     if len(header_bytes) > MAX_HEADER_BYTES:
-        raise CaptureFormatError("frame header exceeds the v2 limit")
+        raise CaptureFormatError("frame header exceeds the v3 limit")
     return PREFIX.pack(len(header_bytes), len(payload)) + header_bytes + payload
 
 
@@ -613,7 +667,7 @@ def _decode(
     kind = document.get("kind")
     if kind == "segment":
         if set(document) != _SEGMENT_KEYS or payload:
-            raise CaptureFormatError(f"{where}: segment header does not match the v2 schema")
+            raise CaptureFormatError(f"{where}: segment header does not match the v3 schema")
         environment = document["venue_environment"]
         if not isinstance(environment, str) or environment not in {
             item.value for item in VenueEnvironment
@@ -656,6 +710,8 @@ def _decode(
             malformed=bool(document["malformed"]),
             written_at=_str(document, "written_at", where),
             payload=payload,
+            venue_environment=VenueEnvironment(_str(document, "venue_environment", where)),
+            deployment_environment=_str(document, "deployment_environment", where),
         )
     if kind == "event":
         _check_event_header(document, where)
@@ -667,13 +723,38 @@ def _decode(
             connection=_opt_int(document, "connection", where),
             written_at=_str(document, "written_at", where),
             monotonic_ns=_int_field(document, "monotonic_ns", where),
+            venue_environment=VenueEnvironment(_str(document, "venue_environment", where)),
+            deployment_environment=_str(document, "deployment_environment", where),
         )
     raise CaptureFormatError(f"{where}: unknown frame kind")
 
 
+def _check_environment(document: Mapping[str, object], where: str) -> None:
+    venue = document.get("venue_environment")
+    if not isinstance(venue, str) or venue not in {item.value for item in VenueEnvironment}:
+        raise CaptureFormatError(f"{where}: unknown venue_environment")
+    if document.get("deployment_environment") not in _ENVIRONMENTS:
+        raise CaptureFormatError(f"{where}: unknown deployment_environment")
+
+
+def same_environment(frame: "PayloadFrame | EventFrame", header: SegmentHeader) -> bool:
+    """Whether a frame's environment identity equals its segment header's."""
+    return (
+        frame.venue_environment is header.venue_environment
+        and frame.deployment_environment == header.deployment_environment
+    )
+
+
+def _venue_value(venue: object) -> str:
+    if not isinstance(venue, VenueEnvironment):
+        raise CaptureFormatError("venue_environment must be a VenueEnvironment")
+    return venue.value
+
+
 def _check_payload_header(document: Mapping[str, object], where: str) -> None:
     if set(document) != _PAYLOAD_KEYS:
-        raise CaptureFormatError(f"{where}: payload header does not match the v2 schema")
+        raise CaptureFormatError(f"{where}: payload header does not match the v3 schema")
+    _check_environment(document, where)
     direction = document["direction"]
     if direction not in {item.value for item in Direction}:
         raise CaptureFormatError(f"{where}: invalid direction")
@@ -696,7 +777,8 @@ def _check_payload_header(document: Mapping[str, object], where: str) -> None:
 
 def _check_event_header(document: Mapping[str, object], where: str) -> None:
     if set(document) != _EVENT_KEYS:
-        raise CaptureFormatError(f"{where}: event header does not match the v2 schema")
+        raise CaptureFormatError(f"{where}: event header does not match the v3 schema")
+    _check_environment(document, where)
     event_type = document["event_type"]
     if not isinstance(event_type, str) or event_type not in _EVENT_VALUES:
         raise CaptureFormatError(f"{where}: unknown event_type")

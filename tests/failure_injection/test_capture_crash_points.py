@@ -159,7 +159,7 @@ def open_store(root: Path) -> CaptureStore:
 
 
 def only_session(root: Path) -> str:
-    (session_id,) = os.listdir(root / "capture" / "v2" / "sessions")
+    (session_id,) = os.listdir(root / "capture" / "v3" / "sessions")
     return session_id
 
 
@@ -255,7 +255,7 @@ def test_a_crash_after_the_final_move_is_accepted_exactly_once(root: Path, point
         tightened = store.reconcile()
         assert len(tightened) == (1 if point == "finalize.moved" else 0)
         assert store.reconcile() == []
-        assert not (root / "capture" / "v2" / "quarantine" / segment_id(session_id, 0)).exists()
+        assert not (root / "capture" / "v3" / "quarantine" / segment_id(session_id, 0)).exists()
 
 
 @pytest.mark.parametrize(
@@ -287,7 +287,7 @@ def test_a_crash_after_the_quarantine_record_completes_the_quarantine(root: Path
     name = segment_id(session_id, 0)
     with open_store(root) as store:
         assert [r.outcome for r in store.recover()] == [RecoveryOutcome.QUARANTINED]
-    record = (root / "capture" / "v2" / "quarantine" / name / "quarantine.json").read_text()
+    record = (root / "capture" / "v3" / "quarantine" / name / "quarantine.json").read_text()
     assert '"reason":"requested"' in record
 
 
@@ -296,7 +296,7 @@ def test_a_crash_after_the_quarantine_move_is_tightened_by_recovery(root: Path) 
     assert crash(root, "quarantine.moved", "quarantine") == 70
     with open_store(root) as store:
         name = segment_id(only_session(root), 0)
-        directory = root / "capture" / "v2" / "quarantine" / name
+        directory = root / "capture" / "v3" / "quarantine" / name
         assert all(os.stat(p).st_mode & 0o777 == 0o400 for p in directory.iterdir())
         assert [(r.name, r.outcome) for r in store.recover()] == [(name, RecoveryOutcome.TIGHTENED)]
         assert os.stat(directory).st_mode & 0o777 == 0o500
@@ -348,7 +348,7 @@ def test_a_torn_frame_write_keeps_only_whole_frames(root: Path) -> None:
     assert crash(root, "frame.written@3", "single") == 70
     session_id = only_session(root)
     name = segment_id(session_id, 0)
-    partial = root / "capture" / "v2" / "open" / name / "segment.pmvraw.partial"
+    partial = root / "capture" / "v3" / "open" / name / "segment.pmvraw.partial"
     data = partial.read_bytes()
     partial.write_bytes(data[:-4])
     with open_store(root) as store:

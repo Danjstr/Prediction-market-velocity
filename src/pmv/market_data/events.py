@@ -70,7 +70,7 @@ class TradingStatus(StrEnum):
 class StreamEventKind(StrEnum):
     """PMV-originated stream events.
 
-    Most mirror raw event types (v1 ``raw_format.EventType``, v2 ``capture_format.EventType``).
+    Most mirror raw event types (v1 ``raw_format.EventType``, v3 ``capture_format.EventType``).
     ``frame_rejected`` is emitted by the normalization driver, never by a parser: a payload
     frame was rejected (flagged malformed by the collector, or refused by the parser), so
     whatever it carried is unknown.

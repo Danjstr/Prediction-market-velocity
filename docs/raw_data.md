@@ -62,9 +62,9 @@ Historical files acquired by the acquisition pipeline (`src/pmv/acquisition/pipe
 
 Storing is not releasing (A-8): nothing here is agent-visible. No real acquisition has run.
 
-## Segmented prospective capture, frame format v2 (B08)
+## Segmented prospective capture, frame format v3 (B08)
 
-Real collection uses the segmented v2 store (`src/pmv/capture_store.py`, format `src/pmv/capture_format.py`), not the v1 store. **Raw format v1 no longer starts a capture outside the `test` environment** (`LegacyFormatRefusedError`): v1 lacks monotonic receipt time and message direction (Step 11 F-12). Reading and verifying v1 captures is unchanged. Decision record: `docs/decisions/2026-10-16_b08_prospective_capture_hardening.md`.
+Real collection uses the segmented store (`src/pmv/capture_store.py`, format `src/pmv/capture_format.py`), not the v1 store. **Raw format v1 no longer starts a capture outside the `test` environment** (`LegacyFormatRefusedError`): v1 lacks monotonic receipt time and message direction (Step 11 F-12). Reading and verifying v1 captures is unchanged. Decision record: `docs/decisions/2026-10-16_b08_prospective_capture_hardening.md`.
 
 Nothing here authorizes live capture. Every demo or production session needs an owner-approved endpoint in `pmv.capture_environment.APPROVED_CAPTURE_ENDPOINTS`, **which is empty**, so every real session refuses.
 
@@ -78,7 +78,7 @@ A **session** is one collector run against one source endpoint. It is written as
 There are no defaults. A crash can damage only the open segment.
 
 ```
-<root>/capture/v2/
+<root>/capture/v3/
   sessions/<session_id>                             permanent session reservation (closed schema)
   open/<segment_id>/segment.pmvraw.partial          the open segment, flock-locked while live
   quarantine/<segment_id>/                          interrupted or stopped segments + quarantine.json
@@ -134,15 +134,24 @@ A segment is accepted exactly when its directory is in `segments/`.
 
 A gap is never bridged: later segments are reported as `unreachable_indices`. `iter_frames` re-verifies every byte, and enforces session-wide sequence continuity and connection discipline.
 
-### Frame format v2 (F-12, F-27)
+### Frame format v3 (F-12, F-27; owner decision B8-2)
 
-Magic `PMVRAW2\n`; v1 framing (4-byte header length, 8-byte payload length, canonical JSON header, payload). A v1 object is never read as v2, or the reverse.
+Magic `PMVRAW3\n`, frame version 3. The framing is v1's: a 4-byte header length, an 8-byte payload length, the canonical JSON header, then the payload.
+
+Version rules:
+- A v1 object is never read as v3, or the reverse.
+- Version 2 (`PMVRAW2`) was an unreleased B08 draft. It carried the environment only in segment headers. It is recognised (`detect_format` returns 2) and refused, never reinterpreted, and salvage never treats it as v3.
+- The store layout directory moved from `capture/v2/` to `capture/v3/` with this change, so no draft-era tree can mix with v3 data.
+
+**Every frame header carries the environment identity (owner decision B8-2, as modified; RT-B2-09):** `venue_environment` and `deployment_environment`.
+- A frame's values must equal its segment header's. Otherwise the reader refuses the object, salvage stops before that frame, and `read_session` reports an integrity failure. This holds even when the manifest was rewritten to match.
+- The identity is part of the canonical frame header. The segment SHA-256, the hash chain, and the manifest therefore cover it.
 
 | Kind | Fields |
 |---|---|
 | `segment` (first frame only) | `session_id`, `segment_index`, `previous_segment_sha256` and `previous_last_sequence` (null for segment 0), `source_id`, `feed_id`, `endpoint_id`, `transport`, `deployment_environment`, `venue_environment` (`synthetic`, `demo`, `production`), `clock_domain`, `session_started_at`, `written_at`, `monotonic_ns` |
-| `payload` | `direction` (`inbound` or `outbound`), `connection`, `observed_at`, `monotonic_ns`, `source_timestamp` (inbound only, caller-supplied), `payload_sha256`, `malformed` (inbound only), `written_at` |
-| `event` | `event_type`, `connection` (required for connection events), `written_at`, `monotonic_ns` |
+| `payload` | `venue_environment`, `deployment_environment`, `direction` (`inbound` or `outbound`), `connection`, `observed_at`, `monotonic_ns`, `source_timestamp` (inbound only, caller-supplied), `payload_sha256`, `malformed` (inbound only), `written_at` |
+| `event` | `venue_environment`, `deployment_environment`, `event_type`, `connection` (required for connection events), `written_at`, `monotonic_ns` |
 
 Event types:
 - `connection_opened` and `connection_closed`;
@@ -156,7 +165,7 @@ Rules:
 - **Monotonic time.** `monotonic_ns` is `CLOCK_MONOTONIC`. It is comparable only within one `clock_domain` (the boot identity, `/proc/sys/kernel/random/boot_id`). It measures intervals and order within a session, and it is never a timestamp. Outside the `test` environment the store refuses any clock domain other than the boot identity it reads itself (RT-B8-05).
 - **Upkeep.** A collector calls `CaptureSession.maintain()` periodically: it rolls over a segment that has outlived its duration bound even when no frame arrives, then syncs (RT-B8-07).
 - **Exceptions after a write.** If `append_*` raises after its frame was written (a rollover or a regression event failed), the frame is on disk and the session has ended. Recovery and salvage keep the frame. A collector treats any exception as "start a new session" (RT-B8-10).
-- **Environment identity** is carried by each segment's hash-chained header, which every frame of that segment sits behind (interpretation B8-2).
+- **Environment identity** is on every frame and must match the segment header (B8-2, as modified by the owner).
 - **Venue sequence numbers** stay inside payloads. The raw layer never parses payloads (B8-3).
 - **Outbound frames** hold application-level messages PMV sent (for example subscriptions). Handshake and authentication material never passes through the store (F-03).
 
@@ -172,7 +181,7 @@ Rules:
 
 - Demo data is protected like real data and is never loaded as data, for any use (`require_data_use`; RT-B2-09).
 - Synthetic data is loaded only for tests. Production data is loaded only for research, and that still happens only through the H-2 release path. Nothing written by the `test` deployment is ever research data, whatever its label.
-- These loader rules apply to v2 sessions and artifacts. v1 captures carry no environment identity. v1 starts new captures only in the `test` environment, so every v1 capture in a store is test data (RT-B8-08).
+- These loader rules apply to segmented (v3) sessions and artifacts. v1 captures carry no environment identity. v1 starts new captures only in the `test` environment, so every v1 capture in a store is test data (RT-B8-08).
 - The CLIs that create project records (`python -m pmv.gates create` and `python -m pmv.holdout_log record`) refuse `--environment test` (RT-4).
 
 ### Limits

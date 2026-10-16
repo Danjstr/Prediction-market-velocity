@@ -179,7 +179,7 @@ def frames_of(store: CaptureStore, session_id: str) -> list[object]:
 
 
 def layout(root: Path) -> Path:
-    return root / "capture" / "v2"
+    return root / "capture" / "v3"
 
 
 def segment_dir(root: Path, session_id: str, index: int) -> Path:
@@ -798,3 +798,67 @@ def test_a_readers_lock_probe_never_ends_a_live_capture(tmp_path: Path) -> None:
     finally:
         os.close(writer)
         os.close(reader)
+
+
+# ----- per-frame environment identity (owner decision B8-2, as modified) -----
+
+
+def test_the_writer_cannot_finalize_a_mixed_environment_segment(
+    root: Path, store: CaptureStore
+) -> None:
+    session = start(store, root)
+    connection = session.open_connection()
+    receive(session, b"a", connection, 0)
+    # a writer defect that changes the environment mid-segment
+    session._venue = VenueEnvironment.PRODUCTION
+    receive(session, b"b", connection, 1)
+    with pytest.raises(CaptureIntegrityError, match="environment differs"):
+        session.close()
+    assert not segment_dir(root, session.session_id, 0).exists()
+    store.recover()
+    record = store.salvage(segment_id(session.session_id, 0))
+    assert record.tail is TailDisposition.INVALID_FRAME
+    payloads = [
+        f.payload
+        for _i, f in store.iter_frames(store.read_session(session.session_id))
+        if isinstance(f, PayloadFrame)
+    ]
+    assert payloads == [b"a"]
+
+
+def test_reading_refuses_a_relabelled_frame_even_with_a_consistent_manifest(
+    root: Path, store: CaptureStore
+) -> None:
+    """Only the per-frame check catches a frame relabelled with its manifest rewritten."""
+    import json
+    import struct
+
+    from pmv.integrity import canonical_json
+
+    session_id = capture(store, root, [b"payload"])
+    directory = segment_dir(root, session_id, 0)
+    target = writable(directory / "segment.pmvraw")
+    data = target.read_bytes()
+    out = bytearray(data[: len(MAGIC)])
+    offset = len(MAGIC)
+    while offset < len(data):
+        header_length, payload_length = struct.unpack_from(">IQ", data, offset)
+        start = offset + 12
+        document = json.loads(data[start : start + header_length])
+        payload = data[start + header_length : start + header_length + payload_length]
+        if document["kind"] == "payload":
+            document["venue_environment"] = "production"
+        body = canonical_json(document)
+        out += struct.pack(">IQ", len(body), len(payload)) + body + payload
+        offset = start + header_length + payload_length
+    target.write_bytes(bytes(out))
+    manifest = writable(directory / "manifest.json")
+    document = json.loads(manifest.read_bytes())
+    document["object"]["sha256"] = hashlib.sha256(bytes(out)).hexdigest()
+    document["object"]["size_bytes"] = len(out)
+    manifest.write_bytes(canonical_json(document) + b"\n")
+    for path in (target, manifest):
+        path.chmod(0o400)
+    directory.chmod(0o500)
+    with pytest.raises(CaptureIntegrityError, match="environment differs"):
+        store.read_session(session_id)

@@ -1,7 +1,7 @@
-"""Segmented prospective-capture store (Step 11 F-11, F-12, F-33; frame format v2).
+"""Segmented prospective-capture store (Step 11 F-11, F-12, F-33; frame format v3).
 
 A capture **session** is one collector run against one source endpoint. It is written as
-a chain of bounded, immutable **segments** (``pmv.capture_format`` v2 objects). A segment
+a chain of bounded, immutable **segments** (``pmv.capture_format`` v3 objects). A segment
 rolls over when it reaches the session's explicit size, frame-count, or duration bound, so
 no stream is ever an indefinitely open mutable file, and a crash can damage at most the
 open segment.
@@ -9,13 +9,13 @@ open segment.
 Layout under the configured raw storage root (beside the v1 store, which it never
 touches)::
 
-    capture/v2/sessions/<session_id>                    permanent session reservation
-    capture/v2/open/<segment_id>/                       the open segment (locked while live)
-    capture/v2/quarantine/<segment_id>/                 interrupted or stopped segments
-    capture/v2/salvage/<segment_id>/                    salvaged valid prefixes (F-11)
-    capture/v2/segments/<source>/<feed>/YYYY/MM/DD/<session_id>/<index>/
+    capture/v3/sessions/<session_id>                    permanent session reservation
+    capture/v3/open/<segment_id>/                       the open segment (locked while live)
+    capture/v3/quarantine/<segment_id>/                 interrupted or stopped segments
+    capture/v3/salvage/<segment_id>/                    salvaged valid prefixes (F-11)
+    capture/v3/segments/<source>/<feed>/YYYY/MM/DD/<session_id>/<index>/
         segment.pmvraw, manifest.json                   finalized segments (0400, dir 0500)
-    capture/v2/normalized/<session_id>/<key>/           normalized artifacts (content-addressed)
+    capture/v3/normalized/<session_id>/<key>/           normalized artifacts (content-addressed)
 
 ``segment_id`` is ``<session_id>.<index>``, with a six-digit index.
 
@@ -72,6 +72,7 @@ from pmv.capture_environment import (
     authorize_capture,
 )
 from pmv.capture_format import (
+    FORMAT_VERSION,
     MAGIC,
     MAX_PAYLOAD_BYTES,
     CaptureFormatError,
@@ -132,7 +133,7 @@ __all__ = [
 _log = get_logger(__name__)
 
 CAPTURE: Final = "capture"
-LAYOUT: Final = "v2"
+LAYOUT: Final = "v3"
 SESSIONS: Final = "sessions"
 OPEN: Final = "open"
 QUARANTINE: Final = "quarantine"
@@ -1581,7 +1582,7 @@ def _manifest_object_and_counts(summary: SegmentSummary) -> dict[str, object]:
         "object": {
             "first_sequence": summary.first_sequence,
             "format": "pmv.raw.frames",
-            "format_version": 2,
+            "format_version": FORMAT_VERSION,
             "frame_count": summary.frame_count,
             "last_sequence": summary.last_sequence,
             "sha256": summary.sha256,
@@ -1836,6 +1837,8 @@ class CaptureSession:
                 source_timestamp=None if source is None else format_timestamp(source),
                 malformed=malformed,
                 written_at=format_timestamp(written),
+                venue_environment=self._venue,
+                deployment_environment=self._deployment,
             )
         )
         monotonic_regressed = (
@@ -1902,6 +1905,8 @@ class CaptureSession:
                 connection=connection,
                 written_at=format_timestamp(self._written_at()[0]),
                 monotonic_ns=self._store._monotonic(),
+                venue_environment=self._venue,
+                deployment_environment=self._deployment,
             )
         )
 
