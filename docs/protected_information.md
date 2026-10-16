@@ -58,7 +58,7 @@ The project owner directed this design. It replaced an earlier plan for a separa
 
 ## What is safe now (Phase 0, and Phase 1 until the release path exists)
 
-*Status (B07, 2026-10-16): the project is in Phase 1. Everything said here about Phase 0 still applies to Phase 1 until the H-2 release path exists.*
+*Status (B08, 2026-10-16): the project is in Phase 1. Everything said here about Phase 0 still applies to Phase 1 until the H-2 release path exists.*
 
 **Phase 0 is safe for:** synthetic fixtures, methodology research, API documentation, open-source research, and deterministic infrastructure development.
 

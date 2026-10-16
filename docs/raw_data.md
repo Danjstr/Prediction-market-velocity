@@ -85,7 +85,7 @@ There are no defaults. A crash can damage only the open segment.
   salvage/<segment_id>/{salvaged.pmvraw,salvage.json}   salvaged valid prefixes (0400, dir 0500)
   segments/<source>/<feed>/YYYY/MM/DD/<session_id>/<index>/{segment.pmvraw,manifest.json}
                                                     finalized segments (0400, dir 0500)
-  normalized/<session_id>/<key>/{observations.json,labels.json}   normalized artifacts
+  normalized/<session_id>/<key>/{artifact.json,observations.json,labels.json}   normalized artifacts
 ```
 
 `session_id` has the capture-ID form. `segment_id` is `<session_id>.<index>`, with a six-digit index.

@@ -83,7 +83,8 @@ Listed oldest first, and appended at each timeline update.
 | `222a7e7` | Prospective-capture hardening: F-11, F-12/F-27, F-33, F-37/RT-4, book continuity, normalized artifacts (Red-Team round 1 subject) |
 | `7190f7f` | Red-Team round 1 remediation (RT-B8-01 to RT-B8-10) and the Statistician review |
 | `6dc2b51` | Round 2 follow-ups (RT-B8-12 to RT-B8-14) and B08 status docs. **Final reviewed capture code**: Red-Team round 3 verdict, no BLOCKING and no MAJOR finding |
-| (the commit adding this row) | Round 3 record, cold-start review and its fixes, and this timeline update. Its hash is the branch tip; see `git ls-remote` |
+| `d52b46a` | Red-Team round 3 verdict recorded, residual rows, and timeline update |
+| (the commit adding this row) | Cold-start review (`research/governance/b08_cold_start_review.md`) and its documentation fixes, plus the `check.sh` result. Its hash is the branch tip; see `git ls-remote` |
 
 ## Ancestry verification for B08 (2026-10-16)
 

@@ -71,7 +71,8 @@ Git records F-11, F-12, F-27, F-26, F-33, F-37, and RT-4 by title only (`docs/ga
 - **Statistician** (`research/governance/b08_statistician_review.md`; development self-review): **PASS WITH CONDITIONS.**
   - No look-ahead. Availability is still the wall-clock receipt time, and every new continuity rule is conservative.
   - No effect on protected data, `T0`, the split, or the holdout.
-- **Cold-start review:** `research/governance/b08_cold_start_review.md`.
+- **Cold-start review:** `research/governance/b08_cold_start_review.md`. Verdict: YES with conditions. Its nine MINOR documentation findings were fixed (see that file, "Coordinator dispositions").
+- **Quality gate:** `./scripts/check.sh` passed on 2026-10-16 (2305 passed, 8 skipped). The 8 skips are the owner-run sentinel probes in `tests/integration/test_information_embargo.py`.
 - **Models used:** development and review used Claude Opus 5.5 (`claude-opus-5-5`). Nothing in B08 trains or selects a predictive model, and no cycle exists.
 
 ### Residuals and conditions (requirements carried forward, not decided here)
@@ -85,6 +86,7 @@ Git records F-11, F-12, F-27, F-26, F-33, F-37, and RT-4 by title only (`docs/ga
 | B8S-04 | A session that does not end `complete` needs an explicit end marker, or decision times capped at its last frame | Real v2 artifacts are used for research |
 | B8S-05 | Pin the parser version per experiment, and record every version that was generated | Experiments on v2 artifacts |
 | B8S-06 | Parser tests for the skip list and for identifying command replies (`solicited`) | A real venue parser (after AR-1 verification) |
+| B8S-07 (note) | Concurrent connections in one session share book keys. That is conservative today; revisit if a session ever multiplexes feeds | A session multiplexes feeds |
 | Artifact digest | Code that relies on an artifact records `artifact_digest` and loads with `expected_digest` | Experiments on v2 artifacts |
 | RT-B8-13 | Fixed: real captures always use the account's protected location. Re-review it with any registry change | Any `APPROVED_CAPTURE_ENDPOINTS` entry |
 | RT-B8-12 (residual) | Under heavy lock contention a collector may wait up to about 1 s before it gives up on a new segment and ends the session. That failure is closed. Monitoring readers should not hold segment locks | Live capture is authorized |

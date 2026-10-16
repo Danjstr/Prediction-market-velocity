@@ -37,6 +37,10 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
   The release tool's code is deliberately **not yet written**: RT-B3-05 requires the owner's E-U1 catalog decision and a reviewed shared catalog first (`docs/release_tool_design.md`). B07 storage never releases anything (A-8).
 - **Recommended next steps:**
   - **Owner:**
+    0. review B08 (`docs/decisions/2026-10-16_b08_prospective_capture_hardening.md`):
+       - confirm or replace interpretations B8-1 to B8-7;
+       - decide on the single B08 → `main` pull request, which the sandbox cannot open (the session supplies its title and body);
+       - merge with a normal merge commit, if approved;
     1. select the first historical source, and supply its terms (AR-3), so that A-1 and A-2 can be prepared (the post-B07 audit found no further source-neutral acquisition engineering worth doing before this);
     2. decide whether to approve the reader dependencies listed in decision record B7-6 (Parquet, DBN, zstd), or to defer those formats;
     3. approve a raw-data backup policy (A-3) and confirm or replace the "size class" reading (B7-7);
@@ -46,7 +50,9 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
     7. optionally decide B6S-14 (independent statistical audit of the release rules before the first release; not adopted).
   - **Agents** (no network, synthetic data only, from the active branch, in a batch chartered by the owner):
     - B08 (done, pending owner review): raw-format v2 and collector hardening (F-11, F-12/F-27, F-33, F-37/RT-4), order-book continuity after rejected frames, and normalized capture artifacts;
-    - before real v2 data is used: the exclusion-ledger and status-after-reset requirements B8S-01 and B8S-02, and the remaining capture items (RT-B8-05, RT-B8-06, B8S-03, B8S-04);
+    - before live capture is authorized: timestamp plausibility and clock-sync state (RT-B8-05, B8S-03);
+    - before real v2 data is used for research: the exclusion ledger (B8S-01), trading status after a reset (B8S-02), and an end marker for sessions that are not `complete` (B8S-04);
+    - before long real sessions are normalized: memory bounds (RT-B8-06);
     - after source selection: the production transport design and its review (B7-4), and any source-specific acquisition support;
     - after owner approval: the Parquet, DBN, and zstd readers inside the G-1 worker.
 
@@ -86,7 +92,7 @@ From `docs/gate0_readiness.md` ("Deferred findings and deadlines") and `docs/dec
 | F-17 minimum economic thresholds and kill criteria | Substantive strategy or model work on real data | Owner, with Quant / Business Lead | Open |
 | F-03 credential isolation implementation | Any venue credential, including data-only | Owner | Open. No credential exists |
 | F-09 network and WebFetch denies for market-data hosts | Phase 1 real collection, and any agent web research (WebFetch or WebSearch) after a cycle's `T0 − m` | Owner (settings are governance) | Policy **decided** (batch 4 O-6, host classes in `docs/external_access.md`). Deterministic denies **committed** in `8517fc2` (B06), behavioral check passed 2026-10-16 |
-| F-11 capture segmentation and salvage; F-12 frame v2 timing and direction (with F-27); F-33 | Phase 1 real collection | API / Execution, Reliability | **Implemented in B08** on synthetic data and Red-Team reviewed (interpretations B8-1 to B8-3 await owner confirmation). Open before real collection: timestamp plausibility and clock-sync state (RT-B8-05, B8S-03), and memory bounds for long sessions (RT-B8-06) |
+| F-11 capture segmentation and salvage; F-12 frame v2 timing and direction (with F-27); F-33 | Phase 1 real collection | API / Execution, Reliability | **Implemented in B08** on synthetic data and Red-Team reviewed (interpretations B8-1 to B8-3 await owner confirmation). Open before live capture is authorized: timestamp plausibility and clock-sync state (RT-B8-05, B8S-03). Open before long real sessions are normalized: memory bounds (RT-B8-06) |
 | F-26 storage-event claims and restore dependency | Phase 1 real collection | API / Execution, Reliability | Open (not in B08 scope) |
 | F-37, RT-4: demo data treated as real; collectors refuse the test environment | Phase 1 real collection | API / Execution | **Implemented in B08** (interpretations B8-4 to B8-6). Owner-approved endpoints (`APPROVED_CAPTURE_ENDPOINTS`) are empty, and E-6 (demo accounts and keys) is open |
 | F-32 collector host and alert recipient | Phase 1 real collection | Owner | Open |
@@ -320,12 +326,22 @@ Tests and review:
 - Statistician (`research/governance/b08_statistician_review.md`): PASS WITH CONDITIONS, with no look-ahead.
 - Cold-start review: `research/governance/b08_cold_start_review.md`.
 
-**Still open** (decision record, "Outcome"):
-- RT-B8-05 and B8S-03: timestamp plausibility and clock-sync state, before live capture.
-- RT-B8-06: memory bounds for long sessions.
-- B8S-01 and B8S-02: the exclusion ledger and trading status after a reset, before real v2 data is used.
-- B8S-04: the end of a session that is not `complete`.
-- F-26.
+**Still open.** The authoritative list is the decision record, "Outcome" → "Residuals and conditions":
+- **Before live capture is authorized:**
+  - RT-B8-05 and B8S-03: timestamp plausibility and clock-sync state;
+  - the RT-B8-12 residual: a writer may wait up to about 1 s under lock contention.
+- **Before long real sessions are normalized:** RT-B8-06, memory bounds.
+- **Before real v2 data is used for research:**
+  - B8S-01: the exclusion ledger;
+  - B8S-02: trading status after a reset;
+  - B8S-04: an end marker for a session that is not `complete`.
+- **Before experiments on v2 artifacts:**
+  - B8S-05: pin the parser version;
+  - record `artifact_digest` and load with `expected_digest` (the RT-B8-01 residual).
+- **Before a real venue parser:** B8S-06, parser tests for the skip list and for solicited replies.
+- **Before any `APPROVED_CAPTURE_ENDPOINTS` entry:** re-review RT-B8-13.
+- **B8S-07 (note):** concurrent connections in one session share book keys. That is conservative today; revisit if a session ever multiplexes feeds.
+- **F-26:** not in B08 scope.
 
 **Not changed:**
 - `src/pmv/acquisition/` (the B07 review still covers it).
