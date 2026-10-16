@@ -4,7 +4,7 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
 
 ## Owner direction for Phase 1 (batch charter, 2026-10-15)
 
-- First venue: Kalshi. Polymarket is deferred until separately approved and verified.
+- First venue: Kalshi. Polymarket is deferred until separately approved and verified. Batch 3 (P5) approves Polymarket historical-data documentation research only.
 - Underlyings: Bitcoin and gold.
 - Horizon: 15-minute markets first, with an architecture that supports roughly 15 minutes to 1 hour.
 - Strategy: quantitative short-horizon price-path and velocity prediction, not sentiment.
@@ -103,6 +103,51 @@ This was documentation research only, under AR-1 (owner decisions D1–D3 in `do
 - E-7: network egress scope and the F-09 denies;
 - Red-Team blocking conditions for the parser and collector: RT-B2-01, 02, 03, and 06 in `research/kalshi/red_team_review.md`.
 
+## Batch 3 (`phase1/historical-data-strategy`): historical data strategy
+
+**Charter (owner, 2026-10-16).** Recorded in `docs/decisions/2026-10-16_phase1_batch3_historical_data_strategy.md`, decisions P1–P6:
+- **P1.** Verified existing historical data is preferred over waiting to regenerate equivalent observations. Prospective PMV capture is prepared in parallel.
+- **P2.** Historical data exposed to development can never become protected holdout data.
+- **P3.** Broad public research within the sandbox allowlist, with external material treated as untrusted.
+- **P4.** Gold stays in scope.
+- **P5.** Polymarket historical-data documentation research is approved.
+- **P6.** This batch is inventory and design only.
+
+This was documentation research and design only. No credential was used, no market-data API returned content, and no dataset or sample was downloaded. One request to an exchange API host (`api.exchange.bullish.com`) was attempted and refused by the proxy (`research/historical_data/incident_2026-10-16_api_host_request.md`). Agents were incidentally exposed to aggregate outcome statistics and to a page containing a live reference-index value (cfbenchmarks.com). Nothing was recorded or used. The committed protected-scope registry is empty, so even a "tiny sample" was not safe under existing policy, and none was taken.
+
+**Outputs:**
+- the historical source inventory (`research/historical_data/`):
+  - `inventory_prediction_markets.md`: Kalshi, Polymarket, and prediction-market archives;
+  - `inventory_underlying_btc_gold.md`: BTC exchanges, vendors, and reference indices; COMEX/CME, LBMA, and other gold sources;
+  - `inventory_open_academic_regulatory.md`: open datasets, literature and software, regulatory sources;
+  - `feasibility_summary.md`: ranked acquisition recommendations, inaccessible sources, and access requests;
+- the Phase 2 design: `docs/phase2.md`, covering general cleaning and dataset engineering, identity, duplicates, and dependence;
+- `research/historical_data/point_in_time_metadata_architecture.md`: the proposal for H-3, H-4, and H-5;
+- reviews:
+  - `research/historical_data/statistician_review.md`;
+  - `research/historical_data/red_team_review.md`;
+- `research/historical_data/incident_2026-10-16_api_host_request.md`: the API-host near-miss incident record.
+
+**Owner decisions raised:** H-1 to H-8, plus the Red-Team items O-2 to O-8 (decision record, "Owner decisions raised by this batch"). P4 settles the scope half of E-1. H-3 restates E-2. H-5 restates E-4.
+
+**Key findings** (detail in `research/historical_data/feasibility_summary.md`):
+- **No official historical order books.** Neither Kalshi nor Polymarket publishes them. Historical depth exists only in paid or license-unclear third-party captures. Book-dependent evidence and the protected holdout must therefore come from prospective capture.
+- **Discovery-grade official history.** Kalshi's historical trades, candles, and settlements, and Polymarket's on-chain fills and resolutions, are primary sources usable for discovery-grade development, under H-4 and H-5.
+- **Settlement and fee regime breaks.**
+  - Kalshi BTC rulebook changes (CFTC filings).
+  - Polymarket's Chainlink TWAP from 2026-08-07, V2 from 2026-04-28, and taker fees from 2026-01-05.
+
+  These partition the history.
+- **Gold.**
+  - KXGOLD15M is reported by secondary sources only: Pyth-settled, about 2 months of history.
+  - The COMEX intraday development source is Databento GLBX.MDP3 (paid).
+  - Open data cannot support gold. P4 keeps gold in scope; evidence will be thin.
+- **Licensing is unresolved for most sources.** No acquisition precedes a licence determination.
+- **Counter-evidence.** A public 2026 study (OpenMarket, arXiv 2607.26245) reports no after-cost edge for a closely related Polymarket BTC 15-minute design.
+- **Incidental pre-cycle exposure.** Aggregate KXBTC15M outcome statistics (2026-01 to 2026-10) appeared in a dataset card read by research agents. No values were recorded. With F-06, this rules out any BTC-family or gold-family snapshot holdout ending on or before 2026-10-16, and the first protected interval must start after 2026-10-16 plus margin (pre-cycle exposure register in the decision record).
+
+**Source-access limitations recorded:** `www.cmegroup.com` (allowlisted, but anti-bot behavior returns no usable content) and `kalshi.com` (Vercel challenge, AR-3). Neither is bypassed.
+
 ## ACCESS REQUESTS
 
 ### AR-1: Kalshi official documentation (blocking for the Kalshi adapter and F-16)
@@ -138,6 +183,17 @@ This was documentation research only, under AR-1 (owner decisions D1–D3 in `do
   2. Allowlist `help.kalshi.com` (read-only, documentation only). This is a new domain and needs owner approval.
   3. Contract-terms documents may be hosted on a domain named only in a `GET /series/{ticker}` response (`contract_terms_url`). Learning that URL requires a market-data API call, which is not authorized. Under option 1 the owner can follow the links from the kalshi.com market rules page instead.
 - **Excluded.** API hosts, market pages showing live prices, account login, and any attempt to bypass the challenge.
+
+### AR-4 to AR-16: batch 3 documentation access requests
+
+These are listed in `research/historical_data/feasibility_summary.md` §6, and none is used. The high-priority ones are:
+- AR-4: Kalshi contract-terms PDFs, or owner-supplied copies;
+- AR-6: Polymarket US docs and legal, if the owner is a US person;
+- AR-8: Pyth documentation, for gold;
+- AR-9: CF Benchmarks methodology, owner-supplied because the site terms bar automated access. AR-9 takes over the BTC half of AR-2;
+- AR-10: CME rulebook, specifications, and licence documents, owner-supplied, because `www.cmegroup.com` gives no usable content to automated clients.
+
+Each is documentation only. Any data acquisition is a separate request under H-2 and H-7.
 
 ### AR-2: settlement reference-source documentation (conditional on AR-1)
 

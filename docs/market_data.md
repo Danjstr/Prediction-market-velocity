@@ -239,6 +239,15 @@ A fresh-context Statistician review of this batch found no blocking defect for s
 - R1: the unit of independence and split grouping;
 - R2: label-end purge and embargo.
 
+## Historical archive data (design, batch 3)
+
+The owner's process change P1 (`docs/decisions/2026-10-16_phase1_batch3_historical_data_strategy.md`) makes acquired historical data a development source. Archive rows differ from PMV captures in ways this layer must represent explicitly. The design is in `docs/phase2.md` and `research/historical_data/point_in_time_metadata_architecture.md`, and nothing below is implemented yet.
+
+- **Availability.** Archive rows have no PMV `received_at`, so `available_at = received_at` cannot apply. They either are excluded or get a flagged synthetic availability `event_time + L_source`, with `L_source` fixed before outcome inspection (owner decision H-5). Every row carries `availability_class` (`RECEIPT` or `SYNTHETIC_ARCHIVE`), and results report the two separately.
+- **Metadata.** Archive contract metadata is end-of-life state. Rows built from it carry `metadata_pit_class = POST_HOC` and follow the admission policy (H-4). Outcome and end-of-life fields go to the label channel or are excluded.
+- **Identity.** The proposed identities (`raw_observation_id`, `source_record_key`, `venue_contract_id`, `contract_version_id`, `outcome_reference_event_id`, `outcome_cell_id`, `time_block_id`, `decision_row_id`) are defined in `docs/phase2.md` "Identity, duplicates, and statistical dependence" (H-6). They would replace `spec_key` as the de facto row key, and the identity and verification split resolves review m4 above (H-3).
+- **Timestamps.** `event_time`, `source_send_time`, `vendor_capture_time`, `received_at`, and `acquired_at` are distinct kinds and are never substituted for one another. `acquired_at` is provenance only.
+
 ## Not yet done (see `docs/phase1.md`)
 
 - The Kalshi parser, contract-spec builder, and resolution parser, pending official documentation (ACCESS REQUEST AR-1).

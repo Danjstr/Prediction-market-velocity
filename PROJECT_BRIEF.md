@@ -118,6 +118,9 @@ Preserve raw market data whenever practical so events can be reconstructed and r
 
 Historical data alone may not contain enough resolution for 5–15 minute forecasting, so **high-frequency live data collection should begin as early as possible.**
 
+### Verified existing historical data
+PMV prefers verified existing historical data to waiting to regenerate equivalent observations. When a historical source's provenance, timestamp semantics, contract semantics, licensing, and quality are adequate, it is used for development, while prospective PMV capture accumulates genuinely untouched data in parallel. This preference never weakens provenance, licensing, point-in-time correctness, holdout integrity, or source-quality requirements. Historical data exposed to development can never later become protected holdout data. Owner record: `docs/decisions/2026-10-16_phase1_batch3_historical_data_strategy.md`.
+
 ### External resources
 Agents may extensively reference:
 - open-source code;
@@ -162,6 +165,7 @@ Use rolling/walk-forward validation for:
 - Opening the holdout requires explicit user approval for the specific frozen candidate, in addition to the technical release gates.
 - Once outcome-dependent information from the holdout has been revealed, it is consumed and can never again serve as untouched data for a changed candidate.
 - No observation may become protected evaluation data after its values, outcomes, or outcome-dependent derivatives have been exposed to development.
+- Historical data from any source, once exposed to development, stays development data permanently. When development relies on historical data, the formation of the protected set (a quarantined, unexamined snapshot, or a prospective protected period) is decided for each cycle before any outcome-dependent inspection.
 - Each holdout is evaluated once, against a preregistered evaluation plan with PASS, FAIL, and INCONCLUSIVE criteria. Any authorized evaluation that reveals outcomes consumes the holdout; only PASS permits the evaluated frozen candidate to continue.
 
 ### Leakage control
