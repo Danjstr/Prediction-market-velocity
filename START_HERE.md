@@ -459,7 +459,7 @@ The Risk & Performance Engineer is defining policy here, not yet building the fu
 - Tax assumptions used in a protected evaluation are frozen and preregistered like other material economic assumptions (Phase 6), or are explicitly designated as sensitivity scenarios in the Holdout Evaluation Plan.
 - Agents research and model; they do not give tax or legal advice. Before real-money scaling, current authoritative verification of the classification and, where appropriate, qualified tax or legal advice are required (Required User Governance Inputs).
 
-**Gate 4.5:** The sizing and risk policy must be defined before the Phase 5 Independent Statistical Audit and before anything is frozen for final holdout evaluation. Every input listed as required by Gate 4.5 under Required User Governance Inputs must be approved by the user before Gate 4.5 passes, including the frozen/adjustable classification and envelope for each risk-appetite input. The policy evaluated on the holdout must be the policy intended for deployment, including its user-approved inputs and manual-control governance.
+**Gate 4.5:** The sizing and risk policy must be defined before the Phase 5 Independent Statistical / Economic / Operational Audit and before anything is frozen for final holdout evaluation. Every input listed as required by Gate 4.5 under Required User Governance Inputs must be approved by the user before Gate 4.5 passes, including the frozen/adjustable classification and envelope for each risk-appetite input. The policy evaluated on the holdout must be the policy intended for deployment, including its user-approved inputs and manual-control governance.
 
 ---
 

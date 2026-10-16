@@ -22,15 +22,17 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
   - parser process isolation with resource limits;
   - pinned, reviewed Parquet and DBN readers;
   - the fetcher, with redirect re-checks and size caps;
-  - the end-to-end pipeline into the protected raw store (`docs/acquisition_readiness.md`).
-- **Blockers before agents see any real observation:** a registered cycle with `T0` and `m` (which first requires the pre-T0 owner checklist P-1 to P-4 in START_HERE.md); and the H-2 per-row release tool, built, reviewed, and approved through an owner governance change (`docs/protected_information.md`).
+  - the end-to-end pipeline into the protected raw store (`docs/acquisition_readiness.md`). Its intake and release receipts are already persisted in a hash-chained journal (B06 continuation).
+- **Blockers before agents see any real observation:** a registered cycle with `T0` and `m` (which first requires the pre-T0 owner checklist P-1 to P-4 in START_HERE.md); and the H-2 per-row release tool, built, reviewed, and approved through an owner governance change (`docs/protected_information.md`). Its code is deliberately **not yet written**: RT-B3-05 requires the owner's E-U1 catalog decision and a reviewed shared catalog first. The P-3 equivalence criterion gates cycle registration, and so the first release, but not the tool's construction. The required properties and the prerequisite chain are in `docs/release_tool_design.md` (proposed design, not an approved requirement).
 - **Recommended next steps:**
   - **Owner:**
-    1. review and merge the B06 pull request;
+    1. open (the sandbox cannot), review, and merge the single B06 pull request;
     2. apply the F-09 settings patch and the agent-file patch on the active branch;
     3. approve a raw-data backup policy (A-3);
-    4. pursue the licence terms for the first candidate source (Kalshi official historical data; AR-3).
-  - **Agents (no network, synthetic data only, from the active branch):** close the remaining A-4 gaps (parser process isolation, pinned readers, fetcher design with redirect re-checks, the pipeline into the protected raw store), then request a fresh Red-Team review.
+    4. pursue the licence terms for the first candidate source (Kalshi official historical data; AR-3);
+    5. decide E-U1 (equivalence-catalog expansion), the first step before the H-2 release tool (`docs/release_tool_design.md`);
+    6. prepare the pre-T0 checklist decisions P-1 to P-4 (START_HERE.md).
+  - **Agents (no network, synthetic data only, from the active branch):** close the remaining A-4 gaps (parser process isolation, pinned readers, fetcher design with redirect re-checks, the pipeline into the protected raw store), then request a fresh Red-Team review. The release tool waits for the owner's E-U1 decision (`docs/release_tool_design.md`).
   - F-09 is required before any acquisition, collection, or post-`T0 − m` web research. It does not gate no-network tooling work.
 
 ## Owner direction for Phase 1 (batch charter, 2026-10-15)
@@ -101,7 +103,7 @@ Done without credentials, real data, or network access:
 
 No Kalshi field, endpoint, unit, fee, rule, or eligibility fact is encoded. `pmv.market_data.kalshi.REQUIRED_VERIFICATIONS` lists what must be verified first.
 
-## Batch 2 (`phase1/kalshi-venue-verification`): Kalshi venue verification
+## Batch 2 (B03, `phase1/kalshi-venue-verification`): Kalshi venue verification
 
 This was documentation research only, under AR-1 (owner decisions D1–D3 in `docs/decisions/2026-10-16_phase1_batch2_owner_decisions.md`). No credential was used, no API host was contacted, no market value was retrieved, and no code changed.
 
@@ -121,20 +123,20 @@ This was documentation research only, under AR-1 (owner decisions D1–D3 in `do
 | Unresolved | `api_terms_and_permitted_use`, `account_and_jurisdiction_eligibility`, `websocket_sequence_and_snapshot_semantics`, `sequence_number_scope_per_subscription_or_market`, `orderbook_delta_semantics_absolute_or_relative` (relative is a strong inference only), `btc_and_gold_series_availability`, `contract_rules_settlement_source_and_timing`, `settlement_reference_window_or_averaging`, `tie_rounding_and_void_rules` |
 
 `KalshiNormalizer` therefore stays fail-closed. No Kalshi parser, `ContractSpec` builder, or label parser was written. They stay blocked by:
-- E-2: the point-in-time versioning decision;
+- E-2: the point-in-time versioning decision (decided in batch 4 as H-3, Option D; implementation open);
 - UR-4: the contract rules;
 - UR-6 and UR-7: sequence scope and delta semantics. They need a recorded test, using a differential two-connection comparison, once a credential and collector are approved. Demo can falsify but cannot confirm production behavior, and a demo account or key needs its own owner classification (E-6).
 
 **Remaining Phase 1 blockers added by batch 2:**
 - E-1: gold scope;
 - E-3: a market-data credential is needed for WS book capture, because the WebSocket requires a signed key;
-- E-4: an availability rule for historical archive rows;
+- E-4: an availability rule for historical archive rows (decided in batch 4 as H-5);
 - AR-3: terms and contract documents;
 - E-6: classification of demo accounts and keys;
 - E-7: network egress scope and the F-09 denies;
 - Red-Team blocking conditions for the parser and collector: RT-B2-01, 02, 03, and 06 in `research/kalshi/red_team_review.md`.
 
-## Batch 3 (`phase1/historical-data-strategy`): historical data strategy
+## Batch 3 (B04, `phase1/historical-data-strategy`): historical data strategy
 
 **Charter (owner, 2026-10-16).** Recorded in `docs/decisions/2026-10-16_phase1_batch3_historical_data_strategy.md`, decisions P1–P6:
 - **P1.** Verified existing historical data is preferred over waiting to regenerate equivalent observations. Prospective PMV capture is prepared in parallel.
@@ -232,7 +234,7 @@ Once AR-1 identifies the official settlement sources for Kalshi BTC and gold con
 
 **Status after batch 2:** still conditional. The docs.kalshi.com pages link to CF Benchmarks documentation (`docs.cfbenchmarks.com`) for the BRTI passthrough. They do **not** state that any contract settles on BRTI or on any averaging window. Gold settlement sources are undocumented. AR-2 is not raised until the contract terms (AR-3) name the settlement sources.
 
-## Batch 4 (`phase1/acquisition-safety-decisions`): owner decisions and acquisition safety
+## Batch 4 (B05, `phase1/acquisition-safety-decisions`): owner decisions and acquisition safety
 
 Governance and policy only. No real market dataset was acquired or inspected, and no code changed. Owner decisions H-1 to H-8, O-3, O-5, O-6 (as clarified), and O-9 are recorded in `docs/decisions/2026-10-16_phase1_batch4_acquisition_safety_decisions.md`. The batch also:
 - replaced the CLAUDE.md "do not inspect real market observations at all" rule with five observation classes;
@@ -254,7 +256,7 @@ Full rulings and the pre-T0 checklist are in the decision record.
 
 *Historical lists from batches 1 and 2. They are superseded by "Current status and next step" at the top of this file. F-06 and F-08 have since been decided (batch 4 H-1 and H-2).*
 
-1. **Venue verification: done as far as `docs.kalshi.com` allows (batch 2).** The verified parser, `ContractSpec` builder, and resolution parser remain blocked by E-2, UR-4, UR-6, and UR-7 (see "Batch 2" above).
+1. **Venue verification: done as far as `docs.kalshi.com` allows (batch 2).** The verified parser, `ContractSpec` builder, and resolution parser remain blocked by the H-3 implementation (E-2 decided as Option D), UR-4, UR-6, and UR-7 (see "Batch 2" above).
 2. **Raw format v2 and collector hardening (no network needed).**
    - F-12: monotonic receive time and message direction in frame v2, with F-27;
    - F-11: capture segmentation and salvage;
@@ -268,13 +270,13 @@ Full rulings and the pre-T0 checklist are in the decision record.
 
 ### Recommended next batches after batch 2
 
-1. **Owner decisions:** E-1 (gold scope), E-2 (point-in-time versioning option), AR-3 (how the terms and contract documents are obtained), and E-3 (whether, and under which F-03 controls, a read-scope market-data credential is ever created). Also the earlier open items.
+1. **Owner decisions:** E-1 (gold scope), E-2 (point-in-time versioning option; since decided as H-3), AR-3 (how the terms and contract documents are obtained), and E-3 (whether, and under which F-03 controls, a read-scope market-data credential is ever created). Also the earlier open items.
 2. **Raw format v2 and collector hardening (no network needed),** now informed by documented Kalshi behavior:
    - per-subscription `use_yes_price` and connection metadata in frames;
    - fail-closed handling of terminal errors 10 and 25;
    - scheduled Thursday maintenance disconnects;
    - F-11, F-12, F-33, F-37 / RT-4.
-3. **Kalshi parser against documented-schema fixtures (no network needed, after E-2):**
+3. **Kalshi parser against documented-schema fixtures (no network needed, after the H-3 implementation):**
    - strict schema validation pinned to the recorded spec hashes;
    - relative-delta handling kept behind an explicit, tested assumption flag until UR-7 is tested;
    - metadata and outcome-field quarantine.
@@ -282,7 +284,7 @@ Full rulings and the pre-T0 checklist are in the decision record.
 
 ## Methodology recommendations for owner decision (Statistician review, 2026-10-15)
 
-These would change approved validation methodology, so they are proposals, not adopted rules. Both feed F-07.
+These would change approved validation methodology, so they are proposals, not adopted rules. Both feed F-07. *Status (batch 4): R1 was adopted as H-6 (unit of independence), and R2 is reflected in `docs/phase2.md` Policy 2. The text below is the original proposal.*
 
 - **R1: unit of independence.**
   - *Current state.* No unit is defined, and `spec_key` is the de facto row key.

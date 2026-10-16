@@ -49,4 +49,4 @@ Verified read-only from the B06 working tree before B06 was created:
 1. Confirm that the current branch is the active branch above, and that its HEAD equals the pushed tip.
 2. `git merge-base --is-ancestor <active-branch-tip> HEAD` must succeed. If it fails, stop and escalate.
 3. `git switch -c bNN/<short-purpose>`, where `NN` is the next number.
-4. In this file, mark the previous branch "Historical checkpoint", add the new row, and move the CURRENT ACTIVE GROUND-TRUTH BRANCH section to the new branch. Commit this on the new branch.
+4. Only when the owner has designated the new branch as active (by a charter or decision record, cited in the new row), mark the previous branch "Historical checkpoint", add the new row, and move the CURRENT ACTIVE GROUND-TRUTH BRANCH section to the new branch. Commit this on the new branch. A session never designates its own branch as active (START_HERE.md "Repository Continuity").

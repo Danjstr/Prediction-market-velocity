@@ -1,6 +1,6 @@
 # Phase 1 batch 4: owner decisions on acquisition safety and holdout formation (2026-10-16)
 
-**Approver:** the project owner, in the batch 4 charter given on 2026-10-16 (branch `phase1/acquisition-safety-decisions`). The charter states the decisions below as approved and instructs the governance edits listed under "Documents changed". The development session wrote this record. The owner reviewed it and issued follow-up rulings on 2026-10-16, recorded under "Owner rulings on the batch 4 reviews" below. The owner restated the same rulings in the B06 recovery charter (`docs/decisions/2026-10-16_b06_governance_continuity_sync.md`, C-6), and the session checked them against this record. Until the B06 pull request is merged, the rulings as restated in the B06 charter govern development on the active branch. The owner confirms the record's final wording by merging.
+**Approver:** the project owner, in the batch 4 charter given on 2026-10-16 (branch `phase1/acquisition-safety-decisions`). The charter states the decisions below as approved and instructs the governance edits listed under "Documents changed". The development session wrote this record. The owner reviewed it and issued follow-up rulings on 2026-10-16, recorded under "Owner rulings on the batch 4 reviews" below. The owner restated the same rulings in the B06 recovery charter (`docs/decisions/2026-10-16_b06_governance_continuity_sync.md`, C-6), and the session checked them against this record. Until the B06 pull request is merged, the rulings table below, as verified in B06 C-6, governs development on the active branch. The owner confirms the record's final wording by merging.
 
 **Limitation:** this record is procedural. The system does not cryptographically prove who approved it (F-42 in `docs/decisions/2026-10-14_phase0_step11_owner_decisions.md`).
 
@@ -99,7 +99,7 @@ Licensing is checked **separately at acquisition time (L-ACQ)** and **again befo
 The owner did **not** adopt a blanket ban on all data, API, and live-display hosts. Instead:
 - public documentation and research hosts, and approved historical-data hosts, may be read under the sandbox allowlist;
 - trading, order-entry, and private-account hosts remain denied unless separately owner-authorized;
-- live market-data API hosts need explicit owner authorization if the batch charter forbids live observations;
+- live market-data API hosts need explicit owner authorization if the batch charter forbids live observations (or is silent: default deny, as CLAUDE.md and `docs/external_access.md` §1 state);
 - an `api.*` hostname is never assumed safe because it contains documentation;
 - an ambiguous host classification fails closed and is raised for approval.
 

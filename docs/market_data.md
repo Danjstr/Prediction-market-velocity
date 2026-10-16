@@ -2,7 +2,7 @@
 
 Venue-neutral data contracts between raw captures and research. Implementation: `src/pmv/market_data/`. Governing text: START_HERE.md ("Data and Contract Identity", Phase 1), CLAUDE.md ("Data", "Prediction Objective", "Holdout Protection").
 
-**Status.** Synthetic data only. No module performs network access, reads real market data, or is wired to a loader of real observations. Real observations reach development only under `docs/protected_information.md`, after the F-06 and F-08 decisions (`docs/phase1.md`). The Kalshi adapter fails closed until its wire format is verified from current official sources.
+**Status.** Synthetic data only. No module performs network access, reads real market data, or is wired to a loader of real observations. Real observations reach development only under `docs/protected_information.md`, and only through the H-2 per-row release tool, which is not yet built. F-06 and F-08 were decided in batch 4 as H-1 and H-2 (`docs/phase1.md`; `docs/release_tool_design.md`). The Kalshi adapter fails closed until its wire format is verified from current official sources.
 
 ## Layers
 
@@ -224,7 +224,7 @@ A fresh-context Statistician review of this batch found no blocking defect for s
 **Open. Blocking before the Kalshi spec builder or any real-data label (M1).** `ContractSpec` does not record when PMV learned it.
 - Scenario: a spec built from metadata fetched after the market ends, for example with a realized early close or an extension, would feed the outcome into `time_remaining` and `time_to_reference`.
 - Required: point-in-time spec versions (a `known_at` per version, the latest version known at decision time selected, scheduled close kept apart from realized close), with `build_feature_row`, `label_for`, and `TrainingExample` refusing a spec learned after the decision.
-- This depends on the open identity-design decision (review m4 above), so it is left for an owner-approved design, not decided here.
+- This depends on the open identity-design decision (review m4 above), so it is left for an owner-approved design, not decided here. *Status (batch 4): the owner chose Option D (H-3, append-only point-in-time metadata), which settles E-2's versioning question. The implementation and the m4 identity design remain open, so the Kalshi spec builder stays blocked.*
 - Batch 2 (venue verification) confirmed from Kalshi documentation that these fields change during a market's life: `close_time` (early close, extension, reopen), strikes (`metadata_updated`), the price grid, fees (effective time only), and trading status. Options A–D for the owner are in `research/kalshi/venue_verification.md` §4. None is chosen.
 - Batch 2 also found that Kalshi's WebSocket `orderbook_delta` field is `delta_fp`, documented as a "contract delta". It is very likely a relative change, but this is not stated. `BookDelta.new_quantity` is absolute, so a Kalshi normalizer must not map one onto the other without an explicit, tested conversion (`research/kalshi/venue_verification.md` §3).
 

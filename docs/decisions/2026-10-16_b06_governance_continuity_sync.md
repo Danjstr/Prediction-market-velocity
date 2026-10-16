@@ -46,3 +46,25 @@ The partial work was kept, carried onto B06, verified against the charter item b
 - No requirement in the holdout, protected-information, acquisition, risk, or real-capital rules was relaxed.
 - No gate status changed. Gate 0 passed; Gate 1 has not been decided. No cycle, `T0`, split, or protected scope exists.
 - No real market observation was accessed, and no live, market-data, or trading host was contacted.
+
+## B06 continuation (2026-10-16, after context exhaustion)
+
+The owner issued a continuation charter after the session that wrote the commits above ran out of context. It directs work to stay on B06 (no new branch) and in one pull request, and authorizes:
+- recovery from Git;
+- completing the acquisition-tooling Red-Team remediation;
+- auditing the full source-neutral Phase 1 acquisition-readiness scope, implementing what is safe without real data, and recording governed deferrals for the rest. This includes the owner-controlled per-row release tool "where implementation is permitted before cycle/T0 registration";
+- a fresh cold-start review, with fixes for genuine inconsistencies;
+- owner-applicable patches for sandbox-read-only files.
+
+It authorizes no real data, live or trading hosts, credentials, purchases, `T0`, holdout access, model development, or merge.
+
+Recovery finding: the tracked tree was clean at `f9c5262`, matching `origin`, and every interrupted-session edit was already committed (`acc8e2b`).
+
+Work done:
+- RT-B6-19 to RT-B6-22 fixed;
+- a durable receipt journal added (RT-B6-12);
+- the release-tool design and deferral (`docs/release_tool_design.md`), with Statistician review;
+- Red-Team round 4;
+- cold-start review fixes.
+
+The release tool's code is deferred under RT-B3-05/H-2 until the owner decides E-U1. No requirement was relaxed, and no gate status changed.
