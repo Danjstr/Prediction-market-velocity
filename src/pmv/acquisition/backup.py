@@ -24,14 +24,24 @@ import stat
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Final
+from typing import Final, Protocol
 
 from pmv.acquisition.formats import FileFormat
-from pmv.acquisition.records import ManifestFile
 from pmv.safe_fs import NEW_FILE_FLAGS, READ_FLAGS
 
 _CHUNK: Final = 1024 * 1024
 _SYNTHETIC_FORMATS: Final = frozenset({FileFormat.CSV, FileFormat.JSONL})
+
+
+class DigestedFile(Protocol):
+    """A file to back up: its plain name, exact size, and SHA-256 (``ManifestFile`` fits)."""
+
+    @property
+    def name(self) -> str: ...
+    @property
+    def size_bytes(self) -> int: ...
+    @property
+    def sha256(self) -> str: ...
 
 
 class BackupError(Exception):
@@ -50,7 +60,7 @@ class RestoreReport:
         return bool(self.verified) and not (self.mismatched or self.missing or self.unexpected)
 
 
-def _copy_verified(source: Path, target: Path, expected: ManifestFile) -> bool:
+def _copy_verified(source: Path, target: Path, expected: DigestedFile) -> bool:
     """Copy exclusively, hashing as it goes. Return whether the copy matches ``expected``."""
     digest = hashlib.sha256()
     size = 0
@@ -86,7 +96,7 @@ def _require_empty_dir(path: Path, what: str) -> None:
 
 
 def _stage(
-    files: Sequence[ManifestFile], source: Path, target: Path, report: RestoreReport
+    files: Sequence[DigestedFile], source: Path, target: Path, report: RestoreReport
 ) -> None:
     for entry in files:
         origin = source / entry.name
@@ -98,7 +108,7 @@ def _stage(
 
 
 def backup_and_verify_restore(
-    files: Sequence[ManifestFile], source_dir: Path, backup_dir: Path, restore_dir: Path
+    files: Sequence[DigestedFile], source_dir: Path, backup_dir: Path, restore_dir: Path
 ) -> RestoreReport:
     """Back up ``files`` from ``source_dir``, restore them, and verify against the manifest."""
     if not files:

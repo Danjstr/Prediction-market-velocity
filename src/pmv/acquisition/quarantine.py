@@ -152,8 +152,13 @@ class Quarantine:
                 size += len(chunk)
                 digest.update(chunk)
             os.fsync(fd)
-        finally:
+        except BaseException:
+            # A partial file must not stay in quarantine (RT-B6-26 c): it was never
+            # journaled, and it would block every later intake session.
             os.close(fd)
+            os.unlink(self.directory / name)
+            raise
+        os.close(fd)
         receipt = Receipt(name=name, size=size, sha256=digest.hexdigest())
         try:
             self.journal.append(
