@@ -249,17 +249,18 @@ Begin high-frequency live data collection as early as practical when historical 
 
 # Protected Holdout
 
-Use a chronological split:
-- oldest approximately 70% for development;
-- newest approximately 30% as protected final holdout.
+Use chronological development and evaluation:
+- historical development data may be divided into chronological train/development partitions;
+- the protected final holdout is the cycle's protected evaluation set: a prospective protected interval beginning at a declared future start `T0` for the first cycle (preferred thereafter), never the newest share of an already-exposed historical dataset;
+- no period or observation exposed to development, historical or PMV-captured, may later be promoted into a protected holdout (CLAUDE.md Holdout Protection; START_HERE.md Protection of Holdout-Eligible Data).
 
 Never randomly shuffle the time series.
 
-The final 30% must not be used for target refinement or for any purpose prohibited under Holdout Protection in CLAUDE.md.
+The protected holdout must not be used for target refinement or for any purpose prohibited under Holdout Protection in CLAUDE.md.
 
 Before outcome-dependent inspection, follow Protection of Holdout-Eligible Data in START_HERE.md. Outcome-dependent Phase 1 work uses only the declared development, discovery, or pilot subset.
 
-Within the development 70%, use walk-forward or rolling validation.
+Within the development pool, use walk-forward or rolling validation.
 
 Use purge and/or embargo where necessary to prevent leakage from:
 - feature lookbacks;
@@ -269,7 +270,7 @@ Use purge and/or embargo where necessary to prevent leakage from:
 
 Every access to the protected final holdout must comply with START_HERE.md and be recorded in HOLDOUT_ACCESS_LOG.md.
 
-The Data Scientist must not request access to the protected final 30% merely because development results are disappointing.
+The Data Scientist must not request access to the protected holdout merely because development results are disappointing.
 
 # Experiment Design
 

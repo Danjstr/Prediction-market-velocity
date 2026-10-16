@@ -121,7 +121,7 @@ Missing or incomplete prior-audit history is itself a finding.
 The auditor may rerun analyses needed for verification.
 
 Reruns must:
-- use only the development 70%;
+- use only the development pool;
 - not modify the audit candidate's code, configuration, or data;
 - write outputs separately from the audit candidate;
 - be recorded in the audit report, including what was run and what was found.
@@ -132,7 +132,7 @@ If a rerun does not reproduce a reported result, that is a finding.
 
 Protect the final holdout.
 
-Do not access the protected final 30% during the audit.
+Do not access the protected holdout during the audit.
 
 Verify, using HOLDOUT_ACCESS_LOG.md, the code, and the research record, whether holdout protection has been respected.
 

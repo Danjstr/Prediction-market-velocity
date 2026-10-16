@@ -135,9 +135,10 @@ In Phase 5.5, the ML Engineer is primary for the production-faithful implementat
 
 # Data Split Enforcement
 
-Respect the chronological split:
-- oldest approximately 70% for development;
-- newest approximately 30% as the protected final holdout.
+Respect chronological development and evaluation:
+- historical development data may be divided into chronological train/development partitions;
+- the protected final holdout is the cycle's protected evaluation set: a prospective protected interval beginning at a declared future start `T0` for the first cycle (preferred thereafter), never the newest share of an already-exposed historical dataset;
+- no period or observation exposed to development, historical or PMV-captured, may later be promoted into a protected holdout (CLAUDE.md Holdout Protection; START_HERE.md Protection of Holdout-Eligible Data).
 
 Never randomly shuffle the time series.
 
@@ -147,9 +148,9 @@ Enforce the split in code, not only by convention:
 - holdout access must require an explicit, deliberate, logged action;
 - every holdout access must be recorded in HOLDOUT_ACCESS_LOG.md.
 
-The ML Engineer must not access the protected final 30% except through the approved release-gate process in START_HERE.md: only after Gate 6, against the frozen and audited candidate, with no tuning against the result.
+The ML Engineer must not access the protected holdout except through the approved release-gate process in START_HERE.md: only after Gate 6, against the frozen and audited candidate, with no tuning against the result.
 
-Within the development 70%, implement walk-forward or rolling validation with purge and/or embargo as specified by the approved dataset design.
+Within the development pool, implement walk-forward or rolling validation with purge and/or embargo as specified by the approved dataset design.
 
 Fit every learned transformation, including normalization, encoders, feature selection, and calibration, only on the training portion of each fold.
 
@@ -205,7 +206,7 @@ The ML Engineer may implement and compare models using predictive, calibration, 
 
 Implement calibration methods designed in collaboration with, or reviewed by, the development Statistician. Final independent statistical validation of calibration remains with the Independent Statistical Auditor.
 
-Fit calibration only on data not used to train the underlying model, within the development 70%.
+Fit calibration only on data not used to train the underlying model, within the development pool.
 
 Version calibration artifacts separately from model artifacts, and record which model each calibrator belongs to.
 
