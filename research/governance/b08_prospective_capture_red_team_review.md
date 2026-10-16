@@ -182,3 +182,62 @@
   - RT-B8-06: memory bounds, before long real sessions are normalized;
   - the RT-B8-12 bounded-wait residual, which is informational.
 - **Recommendation: proceed.** B08 meets the charter's Red-Team bar, subject to the conditions carried forward in the decision record. Nothing here authorizes live capture or changes any gate status.
+
+## B8-2 modification (owner decision, frame format v3)
+
+- **Subject:** commit `b3e8269`, reviewed against `43c4283` (`git diff 43c4283 b3e8269 -- src tests docs`).
+- **Data and scope:** synthetic only, with no network access. `src/pmv/acquisition/` is still untouched.
+- **Tests:** the capture suites all passed (182). These were `tests/unit/test_capture_*.py`, `tests/integration/test_capture_replay.py`, and `tests/failure_injection/test_capture_crash_points.py`.
+- **New reproductions:**
+  - `$TMPDIR/rt8/r8_v3.py`: hand-built v3 objects, including the v2 draft;
+  - `$TMPDIR/rt8/r9_manifest.py`: relabelling the environment fields in a manifest.
+
+**(1) Integrity coverage and fail-closed behaviour: satisfied.**
+- Payload and event headers are closed schemas that now include `venue_environment` and `deployment_environment`, each validated against its enum.
+- `SegmentReader` refuses any frame whose identity differs from its segment header. `r8`, all with consistent hashes, shows the reader refuses each of these:
+  - payload with a different venue;
+  - payload with a different deployment;
+  - event with a different venue;
+  - event with a different deployment.
+- `scan_prefix` stops at the last good frame for each of those cases (tail `invalid_frame`), so salvage never includes a relabelled frame.
+- The segment header is still checked against the session reservation for venue, deployment, source, clock domain, and start (`_check_chain`), and `iter_frames` re-checks the venue.
+- The identity sits inside the canonical header bytes, so the segment SHA-256 and the hash chain cover it.
+- Consistent-manifest forgery: a frame relabelled with its manifest's SHA-256 and size recomputed is refused, because `_verify_finalized` runs the same per-frame check (test `test_reading_refuses_a_relabelled_frame_even_with_a_consistent_manifest`).
+- The writer passes the session's own environments, and the new writer test shows a mixed-environment segment cannot be finalized.
+
+**(2) Versions and compatibility: satisfied.**
+- The magic is `PMVRAW3`, the frame version 3, and the manifest `format_version` 3.
+- `detect_format` returns 2 for `PMVRAW2`, and the only code that calls it is in `capture_format`.
+- A v2-draft object is refused by name in `SegmentReader`. It is therefore refused in `summarize_segment`, finalization, `read_session`, and `iter_frames`, so it can never be normalized.
+- `scan_prefix` returns no header for it, so `salvage` raises `SalvageRefusedError`.
+- A v3-magic object containing frame-version-2 headers is refused by `_decode`.
+- v1 still checks its own magic.
+- The layout moved to `capture/v3/`, and nothing in `src` reads `capture/v2/`. A leftover draft-era tree is simply ignored, which is acceptable because the draft never held real data.
+- Nothing is redefined silently.
+
+**(3) No weakening found.**
+- Segment-level checks, the hash chain, `RENAME_NOREPLACE` finalization, deterministic serialization, the artifact derivation key, and the artifact record are all unchanged.
+- Artifact keys change only because segment bytes and hashes change.
+- Headers grow by about 60 bytes per frame, far below `MAX_HEADER_BYTES`.
+
+**(4) Timing, availability, observation semantics, research eligibility: no change.**
+- `observed_at`, `monotonic_ns`, sequence order, the dispositions, and the loader rules (`_require_use`) are unchanged.
+- The per-frame identity is redundant with the segment and session identity that loaders already use, and is checked to be equal to it.
+- No Statistician review is triggered.
+
+**(5) Regressions: none found** (182 tests passed).
+
+**(6) Documentation: accurate**, with one qualification.
+- The decision record's "Owner decisions" section, the frame-format section of `docs/raw_data.md`, and `docs/market_data.md` describe the change accurately: why it is v3, how the v2 draft is handled, the layout move, what is unchanged, and why there is no timing effect.
+- Qualification: `docs/raw_data.md` says the identity is covered by "the segment SHA-256, the hash chain, and the manifest". That is true of the manifest's object SHA-256. But the manifest's own `venue_environment` and `deployment_environment` fields are never compared with the header (RT-B8-15).
+
+| ID | Severity | Location | Description | Synthetic reproduction | Recommended fix |
+|---|---|---|---|---|---|
+| RT-B8-15 | MINOR (existed before this change) | `CaptureStore._verify_finalized` / `_parse_manifest` | A finalized manifest's descriptive fields (`venue_environment`, `deployment_environment`, and also `source`, `clock_domain`, `session_id` with its index) are not all cross-checked against the verified segment header and the reservation. Only `object`, `counts`, `chain`, `session_id`, `segment_index`, and the end type are checked. A manifest relabelled `production`/`production` on a synthetic test segment still passes `read_session` and `reconcile`. This fails closed for data use, because every reader and loader takes identity from the frame headers and the reservation, never from the manifest. A future tool that inventories manifests (backup, catalog, retention) would see a wrong label. | `r9_manifest.py`: "manifest env relabelled -> read_session ACCEPTED; session venue: synthetic". | In `_verify_finalized`, compare the manifest's environment, source, and clock-domain fields with the verified header (and the reservation), and refuse on any mismatch. Narrow the `docs/raw_data.md` wording, or rely on the fix. |
+
+### Verdict on the B8-2 modification
+
+- **No unresolved BLOCKING? YES.**
+- **MAJOR open? NO.**
+- **New MINOR:** RT-B8-15, which existed before this change and does not affect any loader. Earlier carried-forward MINOR findings (RT-B8-05, RT-B8-06) are unchanged.
+- **Recommendation: proceed.** The owner's modified B8-2 is implemented faithfully and fails closed for every frame kind. RT-B8-15 may be fixed now (it is small) or carried forward before any tool consumes manifest fields.

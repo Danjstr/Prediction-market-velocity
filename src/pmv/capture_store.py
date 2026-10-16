@@ -1414,6 +1414,32 @@ class CaptureStore:
             raise CaptureIntegrityError("a segment does not match its manifest")
         if (manifest.end is not SegmentEnd.ROLLOVER) != summary.session_closed:
             raise CaptureIntegrityError("a segment's end does not match its frames")
+        # The manifest's descriptive identity must equal the verified segment header, so a
+        # tool that reads manifests alone can never see a relabelled segment (RT-B8-15).
+        header = summary.header
+        described = (
+            manifest.document["segment_id"],
+            manifest.document["venue_environment"],
+            manifest.document["deployment_environment"],
+            manifest.document["clock_domain"],
+            manifest.document["source"],
+            _mapping(manifest.document["time"])["session_started_at"],
+        )
+        verified = (
+            segment_id(header.session_id, header.segment_index),
+            header.venue_environment.value,
+            header.deployment_environment,
+            header.clock_domain,
+            {
+                "endpoint_id": header.endpoint_id,
+                "feed_id": header.feed_id,
+                "source_id": header.source_id,
+                "transport": header.transport,
+            },
+            header.session_started_at,
+        )
+        if described != verified or header.session_id != session_id:
+            raise CaptureIntegrityError("a manifest's identity does not match its segment header")
         return manifest, mode == 0o500
 
     def _finalized_header(

@@ -862,3 +862,32 @@ def test_reading_refuses_a_relabelled_frame_even_with_a_consistent_manifest(
     directory.chmod(0o500)
     with pytest.raises(CaptureIntegrityError, match="environment differs"):
         store.read_session(session_id)
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["venue_environment", "deployment_environment", "clock_domain", "source"],
+)
+def test_a_relabelled_manifest_is_refused(root: Path, store: CaptureStore, field: str) -> None:
+    """RT-B8-15: a manifest's identity must equal its verified segment header."""
+    import json
+
+    from pmv.integrity import canonical_json
+
+    session_id = capture(store, root, [b"payload"])
+    directory = segment_dir(root, session_id, 0)
+    manifest = writable(directory / "manifest.json")
+    document = json.loads(manifest.read_bytes())
+    document[field] = {
+        "venue_environment": "production",
+        "deployment_environment": "production",
+        "clock_domain": "e" * 32,
+        "source": {**document["source"], "endpoint_id": "other_ws"},
+    }[field]
+    manifest.write_bytes(canonical_json(document) + b"\n")
+    manifest.chmod(0o400)
+    directory.chmod(0o500)
+    with pytest.raises(CaptureIntegrityError, match="identity does not match"):
+        store.read_session(session_id)
+    with pytest.raises(CaptureIntegrityError, match="identity does not match"):
+        store.reconcile()

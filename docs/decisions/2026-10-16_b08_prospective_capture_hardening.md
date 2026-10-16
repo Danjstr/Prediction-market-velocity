@@ -70,7 +70,10 @@ The owner reviewed B8-1 to B8-7 explicitly, before the B08 pull request, and dec
 - **Store layout.** It moved from `capture/v2/` to `capture/v3/`, and segment manifests record `format_version` 3.
 - **Unchanged:** the segment-level checks, the hash chain, deterministic serialization, and the artifact key derivation. Artifact keys change only because segment hashes change.
 - **No timing effect.** Timing, availability, observation semantics, and research eligibility are unchanged, so no new Statistician review was triggered (the owner's B8-2 instruction, item 5).
-- **Review.** A focused Red-Team re-review of the change is recorded in `research/governance/b08_prospective_capture_red_team_review.md` ("B8-2 modification").
+- **Review.** A focused Red-Team re-review of `b3e8269` is in `research/governance/b08_prospective_capture_red_team_review.md` ("B8-2 modification").
+  - Verdict: proceed, with no BLOCKING and no MAJOR finding. Identity is fail-closed on every frame kind, nothing is reinterpreted, and nothing is weakened.
+  - It found no change to timing, availability, observation semantics, or eligibility.
+  - It raised MINOR RT-B8-15, which predates the change: a manifest's descriptive identity was never compared with its segment header. It is now fixed. `_verify_finalized` refuses a manifest whose environments, source, clock domain, session start, or segment ID differ from the verified header.
 
 ## Not changed
 

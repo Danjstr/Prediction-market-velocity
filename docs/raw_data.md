@@ -145,7 +145,8 @@ Version rules:
 
 **Every frame header carries the environment identity (owner decision B8-2, as modified; RT-B2-09):** `venue_environment` and `deployment_environment`.
 - A frame's values must equal its segment header's. Otherwise the reader refuses the object, salvage stops before that frame, and `read_session` reports an integrity failure. This holds even when the manifest was rewritten to match.
-- The identity is part of the canonical frame header. The segment SHA-256, the hash chain, and the manifest therefore cover it.
+- The identity is part of the canonical frame header, so the segment SHA-256, the hash chain, and the manifest's object hash cover it.
+- The manifest's own descriptive fields (environments, source, clock domain, session start, segment ID) must also equal the verified segment header, or the segment is refused (RT-B8-15).
 
 | Kind | Fields |
 |---|---|
