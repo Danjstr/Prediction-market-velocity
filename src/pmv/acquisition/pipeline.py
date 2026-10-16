@@ -32,7 +32,7 @@ commit and the reviewed commit as ancestors of ``HEAD`` with no acquisition-code
 since the review, an A-4 record that says A-4 is satisfied, and a reviewed production
 transport. **No production transport exists, so a real run always refuses today.** The
 caller cannot change that: in real mode the transport must be listed in the code-level
-``PRODUCTION_TRANSPORTS`` registry (empty) and defined in this package, and every Git fact
+``PRODUCTION_TRANSPORTS`` registry (empty; class objects compared by identity), and every Git fact
 is read from the tool's own checkout (``TOOL_ROOT``), never from an injected repository
 (RT-B7-02).
 
@@ -110,6 +110,7 @@ from pmv.acquisition.records import (
     acquisition_gate_failures,
 )
 from pmv.acquisition.state import ACQUISITION_NAME, AcquisitionState, FileState, StateError, replay
+from pmv.acquisition.worker_protocol import RefusalCode
 from pmv.config import protected_raw_root_problem
 from pmv.data_access_guard import PROTECTED_ROOT
 from pmv.integrity import FormatError, canonical_json, canonical_line, parse_canonical_json
@@ -140,10 +141,21 @@ _ENVIRONMENTAL: Final = frozenset(
         isolation.IsolationFailure.ABNORMAL_EXIT,
     }
 )
-# Reviewed production transports, by qualified class name. Empty: none exists (B7-4).
+# Worker refusals that may come from the environment rather than the input (an unexercised
+# library path, or memory): stop without rejecting, like _ENVIRONMENTAL (RT-B7-04).
+_WORKER_ENVIRONMENTAL: Final = frozenset(
+    {
+        RefusalCode.INTERNAL_ERROR,
+        RefusalCode.RESOURCE_EXHAUSTED,
+        RefusalCode.LIMITS_NOT_APPLIED,
+        RefusalCode.CONFINEMENT_FAILED,
+    }
+)
+# Reviewed production transports, as class objects compared by identity, so a caller's class
+# cannot impersonate one by name (RT-B7-12). Empty: none exists (B7-4).
 # Adding one is a change to acquisition code, so it needs a fresh A-4 review, and a real
 # run refuses while any acquisition code differs from the reviewed commit (RT-B7-02).
-PRODUCTION_TRANSPORTS: Final[frozenset[str]] = frozenset()
+PRODUCTION_TRANSPORTS: Final[frozenset[type]] = frozenset()
 # The tool's own checkout; a real run always reads Git facts from here, never from a caller.
 TOOL_ROOT: Final = Path(__file__).resolve().parents[3]
 
@@ -712,10 +724,8 @@ class AcquisitionPipeline:
         if any(is_synthetic(identifier) for identifier in identifiers) or prepared.policy.synthetic:
             failures.append("mode: a real run refuses synthetic records")
         kind = type(self._transport)
-        if (
-            getattr(self._transport, "synthetic", None) is not False
-            or not kind.__module__.startswith("pmv.acquisition.")
-            or f"{kind.__module__}.{kind.__qualname__}" not in PRODUCTION_TRANSPORTS
+        if getattr(self._transport, "synthetic", None) is not False or not any(
+            kind is registered for registered in PRODUCTION_TRANSPORTS
         ):
             failures.append("G-4: no reviewed production transport")
         if self._backup.synthetic:
@@ -1094,6 +1104,8 @@ class _Run:
         try:
             return call()
         except isolation.WorkerRefusedError as refused:
+            if refused.code in _WORKER_ENVIRONMENTAL:
+                raise PipelineError(f"isolation_{refused.code.value}") from None
             raise _RejectedError("parser", refused.code.value) from None
         except ArchiveRefusedError:
             raise _RejectedError("parser", "archive_refused") from None

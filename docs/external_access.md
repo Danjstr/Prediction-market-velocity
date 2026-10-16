@@ -89,7 +89,14 @@ Acquisition means any download of a historical market dataset, whether free or p
 | A-7 | **Protected storage.** The data lands in the protected raw store (`docs/raw_data.md`), written by a tool running outside agent sessions. It is never written to agent-readable storage. | Raw manifest |
 | A-8 | **Release is separate.** Acquisition releases nothing. Agents see a row only through the H-2 per-row release, after a cycle with a committed `T0` and margin exists. Until the release tool exists, nothing acquired is agent-visible. | — |
 
-**Tooling status (B06, 2026-10-16).** The source-neutral building blocks for A-1 host and prefix enforcement (including §1.1 rules 1 and 8), A-3 restore verification, A-4 safe parsing and extraction, and A-5 and A-6 records exist in `src/pmv/acquisition/`, with every A-4 fault-injection fixture. They were tested on synthetic data only. A-4 is not yet satisfied; the remaining gaps are listed in `docs/acquisition_readiness.md`.
+**Tooling status (B07, 2026-10-16).** The source-neutral tooling exists in `src/pmv/acquisition/`, with every A-4 fault-injection fixture:
+- A-1 host and prefix enforcement, including §1.1 rules 1 and 8, and per-redirect re-authorization in the fetcher;
+- A-3 restore verification;
+- A-4 safe parsing and extraction, in an isolated, rlimited, seccomp-confined worker process;
+- A-5 and A-6 records;
+- an end-to-end pipeline into the protected raw store that releases nothing (A-7, A-8).
+
+It was tested on synthetic data only. A-4 is not yet satisfied: the Parquet, DBN, and zstd readers are deferred for owner dependency approval, and there is no production network transport. Acquisition is not authorized. The remaining gaps are listed in `docs/acquisition_readiness.md`.
 
 **Licence lineage.** Licence lineage is a required field (`input_licence_ids`) in every dataset, feature, model, and audit-candidate manifest. That includes PMV captures, whose `licence_id` records the venue terms in force. A manifest without the field fails closed.
 

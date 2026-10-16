@@ -1,8 +1,9 @@
 """Trusted parent for isolated parsing and extraction (G-1).
 
 ``run_worker`` starts the parse worker (``parse_worker``) as a separate process:
-- the same interpreter, run with ``-I`` (no environment variables, user site, or working
-  directory on the import path);
+- the same interpreter, run with ``-I -S`` (no environment variables, no site directories,
+  so no ``.pth`` or ``sitecustomize`` code, and no working directory on the import path),
+  with only the ``pmv`` package root added to the import path;
 - an empty environment, ``/`` as working directory, and a new session (its own process
   group, no controlling terminal);
 - only three descriptors: the input file on fd 0, opened read-only by this process, the
@@ -139,12 +140,25 @@ def expected_identity() -> dict[str, object]:
     return worker_identity()
 
 
+# The worker runs with ``-I -S``: no environment variables, no user or system site
+# directory, so no ``.pth`` file, ``sitecustomize``, or ``usercustomize`` code runs before
+# confinement (RT-B7-13). The project has no runtime dependency, so the only path the worker
+# needs is the directory that contains the ``pmv`` package, added explicitly.
+_PACKAGE_ROOT: Final = str(Path(__file__).resolve().parents[2])
+_BOOTSTRAP: Final = (
+    "import sys; sys.path.insert(0, sys.argv[1]); del sys.argv[1]; import runpy; "
+    "runpy.run_module('pmv.acquisition.parse_worker', run_name='__main__', alter_sys=True)"
+)
+
+
 def _command(parameters: Mapping[str, object]) -> list[str]:
     return [
         sys.executable,
         "-I",
-        "-m",
-        "pmv.acquisition.parse_worker",
+        "-S",
+        "-c",
+        _BOOTSTRAP,
+        _PACKAGE_ROOT,
         canonical_json(dict(parameters)).decode("ascii"),
     ]
 

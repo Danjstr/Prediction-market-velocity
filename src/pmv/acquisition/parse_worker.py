@@ -1,6 +1,7 @@
 """The isolated parse worker (G-1). Run only by ``isolation.run_worker``, never by hand.
 
-Started as ``python -I -m pmv.acquisition.parse_worker <parameters>`` with no environment,
+Started as ``python -I -S -c <bootstrap> <package root> <parameters>``
+(``isolation._command``) with no environment,
 ``/`` as its working directory, a new session, resource limits set by the parent, and three
 descriptors: the input file on fd 0 (opened read-only by the parent), the output pipe on
 fd 1, and ``/dev/null`` on fd 2. It never receives a path to read.
@@ -36,7 +37,6 @@ import os
 import platform
 import stat
 import sys
-import sysconfig
 import zipfile
 import zlib
 from collections.abc import Mapping
@@ -85,7 +85,7 @@ def worker_identity() -> dict[str, object]:
         "python": platform.python_version(),
         "implementation": sys.implementation.name,
         "executable_sha256": _file_sha256(Path(os.path.realpath(sys.executable))),
-        "startup_hooks_sha256": _startup_hooks_sha256(),
+        "launch": "python -I -S (no site, .pth, or sitecustomize code)",
         "zlib_runtime": zlib.ZLIB_RUNTIME_VERSION,
         "modules": modules,
         "readers": {fmt.value: spec.identity() for fmt, spec in readers.READERS.items()},
@@ -97,23 +97,6 @@ def _file_sha256(path: Path) -> str:
     with path.open("rb") as handle:
         while chunk := handle.read(1024 * 1024):
             digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _startup_hooks_sha256() -> str:
-    """Hash of every ``.pth`` file in the interpreter's site directories.
-
-    ``.pth`` files run at interpreter start, before confinement, so they are part of the
-    code that the worker's identity must pin.
-    """
-    digest = hashlib.sha256()
-    directories = {sysconfig.get_path("purelib"), sysconfig.get_path("platlib")}
-    for directory in sorted(entry for entry in directories if os.path.isdir(entry)):
-        for name in sorted(os.listdir(directory)):
-            if name.endswith(".pth"):
-                path = Path(directory, name)
-                digest.update(f"{path}\0".encode())
-                digest.update(_file_sha256(path).encode())
     return digest.hexdigest()
 
 
@@ -403,6 +386,9 @@ def main(argv: list[str]) -> int:
         operation = wp.Operation(str(document["operation"]))
         limits = document["limits"]
         assert isinstance(limits, dict)  # noqa: S101 - validated by parse_parameters
+        if sys.flags.isolated != 1 or sys.flags.no_site != 1:
+            # Started without -I -S: site code may have run before confinement (RT-B7-13).
+            raise _RefusedError(wp.RefusalCode.CONFINEMENT_FAILED)
         try:
             confinement.verify_limits(limits)
         except confinement.ConfinementError:

@@ -23,6 +23,7 @@ from pmv.acquisition.hosts import UrlAllowlist
 from pmv.acquisition.isolation import (
     IsolationError,
     IsolationFailure,
+    WorkerRefusedError,
     expected_identity,
     run_worker,
     verify_isolation,
@@ -37,6 +38,7 @@ from pmv.acquisition.receipts import (
     new_session_id,
     recover_torn_tail,
 )
+from pmv.integrity import canonical_json
 
 
 def test_failed_intake_leaves_no_partial_file_in_quarantine(tmp_path: Path) -> None:
@@ -182,10 +184,10 @@ def test_identity_is_checked_before_any_frame_is_acted_on(tmp_path: Path) -> Non
     assert seen == []
 
 
-def test_worker_identity_pins_interpreter_and_startup_hooks() -> None:
+def test_worker_identity_pins_interpreter_and_launch() -> None:
     identity = expected_identity()
     assert len(str(identity["executable_sha256"])) == 64
-    assert len(str(identity["startup_hooks_sha256"])) == 64
+    assert "-S" in str(identity["launch"])
     assert "pmv.integrity" in identity["modules"]  # type: ignore[operator]
 
 
@@ -349,6 +351,76 @@ def test_worker_timeout_in_the_pipeline_stops_without_rejecting(
     inputs = syn.inputs([syn.planned_file("a.csv", schema=syn.csv_schema(("a", "integer")))])
     monkeypatch.setattr("pmv.acquisition.isolation.verify_file", timed_out)
     with pytest.raises(pipeline_module.PipelineError, match="isolation_timeout"):
+        pipeline.run(inputs)
+    monkeypatch.undo()
+    assert pipeline.run(inputs).outcome is pipeline_module.Outcome.COMPLETED
+
+
+# --- B07 Red-Team round 2 regressions (RT-B7-12, RT-B7-13, RT-B7-04 residual) -------------
+
+
+def test_a_worker_started_with_site_processing_refuses() -> None:
+    with pytest.raises(IsolationError) as caught:
+        run_worker(
+            wp.Operation.PROBE,
+            {},
+            input_fd=None,
+            limits=WorkerLimits(wall_clock_seconds=60.0),
+            command=[
+                sys.executable,
+                "-I",
+                "-m",
+                "pmv.acquisition.parse_worker",
+                canonical_json(
+                    {"operation": "probe", "limits": WorkerLimits().as_parameters()}
+                ).decode("ascii"),
+            ],
+        )
+    assert caught.value.failure is IsolationFailure.NOT_CONFINED
+
+
+def test_registered_transports_are_matched_by_identity_not_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Registered(syn.SyntheticTransport):
+        pass
+
+    class Impostor(syn.SyntheticTransport):
+        pass
+
+    Impostor.__module__ = Registered.__module__
+    Impostor.__qualname__ = Registered.__qualname__
+    monkeypatch.setattr(pipeline_module, "PRODUCTION_TRANSPORTS", frozenset({Registered}))
+    assert any(Registered is kind for kind in pipeline_module.PRODUCTION_TRANSPORTS)
+    assert not any(Impostor is kind for kind in pipeline_module.PRODUCTION_TRANSPORTS)
+
+
+def test_worker_internal_error_stops_without_rejecting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in ("store", "backup", "restore"):
+        (tmp_path / name).mkdir(mode=0o700)
+
+    def internal(*_args: object, **_kwargs: object) -> object:
+        raise WorkerRefusedError(wp.RefusalCode.INTERNAL_ERROR, None)
+
+    transport = syn.SyntheticTransport({syn.PREFIX + "a.csv": syn.ok(b"a\n1\n")})
+    pipeline = pipeline_module.AcquisitionPipeline(
+        pipeline_module.PipelineSettings(
+            tmp_path / "store",
+            pipeline_module.RunMode.SYNTHETIC,
+            worker_limits=WorkerLimits(wall_clock_seconds=60.0),
+            fetch_policy=FetchPolicy(free_space_margin_bytes=0),
+        ),
+        transport=transport,
+        backup=pipeline_module.DirectoryBackupTarget(
+            "synthetic_backup_policy", tmp_path / "backup", tmp_path / "restore"
+        ),
+        repository=syn.StaticRepository(),
+    )
+    inputs = syn.inputs([syn.planned_file("a.csv", schema=syn.csv_schema(("a", "integer")))])
+    monkeypatch.setattr("pmv.acquisition.isolation.verify_file", internal)
+    with pytest.raises(pipeline_module.PipelineError, match="isolation_internal_error"):
         pipeline.run(inputs)
     monkeypatch.undo()
     assert pipeline.run(inputs).outcome is pipeline_module.Outcome.COMPLETED
