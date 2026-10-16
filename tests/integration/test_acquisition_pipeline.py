@@ -9,6 +9,7 @@ import ast
 import gzip
 import io
 import json
+import subprocess
 import tarfile
 import zipfile
 from dataclasses import dataclass, replace
@@ -402,7 +403,11 @@ def test_synthetic_mode_refuses_the_protected_area(
     assert "A-7: a synthetic run must not write inside ~/pmv-protected" in failures
 
 
-def test_real_mode_refuses_synthetic_records(env: Env) -> None:
+def test_real_mode_refuses_synthetic_records(
+    env: Env, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _tool_checkout(tmp_path / "tool", commit_records=True)
+    monkeypatch.setattr(pipeline_module, "TOOL_ROOT", tmp_path / "tool")
     inputs, transport = _csv_inputs()
     failures = _refused(env, inputs, transport, mode=RunMode.REAL)
     assert "mode: a real run refuses synthetic records" in failures
@@ -410,7 +415,11 @@ def test_real_mode_refuses_synthetic_records(env: Env) -> None:
     assert "A-7: a real store root must resolve inside the protected raw location" in failures
 
 
-def test_real_mode_refuses_even_with_every_git_fact_true(env: Env) -> None:
+def test_real_mode_refuses_even_with_every_git_fact_true(
+    env: Env, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _tool_checkout(tmp_path / "tool", commit_records=True)
+    monkeypatch.setattr(pipeline_module, "TOOL_ROOT", tmp_path / "tool")
     inputs, transport = _csv_inputs()
     repository = syn.StaticRepository("e" * 40, True, True, True, True)
     failures = _refused(env, inputs, transport, mode=RunMode.REAL, repository=repository)
@@ -419,13 +428,96 @@ def test_real_mode_refuses_even_with_every_git_fact_true(env: Env) -> None:
     assert "A-4: the A-4 record does not say A-4 is satisfied" in failures
 
 
-def test_real_mode_checks_git_facts(env: Env) -> None:
+def _git(root: Path, *arguments: str) -> str:
+    result = subprocess.run(  # noqa: S603 - fixed git commands on a temporary repository
+        [  # noqa: S607 - git from PATH, as GitRepository uses it
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=synthetic",
+            "-c",
+            "user.email=synthetic@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            *arguments,
+        ],
+        capture_output=True,
+        check=True,
+    )
+    return result.stdout.decode().strip()
+
+
+def _tool_checkout(root: Path, *, commit_records: bool) -> str:
+    """A temporary, real Git checkout standing in for the tool's own repository.
+
+    Real mode reads every Git fact from ``pipeline.TOOL_ROOT``; tests point that at this
+    repository so the facts are constructed explicitly, never taken from ``/workspace``.
+    """
+    root.mkdir()
+    _git(root, "init", "-q")
+    (root / "src" / "pmv" / "acquisition").mkdir(parents=True)
+    (root / "src" / "pmv" / "acquisition" / "tool.py").write_text("TOOL = 1\n")
+    paths = ["src/pmv/acquisition/tool.py"]
+    if commit_records:
+        for record in (syn.DECISION, syn.REVIEW):
+            (root / record).parent.mkdir(parents=True, exist_ok=True)
+            (root / record).write_text("synthetic placeholder record\n")
+            paths.append(record)
+    _git(root, "add", *paths)
+    _git(root, "commit", "-q", "-m", "synthetic baseline")
+    return _git(root, "rev-parse", "HEAD")
+
+
+A5_DIRTY = "A-5: the acquisition tool must run from a clean, committed tree"
+RECORDS = "records: a cited decision or review file is not committed unchanged"
+
+
+def test_real_mode_checks_git_facts(
+    env: Env, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    checkout = tmp_path / "tool"
+    _tool_checkout(checkout, commit_records=False)
+    # A tracked, uncommitted change to the acquisition tool.
+    (checkout / "src" / "pmv" / "acquisition" / "tool.py").write_text("TOOL = 2\n")
+    monkeypatch.setattr(pipeline_module, "TOOL_ROOT", checkout)
     inputs, transport = _csv_inputs()
     failures = _refused(env, inputs, transport, mode=RunMode.REAL)
-    assert "A-5: the acquisition tool must run from a clean, committed tree" in failures
-    assert "records: a cited decision or review file is not committed unchanged" in failures
+    assert A5_DIRTY in failures
+    assert RECORDS in failures
     assert "F-09: the approval's F-09 commit is not an ancestor of HEAD" in failures
     assert "A-4: the acquisition code changed since its review" in failures
+
+
+def test_real_mode_refuses_an_untracked_file_in_the_tool_tree(
+    env: Env, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    checkout = tmp_path / "tool"
+    _tool_checkout(checkout, commit_records=False)
+    (checkout / "src" / "pmv" / "acquisition" / "planted.py").write_text("X = 1\n")
+    monkeypatch.setattr(pipeline_module, "TOOL_ROOT", checkout)
+    inputs, transport = _csv_inputs()
+    assert A5_DIRTY in _refused(env, inputs, transport, mode=RunMode.REAL)
+
+
+def test_real_mode_reads_clean_committed_git_facts(
+    env: Env, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    checkout = tmp_path / "tool"
+    head = _tool_checkout(checkout, commit_records=True)
+    monkeypatch.setattr(pipeline_module, "TOOL_ROOT", checkout)
+    inputs, transport = _csv_inputs()
+    inputs = _with(inputs, "approval", f09_settings_commit=head)
+    inputs = _with(inputs, "a4_review", reviewed_commit=head)
+    failures = _refused(env, inputs, transport, mode=RunMode.REAL)
+    # A clean, committed checkout produces none of the Git-fact failures...
+    assert A5_DIRTY not in failures
+    assert RECORDS not in failures
+    assert "F-09: the approval's F-09 commit is not an ancestor of HEAD" not in failures
+    assert "A-4: the acquisition code changed since its review" not in failures
+    # ...and the run is still refused for the reasons that do not depend on Git.
+    assert "G-4: no reviewed production transport" in failures
+    assert "mode: a real run refuses synthetic records" in failures
 
 
 # --- structural boundaries ----------------------------------------------------------------

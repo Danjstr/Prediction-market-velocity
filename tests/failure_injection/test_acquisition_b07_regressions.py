@@ -267,7 +267,19 @@ def test_synthetic_root_through_a_symlink_into_the_protected_area_is_refused(
     assert not pipeline_module._inside(tmp_path / "elsewhere", protected)
 
 
-def test_real_mode_ignores_caller_supplied_transport_and_repository(tmp_path: Path) -> None:
+def test_real_mode_ignores_caller_supplied_transport_and_repository(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The tool checkout is a temporary repository that does not track the placeholder
+    # records, so the Git facts are fixed by the test, not by /workspace.
+    checkout = tmp_path / "tool"
+    checkout.mkdir()
+    _git(checkout, "init", "-q")
+    (checkout / "README").write_text("synthetic\n")
+    _git(checkout, "add", "README")
+    _git(checkout, "commit", "-q", "-m", "synthetic baseline")
+    monkeypatch.setattr(pipeline_module, "TOOL_ROOT", checkout)
+
     class DeclaredProduction(syn.SyntheticTransport):
         pass
 
