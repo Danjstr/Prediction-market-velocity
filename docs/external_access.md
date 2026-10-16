@@ -58,7 +58,7 @@ Each batch record counts:
 ### 1.4 Enforcement status
 
 - **Today:** for Bash network access, the sandbox egress proxy allowlist and owner per-host prompts. For WebFetch and WebSearch, Claude Code tool permissions and this rule. Which network controls actually apply to WebFetch and WebSearch is **unverified**, and no claim is made that the proxy covers them. A proxy prompt shows the host, not its class, so a mistaken owner click remains possible. The proxy refusal that stopped the batch 3 near miss depended on an owner click.
-- **Not yet in place:** deterministic WebFetch deny rules for the `live-data`, `live-display`, and `trading-private` classes in `.claude/settings.json` (Step 11 F-09). Agents cannot edit that file. An owner-appliable patch, built on verified Claude Code permission semantics, is in `docs/owner_actions/` (README.md). Verified limits: prefix patterns such as `api.*.*` bind WebFetch only; only exact hosts and leading `*.` patterns also bind the Bash sandbox; WebFetch rules cannot match paths, and WebSearch cannot be domain-restricted. Rules 8–10 of §1.1 therefore stay rule-governed even after the patch. Until the owner commits it, this policy is rule-governed only.
+- **In place (B06, `8517fc2`, owner-applied 2026-10-16; behavioral check passed):** deterministic WebFetch deny rules for the `live-data`, `live-display`, and `trading-private` classes in `.claude/settings.json` (Step 11 F-09). Agents cannot edit that file. The applied patch and its validation are in `docs/owner_actions/` (README.md). Verified limits: prefix patterns such as `api.*.*` bind WebFetch only; only exact hosts and leading `*.` patterns also bind the Bash sandbox; WebFetch rules cannot match paths, and WebSearch cannot be domain-restricted. Rules 8–10 of §1.1 therefore stay rule-governed even with the denies in place.
 - Committed F-09 class denies are required before the first historical acquisition (A-1), before Phase 1 real collection, and before any agent web research (WebFetch or WebSearch) after a cycle's `T0 − m` (§3). The owner designated this a priority blocker.
 - **Fail-closed web access from `T0 − m` (owner ruling E-B4-4).** Before `T0 − m`, committed F-09 class denies are sufficient. From `T0 − m` until the protected holdout is consumed, agent web access (WebFetch, and WebSearch, which cannot be host-restricted) fails closed by default, except for owner-listed permitted hosts. The mechanism is chosen and committed before `T0 − m` (options in `docs/owner_actions/README.md`).
 
@@ -89,7 +89,14 @@ Acquisition means any download of a historical market dataset, whether free or p
 | A-7 | **Protected storage.** The data lands in the protected raw store (`docs/raw_data.md`), written by a tool running outside agent sessions. It is never written to agent-readable storage. | Raw manifest |
 | A-8 | **Release is separate.** Acquisition releases nothing. Agents see a row only through the H-2 per-row release, after a cycle with a committed `T0` and margin exists. Until the release tool exists, nothing acquired is agent-visible. | — |
 
-**Tooling status (B06, 2026-10-16).** The source-neutral building blocks for A-1 host and prefix enforcement (including §1.1 rules 1 and 8), A-3 restore verification, A-4 safe parsing and extraction, and A-5 and A-6 records exist in `src/pmv/acquisition/`, with every A-4 fault-injection fixture. They were tested on synthetic data only. A-4 is not yet satisfied; the remaining gaps are listed in `docs/acquisition_readiness.md`.
+**Tooling status (B07, 2026-10-16).** The source-neutral tooling exists in `src/pmv/acquisition/`, with every A-4 fault-injection fixture:
+- A-1 host and prefix enforcement, including §1.1 rules 1 and 8, and per-redirect re-authorization in the fetcher;
+- A-3 restore verification;
+- A-4 safe parsing and extraction, in an isolated, rlimited, seccomp-confined worker process;
+- A-5 and A-6 records;
+- an end-to-end pipeline into the protected raw store that releases nothing (A-7, A-8).
+
+It was tested on synthetic data only. A-4 is not yet satisfied: the Parquet, DBN, and zstd readers are deferred for owner dependency approval, and there is no production network transport. Acquisition is not authorized. The remaining gaps are listed in `docs/acquisition_readiness.md`.
 
 **Licence lineage.** Licence lineage is a required field (`input_licence_ids`) in every dataset, feature, model, and audit-candidate manifest. That includes PMV captures, whose `licence_id` records the venue terms in force. A manifest without the field fails closed.
 

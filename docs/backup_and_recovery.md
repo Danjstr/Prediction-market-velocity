@@ -160,7 +160,7 @@ If any prerequisite stops holding (for example, the ruleset is disabled, gains a
 
 **Workflow:**
 
-1. Create the task branch (`bNN/<short-purpose>`) from the current active ground-truth branch in `docs/BRANCH_TIMELINE.md`, after verifying with `git merge-base --is-ancestor` that it descends from that branch's recorded head. Never start from `main` or an older branch while a newer cumulative branch exists (START_HERE.md "Repository Continuity"). Record the new branch in `docs/BRANCH_TIMELINE.md`. Agents never commit to or push `main`.
+1. Create the task branch (`bNN/<short-purpose>`) from the current active ground-truth branch in `docs/BRANCH_TIMELINE.md`, after verifying with `git merge-base --is-ancestor` that it descends from that branch's recorded head. Never start from `main` or an older branch while a newer cumulative branch exists (START_HERE.md "Repository Continuity"). Add the new branch's row to `docs/BRANCH_TIMELINE.md`, and mark it active, only once the owner has designated it as active through a batch charter or decision record cited in that row (`docs/BRANCH_TIMELINE.md`, "Procedure for the next branch", step 4). Agents never commit to or push `main`.
 2. Implement within the approved batch scope.
 3. Run `./scripts/check.sh`. A failure, or an inability to run it, blocks the checkpoint exactly as in the local workflow: nothing is committed or pushed.
 4. Inspect the exact diff. Stage explicit paths only (never `git add -A`; see the rules above), confirm with `git diff --cached --name-only`, then commit with a meaningful message.

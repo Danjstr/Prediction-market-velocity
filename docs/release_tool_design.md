@@ -44,7 +44,7 @@ Notation (from `docs/phase2.md` Policy 2): `B` is the protected start (for the f
 - the committed protected-scope registry and its cycle (`B`, `m`, `E`), verified as the guard verifies it (`python -m pmv.protected_scope verify-history`);
 - the shared source catalog: per `source_id`, every field's role (observation time, observable value, label channel, as-of), its equivalent-observable families, and its time field;
 - the contract-lifecycle metadata needed for `I(k)` (H-3 point-in-time metadata; `POST_HOC` rows use the synthetic finalization rule in Policy 3);
-- the acquisition manifest and receipt journal (`src/pmv/acquisition/receipts.py`), so only verified raw bytes are cut. Journal entries are not yet bound to a manifest or approval (RT-B6-27, part of G-6); that binding is a prerequisite for using the journal this way.
+- the acquisition record (`acquisition.json`) and receipt journal written by the acquisition pipeline (`src/pmv/acquisition/pipeline.py`, `receipts.py`), so only verified raw bytes are cut. Since B07, pipeline journal entries are bound to the acquisition and to the hash of its authorizing bundle (RT-B6-27). Entries from the B06 `Quarantine` class (v1) stay unbound and are not a release input.
 
 ## Prerequisite chain (each step gates the next)
 

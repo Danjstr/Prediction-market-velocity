@@ -46,6 +46,22 @@ Real market captures are holdout-eligible plaintext. The deterministic collector
 
 Source, feed, and endpoint identifiers match `[a-z][a-z0-9_]{0,63}` and come from our code or configuration, never from URLs or server-provided strings.
 
+## Historical acquisitions (B07)
+
+Historical files acquired by the acquisition pipeline (`src/pmv/acquisition/pipeline.py`; `docs/acquisition_readiness.md`) are kept in their own tree. They are not capture frames. In a real run, the store root must resolve inside `~/pmv-protected/raw`. A synthetic run refuses any root inside `~/pmv-protected`.
+
+```
+<store_root>/acquisitions/v1/
+  journal.jsonl                                      hash-chained receipt and state journal
+  .lock                                              one run at a time
+  work/<acquisition_id>/{quarantine,evidence,scratch}/  working area (scratch: derived plaintext, deleted)
+  store/<source_id>/<acquisition_id>/<file>          exact received bytes (0400); directory 0500 when complete
+  store/<source_id>/<acquisition_id>/acquisition.json   provenance record (0400)
+  rejected/<acquisition_id>/  orphans/<acquisition_id>/  set-aside bytes, never deleted
+```
+
+Storing is not releasing (A-8): nothing here is agent-visible. No real acquisition has run.
+
 ## Raw object format `pmv.raw.frames` v1
 
 File magic `PMVRAW1\n`, then frames. Each frame: 4-byte big-endian header length, 8-byte big-endian payload length, canonical JSON header (sorted keys, no spaces, ASCII, no floats), payload bytes.

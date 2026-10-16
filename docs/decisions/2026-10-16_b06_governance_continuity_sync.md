@@ -35,6 +35,8 @@ The partial work was kept, carried onto B06, verified against the charter item b
 
 ## Stale contradictions
 
+> **Status note (B07, 2026-10-16).** The owner applied both patches listed below in `8517fc2` (agent files and `.claude/settings.json`), and B06 was merged by PR #5 (`2314326`). The entries below describe the state when this record was written.
+
 - **Agent files (`.claude/agents/`, six files).** These still use the literal "oldest ~70% / newest ~30%" wording. The sandbox mounts them read-only, so this session cannot write them, and it did not try to bypass that. The CLAUDE.md and START_HERE.md definition governs how they are read. An owner-applicable patch, verified on 2026-10-16 to apply cleanly to B06 and to leave no stale term, is in `docs/owner_actions/`.
 - **HOLDOUT_ACCESS_LOG.md Holdout Rules.** These are hash-pinned (HAL-0005) and were not changed. CLAUDE.md "Holdout Protection" and START_HERE.md "Evaluation Cycles" state that the current prospective-holdout semantics govern how that historical restatement is read.
 - **`.claude/settings.json` (F-09).** The file is read-only in the sandbox. An owner-applicable patch, based on Claude Code permission semantics verified on 2026-10-16, is in `docs/owner_actions/`. It still applies cleanly to B06 and yields valid JSON.

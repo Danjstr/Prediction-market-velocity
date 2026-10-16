@@ -2,36 +2,49 @@
 
 Working record for Phase 1. The authoritative requirements are START_HERE.md (Phase 1, Gate 1, Project-Wide Controls), CLAUDE.md, and PROJECT_BRIEF.md; where this file summarizes them, they win. This is not a gate record and not an owner-decision record.
 
-## Current status and next step (as of 2026-10-16, B06)
+## Current status and next step (as of 2026-10-16, B07)
 
 - **Phase:** Phase 1. No cycle, `T0`, split, or protected scope exists. No real market observation has been acquired, captured, or released to agents. The guard refuses every real request.
-- **Strategy:** late-window, high-confidence (PROJECT_BRIEF.md §3; START_HERE.md "Strategy at a Glance").
-- **Gate status:** Gate 0 passed. Gate 1 has not been decided.
-- **Active branch:** `b06/governance-continuity-sync` (B06; `docs/BRANCH_TIMELINE.md`). It contains batch 4 (B05, `a1752b4`), the B06 governance continuity sync (`docs/decisions/2026-10-16_b06_governance_continuity_sync.md`), and the B06 acquisition-readiness tooling (`docs/acquisition_readiness.md`). It integrates into `main` through one pull request; merging is the owner's decision.
-- **Owner patches applied** (`docs/owner_actions/README.md`): the F-09 host-class settings patch and the agent-file split-wording patch were applied and committed on B06 in `8517fc2`, and the F-09 behavioral check passed on 2026-10-16. This does not change any gate status or authorize acquisition.
+- **Strategy:** late-window, high-confidence (PROJECT_BRIEF.md §3; START_HERE.md "Strategy at a Glance"). B07 did not change it.
+- **Gate status:** Gate 0 passed. Gate 1 has not been decided. **Acquisition is not authorized.**
+- **Active branch:** `b07/phase1-acquisition-pipeline-hardening` (B07; `docs/BRANCH_TIMELINE.md`). It was branched from final B06 (`c0d2a2b`) and contains everything through B06. It integrates into `main` through one pull request; merging is the owner's decision. B06 is a preserved historical checkpoint.
 - **Blockers before the first historical acquisition** (`docs/external_access.md` §2):
   - a per-source owner approval naming its hosts (A-1);
   - an owner licence determination from verbatim terms (A-2);
   - the raw backup policy and a restore test on the real backup medium (A-3);
-  - a reviewed safe-parsing acquisition tool with passing fault-injection fixtures (A-4);
+  - A-4 satisfied, which is not the case (below);
   - provenance and source-quality entries (A-5, A-6);
   - committed F-09 denies (done: `8517fc2`, behavioral check passed 2026-10-16).
-- **A-4 status (B06):** the source-neutral building blocks and every named fault-injection fixture exist, tested on synthetic data only. The Reliability / Red-Team review and its re-verification are in `research/governance/b06_acquisition_tooling_red_team_review.md`. **A-4 is not satisfied.** Still missing:
-  - parser process isolation with resource limits;
-  - pinned, reviewed Parquet and DBN readers;
-  - the fetcher, with redirect re-checks and size caps;
-  - the end-to-end pipeline into the protected raw store (`docs/acquisition_readiness.md`). Its intake and release receipts are already persisted in a hash-chained journal (B06 continuation).
-- **Blockers before agents see any real observation:** a registered cycle with `T0` and `m` (which first requires the pre-T0 owner checklist P-1 to P-4 in START_HERE.md); and the H-2 per-row release tool, built, reviewed, and approved through an owner governance change (`docs/protected_information.md`). Its code is deliberately **not yet written**: RT-B3-05 requires the owner's E-U1 catalog decision and a reviewed shared catalog first. The P-3 equivalence criterion gates cycle registration, and so the first release, but not the tool's construction. The required properties and the prerequisite chain are in `docs/release_tool_design.md` (proposed design, not an approved requirement).
+- **A-4 status (B07):** see `docs/acquisition_readiness.md` and `docs/decisions/2026-10-16_b07_acquisition_pipeline_hardening.md`. **A-4 is not satisfied.**
+  - Implemented and tested on synthetic data only:
+    - G-1: isolated, rlimited, seccomp-confined parse worker;
+    - G-2 and G-3 for CSV, JSON, JSONL, and text: stdlib readers with pinned identities and required schemas;
+    - G-4: fetcher semantics with per-redirect re-authorization, behind a synthetic transport;
+    - G-5 for gzip, bzip2, and xz;
+    - G-6: the end-to-end pipeline into the protected raw store, with a state machine, bound journal, and crash recovery.
+  - Still open:
+    - Parquet, DBN, and zstd readers, which need owner approval of a dependency (decision record B7-6);
+    - the production network transport (B7-4);
+    - the G-7 owner inputs;
+    - a review record stating A-4 is satisfied.
+- **Blockers before agents see any real observation:**
+  - a registered cycle with `T0` and `m`, which first requires the pre-T0 owner checklist P-1 to P-4 in START_HERE.md;
+  - the H-2 per-row release tool, built, reviewed, and approved through an owner governance change (`docs/protected_information.md`).
+
+  The release tool's code is deliberately **not yet written**: RT-B3-05 requires the owner's E-U1 catalog decision and a reviewed shared catalog first (`docs/release_tool_design.md`). B07 storage never releases anything (A-8).
 - **Recommended next steps:**
   - **Owner:**
-    1. open (the sandbox cannot), review, and merge the single B06 pull request;
-    2. approve a raw-data backup policy (A-3);
-    3. pursue the licence terms for the first candidate source (Kalshi official historical data; AR-3);
-    4. decide E-U1 (equivalence-catalog expansion), the first step before the H-2 release tool (`docs/release_tool_design.md`);
-    5. prepare the pre-T0 checklist decisions P-1 to P-4 (START_HERE.md).
-    (Done: the F-09 settings patch and the agent-file patch, `8517fc2`.)
-  - **Agents (no network, synthetic data only, from the active branch):** close the remaining A-4 gaps (parser process isolation, pinned readers, fetcher design with redirect re-checks, the pipeline into the protected raw store), then request a fresh Red-Team review. The release tool waits for the owner's E-U1 decision (`docs/release_tool_design.md`).
-  - F-09 is required before any acquisition, collection, or post-`T0 − m` web research. It is now committed and behaviorally validated, but it is only one of the acquisition prerequisites above; acquisition is still not authorized. It does not gate no-network tooling work.
+    1. open (the sandbox cannot), review, and merge the single B07 pull request with a normal merge commit;
+    2. decide whether to approve the reader dependencies listed in decision record B7-6 (Parquet, DBN, zstd), or to defer those formats;
+    3. approve a raw-data backup policy (A-3) and confirm or replace the "size class" reading (B7-7);
+    4. pursue the licence terms for the first candidate source (Kalshi official historical data; AR-3);
+    5. decide E-U1 (equivalence-catalog expansion), the first step before the H-2 release tool;
+    6. prepare the pre-T0 checklist decisions P-1 to P-4 (START_HERE.md);
+    7. optionally decide B6S-14 (independent statistical audit of the release rules before the first release; not adopted).
+  - **Agents** (no network, synthetic data only, from the active branch, in a later batch chartered by the owner):
+    - the production transport design and its review (B7-4);
+    - after owner approval, the Parquet, DBN, and zstd readers inside the G-1 worker;
+    - raw-format v2 and collector hardening (F-11, F-12, F-33, F-37).
 
 ## Owner direction for Phase 1 (batch charter, 2026-10-15)
 
@@ -68,7 +81,7 @@ From `docs/gate0_readiness.md` ("Deferred findings and deadlines") and `docs/dec
 | F-07 power-based holdout size and unit of independence | First real protected scope or cycle | Owner, with Statistician | Unit of independence **decided** (batch 4 H-6). Power floor and holdout size open, fixed per cycle before `T0` (H-1) |
 | F-17 minimum economic thresholds and kill criteria | Substantive strategy or model work on real data | Owner, with Quant / Business Lead | Open |
 | F-03 credential isolation implementation | Any venue credential, including data-only | Owner | Open. No credential exists |
-| F-09 network and WebFetch denies for market-data hosts | Phase 1 real collection, and any agent web research (WebFetch or WebSearch) after a cycle's `T0 − m` | Owner (settings are governance) | Policy **decided** (batch 4 O-6, host classes in `docs/external_access.md`). Deterministic denies in `.claude/settings.json` not yet committed |
+| F-09 network and WebFetch denies for market-data hosts | Phase 1 real collection, and any agent web research (WebFetch or WebSearch) after a cycle's `T0 − m` | Owner (settings are governance) | Policy **decided** (batch 4 O-6, host classes in `docs/external_access.md`). Deterministic denies **committed** in `8517fc2` (B06), behavioral check passed 2026-10-16 |
 | F-11 capture segmentation and salvage; F-12 frame v2 timing and direction (with F-27); F-26; F-33 | Phase 1 real collection | API / Execution, Reliability | Open |
 | F-37, RT-4: demo data treated as real; collectors refuse the test environment | Phase 1 real collection | API / Execution | Open |
 | F-32 collector host and alert recipient | Phase 1 real collection | Owner | Open |
@@ -249,6 +262,27 @@ Governance and policy only. No real market dataset was acquired or inspected, an
 - The owner also directed that the late-window, high-confidence strategy objective be recorded (PROJECT_BRIEF.md §3).
 
 Full rulings and the pre-T0 checklist are in the decision record.
+
+## B07 (`b07/phase1-acquisition-pipeline-hardening`): acquisition pipeline hardening
+
+**Charter (owner, 2026-10-16).** Recorded in `docs/decisions/2026-10-16_b07_acquisition_pipeline_hardening.md`. Synthetic data only: no real data, network host, credential, approval, licence determination, gate decision, `T0`, holdout access, or modeling.
+
+**Done:**
+- **G-1.** An isolated parse worker:
+  - resource limits applied by the parent before exec;
+  - launch with `python -I -S` and an empty environment, with a finder that loads only `pmv` from the package root;
+  - `no_new_privs` and a seccomp **allowlist** (argument-filtered `fcntl` and `ioctl`) installed before any input is read;
+  - a framed protocol enforced by a parent that has made itself non-dumpable.
+- **G-2, G-3, G-5.** Stdlib readers with pinned identities and required schemas, and bounded gzip, bzip2, and xz decoding. Parquet, DBN, and zstd are deferred for owner dependency approval.
+- **G-4.** Fetcher semantics behind an injectable transport. No production transport exists.
+- **G-6.** The plan and evidence records, the explicit state machine, and the orchestrator into the protected raw store, with crash and restart recovery.
+- **RT-B6-26 and RT-B6-27.** Torn-tail recovery and the bound journal.
+- **RT-B6-28.** Re-reviewed: correct in `release`; the gaps in `receive` and move-aside are fixed (RT-B7-07).
+
+Tests and review:
+- 376 new synthetic tests, including fault injection at every pipeline boundary and real `SIGKILL`s.
+- The independent Red-Team review is in `research/governance/b07_acquisition_pipeline_red_team_review.md`. It ran five rounds: round 1 found one BLOCKING finding (RT-B7-01, worker-to-parent channels under a denylist) and one MAJOR finding (RT-B7-02, injectable real-mode gate). Both were fixed. The final verdict at `4170b3c` is no BLOCKING and no MAJOR finding, with documented MINOR residuals. A-4 is still not satisfied.
+- No Statistician review was triggered: B07 does not touch release, holdout, `T0`, or equivalence semantics.
 
 ## Recommended next batches
 

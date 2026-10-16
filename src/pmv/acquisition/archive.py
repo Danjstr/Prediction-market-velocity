@@ -166,6 +166,11 @@ def safe_member_name(raw: str, *, is_dir: bool, max_depth: int) -> str:
 def _archive_kind(path: Path) -> str:
     with path.open("rb") as handle:
         head = handle.read(_BLOCK)
+    return archive_kind_of(head)
+
+
+def archive_kind_of(head: bytes) -> str:
+    """Return ``zip``, ``tar``, ``tar.gz``, ``tar.bz2``, or ``tar.xz`` from leading bytes."""
     if head.startswith(b"PK\x03\x04") or head.startswith(b"PK\x05\x06"):
         return "zip"
     if head.startswith(b"\x1f\x8b"):
@@ -484,17 +489,29 @@ def _tar_pass(
     visit: Callable[[_Entry, _Readable | None], None],
 ) -> tuple[list[_Entry], str]:
     """Walk the tar once. Return its entries and the SHA-256 of the raw archive bytes."""
-    entries: list[_Entry] = []
     fd = os.open(archive_path, READ_FLAGS)
     try:
-        raw = _HashingReader(fd)
-        with _decompressed(raw, kind) as stream:
-            for entry, data in _walk_tar(stream, limits, _stream_limit(limits, archive_size)):
-                entries.append(entry)
-                visit(entry, data)
-        raw.drain()
+        return tar_pass_fd(fd, kind, limits, archive_size, visit)
     finally:
         os.close(fd)
+
+
+def tar_pass_fd(
+    fd: int,
+    kind: str,
+    limits: ExtractionLimits,
+    archive_size: int,
+    visit: Callable[[_Entry, _Readable | None], None],
+) -> tuple[list[_Entry], str]:
+    """Walk the tar open on ``fd`` once, from offset 0. Used by the isolated worker."""
+    entries: list[_Entry] = []
+    os.lseek(fd, 0, os.SEEK_SET)
+    raw = _HashingReader(fd)
+    with _decompressed(raw, kind) as stream:
+        for entry, data in _walk_tar(stream, limits, _stream_limit(limits, archive_size)):
+            entries.append(entry)
+            visit(entry, data)
+    raw.drain()
     return entries, raw.digest.hexdigest()
 
 
