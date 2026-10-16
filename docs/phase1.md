@@ -11,7 +11,7 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
 - Production runtime: free of LLMs and agents.
 - Not authorized: real venue credentials, real-money execution, protected or holdout exposure, and irreplaceable live-data capture.
 
-This direction comes from the batch charter. It has not yet been recorded under `docs/decisions/`. Recommendation: the owner records it there, and in particular the Polymarket deferral, because PROJECT_BRIEF.md §1 and §6 name both venues.
+This direction came from the batch 1 charter. The Polymarket deferral, AR-1, and the batch 2 authorization limits are now recorded in `docs/decisions/2026-10-16_phase1_batch2_owner_decisions.md`. PROJECT_BRIEF.md §1 and §6 still name both venues; the deferral sequences the work and does not change the brief.
 
 ## What Phase 1 requires (START_HERE.md)
 
@@ -31,7 +31,7 @@ From `docs/gate0_readiness.md` ("Deferred findings and deadlines") and `docs/dec
 
 | Item | Must be resolved before | Owner | Status |
 |---|---|---|---|
-| F-16 venue and jurisdiction eligibility, and whether in-scope gold contracts exist | Any venue account or credential, or any real collection or trading integration | Owner, with API / Execution research | Open. Needs AR-1 |
+| F-16 venue and jurisdiction eligibility, and whether in-scope gold contracts exist | Any venue account or credential, or any real collection or trading integration | Owner, with API / Execution research | Open. Batch 2 documentation findings are in `research/kalshi/venue_verification.md` §5. The terms, Developer Agreement, and eligibility could not be retrieved (AR-3). No gold event-contract series is documented (E-1). |
 | F-06 prospective holdout as the default formation | Agents see any real observation | Owner | Open |
 | F-08 release architecture (trusted collector plus release by receipt time) | Agents see any real observation | Owner | Open. This batch is compatible: availability is defined by receipt time |
 | F-07 power-based holdout size and unit of independence | First real protected scope or cycle | Owner, with Statistician | Open |
@@ -70,9 +70,45 @@ Done without credentials, real data, or network access:
 
 No Kalshi field, endpoint, unit, fee, rule, or eligibility fact is encoded. `pmv.market_data.kalshi.REQUIRED_VERIFICATIONS` lists what must be verified first.
 
+## Batch 2 (`phase1/kalshi-venue-verification`): Kalshi venue verification
+
+This was documentation research only, under AR-1 (owner decisions D1–D3 in `docs/decisions/2026-10-16_phase1_batch2_owner_decisions.md`). No credential was used, no API host was contacted, no market value was retrieved, and no code changed.
+
+- **Summary:** `research/kalshi/venue_verification.md`. It covers verified facts, unresolved facts, project assumptions, versioning options, F-16 findings, and escalations E-1 to E-5.
+- **Detail:**
+  - `research/kalshi/api_documentation_findings.md`: API / Execution;
+  - `research/kalshi/statistician_review.md`: the development Statistician, as self-review;
+  - `research/kalshi/red_team_review.md`: Reliability / Red-Team.
+- **Sources:** `research/sources.md` lists 60 docs.kalshi.com files with retrieval times and SHA-256 hashes, plus the kalshi.com pages that could not be retrieved.
+
+**Status of `pmv.market_data.kalshi.REQUIRED_VERIFICATIONS`** (documentation level only; nothing is verified by test):
+
+| Status | Items |
+|---|---|
+| Documented | `authentication_for_market_data`, `rest_market_and_event_metadata_schema`, `websocket_channels_and_message_schema` (with conflicts), `orderbook_representation_and_price_units` (sort-order conflict), `trade_print_schema_and_identifiers`, `early_close_and_extension_semantics` (mechanics), `lifecycle_status_messages_and_result_fields` (no WS dispute or amend events) |
+| Partly documented | `timestamp_fields_and_resolution` (REST timezone and precision missing), `rate_limits` (unauthenticated limits missing), `historical_data_depth_and_resolution` (resolution yes, retention no, no historical book), `fee_schedule_and_effective_dates` (fields and endpoints yes, rates no), `demo_environment_scope_and_fidelity` (fidelity warning yes, scope no) |
+| Unresolved | `api_terms_and_permitted_use`, `account_and_jurisdiction_eligibility`, `websocket_sequence_and_snapshot_semantics`, `sequence_number_scope_per_subscription_or_market`, `orderbook_delta_semantics_absolute_or_relative` (relative is a strong inference only), `btc_and_gold_series_availability`, `contract_rules_settlement_source_and_timing`, `settlement_reference_window_or_averaging`, `tie_rounding_and_void_rules` |
+
+`KalshiNormalizer` therefore stays fail-closed. No Kalshi parser, `ContractSpec` builder, or label parser was written. They stay blocked by:
+- E-2: the point-in-time versioning decision;
+- UR-4: the contract rules;
+- UR-6 and UR-7: sequence scope and delta semantics. They need a recorded test, using a differential two-connection comparison, once a credential and collector are approved. Demo can falsify but cannot confirm production behavior, and a demo account or key needs its own owner classification (E-6).
+
+**Remaining Phase 1 blockers added by batch 2:**
+- E-1: gold scope;
+- E-3: a market-data credential is needed for WS book capture, because the WebSocket requires a signed key;
+- E-4: an availability rule for historical archive rows;
+- AR-3: terms and contract documents;
+- E-6: classification of demo accounts and keys;
+- E-7: network egress scope and the F-09 denies;
+- Red-Team blocking conditions for the parser and collector: RT-B2-01, 02, 03, and 06 in `research/kalshi/red_team_review.md`.
+
 ## ACCESS REQUESTS
 
 ### AR-1: Kalshi official documentation (blocking for the Kalshi adapter and F-16)
+
+**Status: APPROVED 2026-10-15** (temporary, read-only, documentation only; `docs/decisions/2026-10-16_phase1_batch2_owner_decisions.md` D1). Used in batch 2. `docs.kalshi.com` was retrieved. `kalshi.com` returned a bot challenge (HTTP 429) and was not retrieved (see AR-3).
+
 
 - **Resources.**
   - `docs.kalshi.com`: API reference, covering REST market, event, and series metadata; the WebSocket channels, message schemas, sequence and snapshot semantics; authentication requirements, including for public market data; rate limits; historical-data endpoints and depth; the demo environment; and any OpenAPI or AsyncAPI specification files it publishes.
@@ -87,13 +123,31 @@ No Kalshi field, endpoint, unit, fee, rule, or eligibility fact is encoded. `pmv
 - **Access.** Temporary, read-only, for the venue-verification task. Phase 12 re-verification is a new request.
 - **Hosts that must stay blocked.** The Kalshi trading and market-data API hosts, consistent with F-09.
 
+### AR-3: Kalshi terms, fee schedule, and contract-rule documents (blocking for F-16, fees, and the BTC spec builder)
+
+- **Problem.** AR-1 approved `kalshi.com`, but every `kalshi.com` page tried on 2026-10-16 (`/terms`, `/developer-agreement`, `/fee-schedule`, `/docs/kalshi-fee-schedule.pdf`) returned HTTP 429 with a "Vercel Security Checkpoint" JavaScript challenge. Agents do not circumvent bot protection. `www.kalshi.com` is not on the network allowlist.
+- **Needed documents.**
+  - Terms of service.
+  - Developer Agreement (docs.kalshi.com says API use binds the user to it).
+  - Fee-schedule PDF (`Series.fee_type` points to it).
+  - The Kalshi rulebook.
+  - The contract terms for the BTC series, and for any gold series, behind each series' `contract_terms_url` and `contract_url`.
+  - Help-center eligibility and demo-account articles (`help.kalshi.com`).
+- **Options, for the owner to choose (not decided here).**
+  1. **Preferred.** The owner downloads the documents in a normal browser and places them in a repository path the owner chooses, for example `research/kalshi/source_documents/`, with retrieval date and URL. They are legal and rule documents, not market observations.
+  2. Allowlist `help.kalshi.com` (read-only, documentation only). This is a new domain and needs owner approval.
+  3. Contract-terms documents may be hosted on a domain named only in a `GET /series/{ticker}` response (`contract_terms_url`). Learning that URL requires a market-data API call, which is not authorized. Under option 1 the owner can follow the links from the kalshi.com market rules page instead.
+- **Excluded.** API hosts, market pages showing live prices, account login, and any attempt to bypass the challenge.
+
 ### AR-2: settlement reference-source documentation (conditional on AR-1)
 
 Once AR-1 identifies the official settlement sources for Kalshi BTC and gold contracts (for example, a CF Benchmarks index for BTC), request read-only access to that provider's **methodology documentation** domain only. The purpose is to define `resolution_source_id` semantics and the BTC/gold reference-feed requirements. No price data is requested. The domains are named after AR-1, not guessed now.
 
+**Status after batch 2:** still conditional. The docs.kalshi.com pages link to CF Benchmarks documentation (`docs.cfbenchmarks.com`) for the BRTI passthrough. They do **not** state that any contract settles on BRTI or on any averaging window. Gold settlement sources are undocumented. AR-2 is not raised until the contract terms (AR-3) name the settlement sources.
+
 ## Recommended next batches
 
-1. **Venue verification (needs AR-1).** Record Kalshi sources. Draft the F-16 eligibility findings for the owner. Write the verified Kalshi parser, the `ContractSpec` builder, and the resolution parser against fixtures built from documented schemas.
+1. **Venue verification: done as far as `docs.kalshi.com` allows (batch 2).** The verified parser, `ContractSpec` builder, and resolution parser remain blocked by E-2, UR-4, UR-6, and UR-7 (see "Batch 2" above).
 2. **Raw format v2 and collector hardening (no network needed).**
    - F-12: monotonic receive time and message direction in frame v2, with F-27;
    - F-11: capture segmentation and salvage;
@@ -104,6 +158,20 @@ Once AR-1 identifies the official settlement sources for Kalshi BTC and gold con
 4. **Owner decisions:** F-06, F-08, F-16, F-07, F-17, F-09, F-03, F-32, F-21b, and the raw-data backup policy. Real collection and agent-visible data stay blocked until they are resolved.
 5. **Point-in-time contract-spec versioning (Statistician M1; blocking before the Kalshi spec builder).** Needs the owner's identity-design decision (`docs/market_data.md`, review m4).
 6. **Exclusion ledger and policy recording (Statistician M4).** Persistent counts of exclusions and faults by reason, regime, and period, keyed by policy IDs.
+
+### Recommended next batches after batch 2
+
+1. **Owner decisions:** E-1 (gold scope), E-2 (point-in-time versioning option), AR-3 (how the terms and contract documents are obtained), and E-3 (whether, and under which F-03 controls, a read-scope market-data credential is ever created). Also the earlier open items.
+2. **Raw format v2 and collector hardening (no network needed),** now informed by documented Kalshi behavior:
+   - per-subscription `use_yes_price` and connection metadata in frames;
+   - fail-closed handling of terminal errors 10 and 25;
+   - scheduled Thursday maintenance disconnects;
+   - F-11, F-12, F-33, F-37 / RT-4.
+3. **Kalshi parser against documented-schema fixtures (no network needed, after E-2):**
+   - strict schema validation pinned to the recorded spec hashes;
+   - relative-delta handling kept behind an explicit, tested assumption flag until UR-7 is tested;
+   - metadata and outcome-field quarantine.
+4. **Contract-rule verification (after AR-3):** BTC series rules, and gold if any exist. Then AR-2.
 
 ## Methodology recommendations for owner decision (Statistician review, 2026-10-15)
 

@@ -225,6 +225,8 @@ A fresh-context Statistician review of this batch found no blocking defect for s
 - Scenario: a spec built from metadata fetched after the market ends, for example with a realized early close or an extension, would feed the outcome into `time_remaining` and `time_to_reference`.
 - Required: point-in-time spec versions (a `known_at` per version, the latest version known at decision time selected, scheduled close kept apart from realized close), with `build_feature_row`, `label_for`, and `TrainingExample` refusing a spec learned after the decision.
 - This depends on the open identity-design decision (review m4 above), so it is left for an owner-approved design, not decided here.
+- Batch 2 (venue verification) confirmed from Kalshi documentation that these fields change during a market's life: `close_time` (early close, extension, reopen), strikes (`metadata_updated`), the price grid, fees (effective time only), and trading status. Options A–D for the owner are in `research/kalshi/venue_verification.md` §4. None is chosen.
+- Batch 2 also found that Kalshi's WebSocket `orderbook_delta` field is `delta_fp`, documented as a "contract delta". It is very likely a relative change, but this is not stated. `BookDelta.new_quantity` is absolute, so a Kalshi normalizer must not map one onto the other without an explicit, tested conversion (`research/kalshi/venue_verification.md` §3).
 
 **Open, before real data:**
 - M4: an exclusion ledger, with counts by reason, regime (volatility, time remaining), and period, covering label exclusions, book faults, and validation anomalies. Faults cluster in fast markets, where a velocity edge would live, so they are not missing at random.
