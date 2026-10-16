@@ -11,7 +11,7 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
   - B09 was branched directly from final B08 (`5806d8c`), not from `main`, and contains everything through B08.
   - B08 was merged into `main` by PR #7 (merge commit `a6b5411`) and is a preserved historical checkpoint. B07 was merged by PR #6 (`2a46ffd`).
   - **B09 is source qualification only:** Kalshi official historical data as a candidate first source, and the owner-decision packet for A-1 to A-6. It acquires no data, contacts no Kalshi host, and changes no code. Its provisional verdict is NOT CURRENTLY QUALIFIABLE — EVIDENCE MISSING (the AR-3 terms, AR-B9-1 re-verification, gold existence, and retention depth).
-  - A-1 to A-6 remain owner-controlled and unresolved. The owner's decisions D-B09-1 to D-B09-8 are pending.
+  - A-1 to A-6 remain owner-controlled and unresolved. The owner's decisions D-B09-1 to D-B09-9 are pending.
   - B09 integrates through one pull request, opened after the owner's decisions are recorded. Merging is the owner's decision.
 - **Blockers before the first historical acquisition** (`docs/external_access.md` §2):
   - a per-source owner approval naming its hosts (A-1);
@@ -39,7 +39,7 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
   The release tool's code is deliberately **not yet written**: RT-B3-05 requires the owner's E-U1 catalog decision and a reviewed shared catalog first (`docs/release_tool_design.md`). B07 storage never releases anything (A-8).
 - **Recommended next steps:**
   - **Owner:**
-    0. B09: decide D-B09-1 to D-B09-8 (`docs/decisions/2026-10-16_b09_kalshi_source_qualification.md`, "Owner-decision packet"), including supplying the AR-3 documents listed there. B08 is merged (PR #7, `a6b5411`);
+    0. B09: decide D-B09-1 to D-B09-9 (`docs/decisions/2026-10-16_b09_kalshi_source_qualification.md`, "Owner-decision packet"), including supplying the AR-3 documents listed there. B08 is merged (PR #7, `a6b5411`);
     1. select the first historical source, and supply its terms (AR-3), so that A-1 and A-2 can be prepared (the post-B07 audit found no further source-neutral acquisition engineering worth doing before this);
     2. decide whether to approve the reader dependencies listed in decision record B7-6 (Parquet, DBN, zstd), or to defer those formats;
     3. approve a raw-data backup policy (A-3) and confirm or replace the "size class" reading (B7-7);
@@ -243,7 +243,7 @@ This was documentation research and design only. No credential was used, no mark
 
 ### AR-B9-1: one-time re-verification of Kalshi API documentation (B09; owner decision D-B09-8)
 
-- **Host and paths:** `docs.kalshi.com`, an exact list of 16 paths covering the historical-tier, pagination, rate-limit, and series pages, `llms.txt`, and the two spec files (`research/kalshi/b09_source_qualification.md` §1.2).
+- **Host and paths:** `docs.kalshi.com`, an exact list of 18 paths covering the historical-tier, pagination, rate-limit, series, and events pages, `llms.txt`, and the two spec files (`research/kalshi/b09_source_qualification.md` §1.2).
 - **Class:** `docs`.
 - **Purpose:** re-verify the 2026-10-15 snapshot facts that A-1 and the paginated REST design rely on.
 - **Why it is not covered today:** AR-1 was approved as temporary, for the batch 2 work, and its expiry was never recorded (E-7). §1.1 rule 3 of `docs/external_access.md` also requires the licensor's terms first, and they are not yet owner-supplied (AR-3).

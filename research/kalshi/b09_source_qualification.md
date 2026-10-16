@@ -46,13 +46,14 @@ Each candidate host was classified first (`docs/external_access.md` §1, F-09, C
 | `www.cftc.gov` filings | `docs` | Not needed: the batch 3 filings are already in Git |
 
 **OWNER EXTERNAL-ACCESS APPROVAL REQUIRED (ACCESS REQUEST AR-B9-1):**
-- **Host and paths.** `https://docs.kalshi.com/`, these exact paths only: `llms.txt`, `welcome/index.md`, `getting_started/historical_data.md`, `getting_started/pagination.md`, `getting_started/rate_limits.md`, `getting_started/terms.md`, `api-reference/historical/get-historical-cutoff-timestamps.md`, `api-reference/historical/get-historical-markets.md`, `api-reference/historical/get-historical-market.md`, `api-reference/historical/get-historical-market-candlesticks.md`, `api-reference/historical/get-historical-trades.md`, `api-reference/market/get-series.md`, `api-reference/exchange/get-series-fee-changes.md`, `openapi.yaml`, `asyncapi.yaml`, `changelog/index.md`.
+- **Host and paths.** `https://docs.kalshi.com/`, these exact paths only: `llms.txt`, `welcome/index.md`, `getting_started/historical_data.md`, `getting_started/pagination.md`, `getting_started/rate_limits.md`, `getting_started/terms.md`, `api-reference/historical/get-historical-cutoff-timestamps.md`, `api-reference/historical/get-historical-markets.md`, `api-reference/historical/get-historical-market.md`, `api-reference/historical/get-historical-market-candlesticks.md`, `api-reference/historical/get-historical-trades.md`, `api-reference/market/get-series.md`, `api-reference/exchange/get-series-fee-changes.md`, `api-reference/events/get-events.md`, `api-reference/events/get-event.md`, `openapi.yaml`, `asyncapi.yaml`, `changelog/index.md`.
 - **Class.** `docs`. The host serves nothing else as far as is known. It returns a `308` redirect from `/` to `/welcome` on the same host; any cross-host redirect is refused.
 - **Terms status.** Not obtained (AR-3). The owner must rule whether rule 3 lets this host be fetched before the AR-3 documents are supplied. **Recommendation:** fetch only after the AR-3 documents are supplied and reviewed.
 - **Purpose.** Re-verify every DOC-1015 fact that A-1 and the pagination design rely on: parameter lists, cursor semantics, the end-of-pagination signal, timestamp units, unauthenticated rate limits, and the `license` and terms links in the specs. Compare against the batch 2 hashes.
 - **Market observations returned.** None. Example payloads are illustrations and are never used as data.
 - **Protected-interval content.** None. No cycle or `T0` exists.
 - **Grant proposed.** One-time, agent fetch with `curl` without following redirects, into a fresh `$TMPDIR` directory. The bytes are hashed and recorded in `research/sources.md`.
+- **Requested by:** B09 (`b09/kalshi-source-qualification`), lead development session. The fetch would be run by that session or an API / Execution agent briefed with this host-class rule.
 
 ---
 
@@ -120,15 +121,17 @@ A-1 stays owner-controlled and unapproved. Fields follow `pmv.acquisition.record
 | `source_id` | `kalshi_official_historical` | Proposed |
 | `dataset` | Kalshi Trade API v2 historical tier: markets, trades, 1-minute candles, and series and fee metadata | Proposed |
 | `instruments` | BTC short-horizon series (KXBTC15M; KXBTCD hourly if it qualifies) and any gold short-horizon series (KXGOLD15M is SECONDARY) | **UNRESOLVED:** series existence and rules (UR-4, UR-5) |
-| `date_range_start` | Earliest available | **UNRESOLVED:** retention is not documented. SECONDARY: "about 100 days" for the historical tier, trades back to 2021-06 (TrevorJS card) |
+| `date_range_start` | Earliest available | **UNRESOLVED:** retention is not documented. SECONDARY: the historical *cutoff* was "100 days" (jdkatz21; probably a lag behind the present, not retention depth: U15 versus UR-11); trades reachable back to 2021-06 (TrevorJS card) |
 | `date_range_end` | A fixed instant ≤ the `/historical/cutoff` values at acquisition time, and before any future `T0 − m` | Proposed rule |
 | `formats` | JSON (`application/json`), identity encoding | Proposed. No CSV, Parquet, DBN, zstd, or archives |
 | `expected_size_bytes` | UNRESOLVED | It cannot be estimated without data. One option is a byte cap per series, with a stop and owner review when it is reached |
 | `cost`, `currency` | 0, USD (the API is free) | Proposed. Excludes the paid CF Benchmarks and Pyth channels |
 | `credential_required` | `false` | DOC-1015 (no `security`). B7-5 refuses credentialed acquisition anyway |
 | `purchase_or_credential_decision` | Not applicable (no purchase or credential). Terms acceptance by conduct still needs an owner decision (§2.5) | — |
-| `url_prefixes` | `https://external-api.kalshi.com/trade-api/v2/historical/`, `…/trade-api/v2/series/` and `…/trade-api/v2/events` (scope to be narrowed after AR-B9-1) | Proposed. **Not acquirable with today's tooling** (§4) |
-| `host_class_decisions` | An owner classification of `external-api.kalshi.com` with those exact prefixes, as a historical-acquisition host in `docs/external_access.md` §1.5, for the acquisition tool only and never for agents | Required: the host is restricted (label `external-api` contains `api`; `kalshi.com` is a named venue domain; the path contains `/v2/`) |
+| `url_prefixes` | **Exact endpoint templates, not broad prefixes** (RT-B9-01). `hosts.py` matches prefixes at segment boundaries, so `/series/` or `/events` would also cover live endpoints (`/series/{s}/markets/{t}/candlesticks`, `/events/{t}` with nested live markets, `/events?status=open`, `/events/multivariate`). Candidates: `/trade-api/v2/historical/cutoff`, `/historical/markets`, `/historical/markets/{ticker}`, `/historical/markets/{ticker}/candlesticks`, `/historical/trades`, `/series/{series_ticker}` (no sub-path), `/series/fee_changes`. `/events` and `/events/{event_ticker}` only with plan-fixed `exclude_markets=true` and a settled-only status filter, if AR-B9-1 confirms those filters exist; otherwise they are excluded | Proposed. **Not acquirable with today's tooling** (§4) |
+| `host_class_decisions` | An owner classification of `external-api.kalshi.com` with those exact templates, as a historical-acquisition host in `docs/external_access.md` §1.5, for the acquisition tool only and never for agents | Required: the host is restricted (label `external-api` contains `api`; `kalshi.com` is a named venue domain; the path contains `/v2/`). **Governance conflict (RT-B9-02):** `docs/external_access.md` §1.1 rule 1 ends "No such classification ever covers a path that returns market observations", and `/historical/*` returns market observations. The B06/B07 tooling (`host_class_decisions`) already assumes a §1.5 classification can authorize acquisition, so the tension predates B09. It needs an owner ruling (D-B09-9) before D-B09-2 can be approved |
+| `approval_id` | Assigned by the owner record | Owner |
+| `f09_settings_commit` | `8517fc2` or a later committed F-09 settings commit; the pipeline enforces it as an ancestor of `HEAD` | Precondition: committed F-09 denies (done in B06) |
 | `licence_id` | none yet | Blocked by A-2 |
 | `decision_record` | — | Owner |
 
@@ -162,12 +165,14 @@ So the gap is real: the current machinery cannot acquire this source without cod
 - the host (exactly one);
 - a path template with typed path parameters (for example `/trade-api/v2/historical/markets/{ticker}/candlesticks`);
 - an exact allowlist of query parameter names, each with a type, value grammar, and range;
-- whether each value is **fixed by the plan** or **variable** (only `cursor`, and the time window if the owner allows).
+- whether each value is **fixed by the plan** or **variable** (only `cursor`). Every window bound is fixed in the plan hash; there are no variable windows (RT-B9-03).
 
 The record cites the documentation snapshot hash it was derived from. A parameter or template not in the record is refused. Changing the record is a new owner approval.
 
 **S3. Parameter values.**
 - Fixed values are bound into the plan hash: `limit` (one value), `series_ticker`, `period_interval = 1`, and the window bounds.
+- Timestamp units (seconds or milliseconds) for `min_ts`, `max_ts`, `start_ts`, and `end_ts` are UNRESOLVED and must be confirmed under AR-B9-1 before the grammar is written. A unit error could widen the window or produce an empty series.
+- Prefer value grammars that never need percent-encoding (today's allowlist refuses percent-encoding). Where a value would need encoding, refuse it.
 - Integers are decimal ASCII, with no sign, leading zeros, or exponent, inside the declared range.
 - A time bound must lie inside `[date_range_start, date_range_end]` and at or before the cutoff snapshot (S12).
 - Tickers must match a strict grammar (for example `^[A-Z0-9][A-Z0-9._-]{0,63}$`; final grammar after AR-B9-1).
@@ -192,6 +197,8 @@ The record cites the documentation snapshot hash it was derived from. A paramete
 **S7. Termination.** A series is `complete` only when a page returns a terminal cursor (`null`, absent, or `""`). The doc conflict is resolved by treating all three as terminal, and the form seen is recorded. Each of these ends the series as **`incomplete`**, never `complete`:
 - `max_pages` reached;
 - the byte cap reached;
+- an empty series that the plan did not declare as possibly empty;
+- any record outside `[date_range_start, date_range_end]` or after a cutoff snapshot, and any market whose status is not settled or finalized (the record is kept and flagged with a quarantine code, never dropped);
 - a repeated cursor (`cursor_cycle`; a set of cursor hashes is kept);
 - a non-terminal page with zero items more than an owner-set number of times;
 - a page with more items than `limit`;
@@ -235,7 +242,7 @@ The record cites the documentation snapshot hash it was derived from. A paramete
 
 **S17. Rate.**
 - Serial requests on one connection, at a fixed conservative rate set by the owner (for example ≤ 1 request/s), well below the documented Basic Read budget, because unauthenticated limits are undocumented.
-- On a 429, back off. After an owner-set number of consecutive 429s the run stops with `stage_failed` (`rate_limited`) and resumes later.
+- On a 429, back off. After an owner-set number of consecutive 429s the run stops with `stage_failed` (`rate_limited`) and resumes only when the owner re-initiates it; never automatically.
 
 **S18. Crash and restart.**
 - Each page is journaled before the next request.
@@ -243,6 +250,14 @@ The record cites the documentation snapshot hash it was derived from. A paramete
 - Torn-tail recovery follows the B07 owner-attested procedure.
 
 **S19. Provenance per page:** the §6 fields.
+
+**S19a. Transport hygiene (RT-B9-10).** TLS certificate and hostname verification are required. `HTTP_PROXY`, `HTTPS_PROXY`, and similar environment variables are ignored unless the owner configures a proxy explicitly. There is no cookie jar. These belong to the production transport review (B7-4).
+
+**S19b. Resume across cutoff changes.** On resume, `/historical/cutoff` is snapshotted again, and S12 is re-checked against every series's window.
+
+**S19c. Series linkage.** `series_ticker` is not a required Market field (only `event_ticker` is). Linking a market to its series therefore needs a defined event→series step through allowed endpoints (S6, `/events` constraints in §3), never the live tier.
+
+**S19d. Cursor grammar.** S5's cursor grammar is its own owner-set grammar (length cap and character set), fixed after AR-B9-1. It is not the ticker grammar.
 
 **S20. Preventing widening.**
 - The tool cannot be pointed at a template, parameter, host, or value range outside the owner record.
@@ -295,7 +310,7 @@ The record cites the documentation snapshot hash it was derived from. A paramete
 | S | Documentation versus data | NOT YET EVIDENCED, structurally **AMBIGUOUS** | The spec files carry a licence pointer to the general terms |
 | T | Upstream licensors | **AMBIGUOUS** | <ul><li>BTC `expiration_value` and settlement values derive from CF Benchmarks BRTI.</li><li>The CF Benchmarks REST passthrough needs an entitlement.</li><li>The `cfbenchmarks.com` site terms bar automated access (batch 3 terms event).</li><li>Gold reportedly settles on Pyth (SECONDARY). Kalshi's paid `pyth_value` feed costs $1,000/month.</li></ul>Whether Kalshi's historical records may carry and license these upstream-derived values to members is unknown. Unknown counts as no (A-2: "the redistributor's right to grant the licence is established from the upstream terms") |
 
-The existing `LicenceRecord` schema (`records.py`) has no fields for B (caching), D (backups), F (backtesting), H (ML training), K (model artifacts), O (sharing with tools or agents), P (retention after termination), or Q (deletion). If the owner wants those decided explicitly, the schema needs extending: a later code change, with review.
+The existing `LicenceRecord` schema (`records.py`) partly covers some rows: `storage` (C), `retention_after_subscription` (partly P), `research_use` and `internal_model_development` (partly E, G, H), `commercial_trading_use` (L), `redistribution` (M), and `derived_data` (J). There is no dedicated field for B (caching), D (backups), F (backtesting), H (ML training as such), K (model artifacts), O (sharing with tools or agents), P (retention after termination of access), or Q (deletion). If the owner wants those decided explicitly, the schema needs extending: a later code change, with review.
 
 **Escalation (charter §19).** The governing documents are not even in hand, so A-2 stops at NOT YET EVIDENCED. A neutral clarification request is drafted in the decision record. It is to be sent by the owner, if at all, after the owner has read the supplied documents.
 
@@ -343,7 +358,7 @@ The existing `LicenceRecord` schema (`records.py`) has no fields for B (caching)
 | Failure modes | Single site (theft, fire); the drive fails silently between tests; the owner forgets to connect it; a lost key means lost data | Credential compromise; provider lock-in or account closure; **licence risk: a third-party cloud may count as storage or sharing that the Kalshi terms restrict (A-2 rows D and O)**; egress cost on restore | Complexity; drift between copies |
 
 **Recommendation (owner decides):**
-- Option 1 is the minimum to unblock a *historical* acquisition. It is the only one compatible with today's code without change, and it avoids the A-2 third-party question.
+- Option 1 is the minimum to unblock a *historical* acquisition. It is the only one compatible with today's code without change, and it avoids the A-2 third-party question. **But it leaves the acquired files single-site, and they count as irreplaceable** (`reproducible_from_provider: unknown`, treated as `no`). Choosing Option 1 means the owner explicitly accepts that risk; the alternative is to require Option 3 for historical acquisitions too (RT-B9-09).
 - Plan Option 3 before *irreplaceable* prospective capture, which needs off-site protection that Option 1 lacks. Only after A-2 shows that off-site third-party storage is allowed.
 
 A-3 is **not** satisfied: no policy, no medium, no restore test.
@@ -368,10 +383,10 @@ A-3 is **not** satisfied: no policy, no medium, no restore test.
 **Safety analysis:**
 - **Fail-closed is preserved under the source-specific reading.** The pipeline refuses any plan with a format that has no adopted reader, before transport. The worker's reader registry refuses Parquet, DBN, and zstd today, and keeps refusing them. A JSON-only source never exercises those code paths.
 - **The real risk is certification creep.** A bare `a4_satisfied: true` granted for a JSON source could later be cited by a Parquet source. Mitigation: replace the bare flag with a scoped record:
-  - `formats_covered`, `compressions_covered`, and `source_ids` (or `any`);
+  - `formats_covered`, `compressions_covered`, and an explicit list of `source_ids` (no `any` wildcard, which would bring back certification creep: RT-B9-10);
   - `reviewed_commit` (already present);
   - the pipeline refuses a plan unless its formats and compressions are a subset of those covered.
-- The Kalshi source needs only JSON with identity encoding. Unused Parquet, DBN, or zstd support would add attack surface (pyarrow's history includes CVE-2023-47248) and give the Kalshi source no benefit.
+- The Kalshi source needs only JSON with identity encoding. Unused Parquet, DBN, or zstd support would add attack surface (pyarrow's history includes CVE-2023-47248, as recorded in B07 from general knowledge; verify against current advisories) and give the Kalshi source no benefit.
 - **Both readings leave the production transport (B7-4) and the pagination support (§4) outstanding.** The source-specific reading does not by itself make A-4 satisfiable for Kalshi today.
 
 **What would change:**
@@ -427,7 +442,7 @@ The owner assigns the tier before any outcome-dependent result (`docs/phase2.md`
 **Checks** (deterministic, run by owner-side tooling on protected data; agents see only counts and closed codes until H-2 release):
 
 1. **Pagination completeness.** Every series ends `complete` (S7). Page counts are compared with the item counts. Any `incomplete` series is a recorded gap, never silently retried into "complete".
-2. **Cutoff consistency.** Every acquired record lies before both cutoff snapshots. Records after them are refused (the live tier is out of scope).
+2. **Cutoff and window consistency.** Every acquired record lies before both cutoff snapshots and inside `[date_range_start, date_range_end]` (and before any future `T0 − m`). Records outside are flagged and quarantined, never dropped (the live tier is out of scope).
 3. **Duplicates.** `trade_id` must be unique. An exact duplicate is counted and recorded. The same `trade_id` with different content is an anomaly (`docs/phase2.md` duplicate policy). Nothing is deleted.
 4. **Ordering.** The API's ordering is not documented, so no order is assumed. Within-page and cross-page ordering of `created_time` is measured and recorded. Canonical order is imposed downstream by `(created_time, trade_id)`, with ties flagged.
 5. **Timestamps.** Strict RFC 3339 with an explicit offset. A naive timestamp is refused. The precision distribution is recorded (UR-14). `created_time` stays inside the market's `[open_time, close_time]`; a violation is an anomaly. Note that `close_time` can move (early close or reopen).
@@ -463,7 +478,7 @@ The owner assigns the tier before any outcome-dependent result (`docs/phase2.md`
 | | Evidence | Status |
 |---|---|---|
 | **Bitcoin** | The historical endpoints are generic over series (DOC-1015). `KXBTC15M` appears only as an example ticker and in a changelog mention. The `fifteen_min` cadence exists. BTC rulebook texts exist (CFTC filings, batch 3). SECONDARY: KXBTC15M history from about 2026-01; KXBTCD hourly; trades reachable back to 2021-06 for some series | **Plausible, unverified.** Series existence, the rules that govern KXBTC15M, retention depth, and the cutoff lag are UNRESOLVED. 1-minute candles and trade prints exist; there is no historical book |
-| **Gold** | No gold event-contract series is documented on `docs.kalshi.com`. SECONDARY: KXGOLD15M launched about 2026-08 and settles on a Pyth 1-minute gold candle; history at most about 2 months | **Unknown.** Even if it exists, its depth would be thin. P4 keeps gold in scope; nothing here narrows PMV to Bitcoin |
+| **Gold** | No gold event-contract series is documented on `docs.kalshi.com`. SECONDARY: KXGOLD15M launched about 2026-08 and settles on a Pyth 1-minute gold candle; history at most about 2 months | **Unknown.** Even if it exists, its depth would be thin. If the historical cutoff lags the present by about 100 days (SECONDARY), a series launched around 2026-08 may have nothing in the historical tier yet. P4 keeps gold in scope; nothing here narrows PMV to Bitcoin |
 | **15–60-minute horizon** | 15-minute cadence documented as a metadata value; hourly SECONDARY | Plausible for BTC, unknown for gold |
 | **Fit to the late-window strategy** (PROJECT_BRIEF.md §3) | Trades and 1-minute candles give coarse final-minutes information. No book means no executable-price history | Discovery-grade only. Executable EV evidence must come from prospective capture (batch 3 key finding; Statistician) |
 
@@ -481,7 +496,7 @@ This is not a rejection. Technically, Kalshi's own historical tier is the strong
 
 | Item | Readiness |
 |---|---|
-| A-1 | Candidate drafted (§3). Not approvable yet: the A-2 evidence and AR-B9-1 re-verification are missing, the host classification is not decided, the pagination tooling does not exist, and the series and retention are UNRESOLVED |
+| A-1 | Candidate drafted (§3). Not approvable yet: the A-2 evidence and AR-B9-1 re-verification are missing, the host classification conflicts with §1.1 rule 1 and needs owner ruling D-B09-9, the pagination tooling does not exist, and the series and retention are UNRESOLVED |
 | A-2 | **Not assessable.** All rows are NOT YET EVIDENCED; rows R, S, and T are structurally AMBIGUOUS. Blocked on owner-supplied documents |
 | A-3 | Options prepared (§7). No owner choice, no medium, no restore test |
 | A-4 | Not satisfied under either reading. The scope decision is open (§8). Transport (B7-4) and pagination support are still needed |

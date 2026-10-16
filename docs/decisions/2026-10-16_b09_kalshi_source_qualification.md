@@ -29,7 +29,7 @@ The analysis behind it is in `research/kalshi/b09_source_qualification.md`.
 
 ## Designation
 
-Under this charter, B09 is the current active ground-truth branch (`docs/BRANCH_TIMELINE.md`). The charter places all B09 work on `b09/kalshi-source-qualification`, created from final B08. B08 is a historical checkpoint, preserved, and merged by PR #7 (`a6b5411`). This follows the B08 precedent (B08 record, "Designation").
+Under this charter, B09 is the current active ground-truth branch (`docs/BRANCH_TIMELINE.md`). The operative charter lines are: "B09 MUST be created directly from final B08, NOT from main" and "All B09 work stays on: b09/kalshi-source-qualification". The full charter text is not in Git; this record summarizes it, so the owner is asked to confirm the designation when recording the D-B09 decisions (RT-B9-11). The charter's "No B10" means no B10 is created in this batch; it does not change the timeline rule that a future successor starts from final B09. B08 is a historical checkpoint, preserved, and merged by PR #7 (`a6b5411`). This follows the B08 precedent (B08 record, "Designation").
 
 ## Continuity verified (2026-10-16, before the first B09 commit)
 
@@ -57,7 +57,7 @@ After `git fetch origin`:
   - the analysis (`research/kalshi/b09_source_qualification.md`);
   - this record;
   - status updates in `docs/phase1.md` and `docs/BRANCH_TIMELINE.md`;
-  - the Reliability / Red-Team review (`research/governance/b09_source_qualification_red_team_review.md`).
+  - the Reliability / Red-Team review (`research/governance/b09_source_qualification_red_team_review.md`, added in the commit after `703fd7f`), and the fixes for its findings.
 
 ## Provisional verdict
 
@@ -84,7 +84,7 @@ Every item below is **NOT YET OWNER-SUPPLIED / NOT YET AR-3 EVIDENCE**. URLs com
 |---|---|---|---|
 | 1 | Kalshi Developer Agreement | `https://kalshi.com/developer-agreement` (welcome page: API use binds the user to it) | A-2 rows A–T; acceptance by conduct; termination; modification |
 | 2 | Kalshi Terms of Service | `https://kalshi.com/terms` (the AsyncAPI `license.url`) | A-2 rows R and S; precedence against item 1 |
-| 3 | Member or customer agreement, and any API, market-data, or data-licensing terms, plus every document incorporated by reference in items 1 and 2 | Unknown. `https://kalshi.com/market-data` is one page to check | Precedence, data-use scope, row T |
+| 3 | Member or customer agreement, and any API, market-data, or data-licensing terms, plus every document incorporated by reference in items 1 and 2 | Unknown. `https://kalshi.com/market-data` is one page to check. It may show market values: the owner may visit it, but should not relay any values to agents | Precedence, data-use scope, row T |
 | 4 | Fee schedule | `https://kalshi.com/docs/kalshi-fee-schedule.pdf` | Fees (UR-3), F-17 |
 | 5 | Kalshi rulebook, and the contract terms for each BTC short-horizon series and any gold series (current, and the original filing) | Each series' `contract_terms_url` and `contract_url`. SECONDARY locator: `https://kalshi-public-docs.s3.amazonaws.com/contract_terms/CRYPTO15M.pdf`. Or follow the links from the kalshi.com market-rules page in a normal browser | UR-4, UR-5, settlement lineage, AR-2 |
 | 6 | Help-center articles on eligibility, location attestation, and demo accounts | `help.kalshi.com` (for example the demo-account article linked from `getting_started/demo_env.md`) | F-16, E-6 |
@@ -97,7 +97,7 @@ Every item below is **NOT YET OWNER-SUPPLIED / NOT YET AR-3 EVIDENCE**. URLs com
 
 ## Owner-decision packet
 
-Only decisions that need the owner's action next. None is taken here.
+Only decisions that need the owner's action next. None is taken here. They were revised after the Red-Team review (RT-B9-01, -02, -09): D-B09-2 was narrowed, and D-B09-9 was added.
 
 **D-B09-1. Kalshi official historical data as the first-source candidate.**
 - *Recommended:* keep it as the **first candidate**, conditional on A-2. Do not select it for acquisition yet.
@@ -107,7 +107,7 @@ Only decisions that need the owner's action next. None is taken here.
 - *Unlocks:* focusing AR-3, AR-B9-1, and the A-2 work on this source.
 
 **D-B09-2. A-1 hosts and path families.**
-- *Recommended:* **defer** until A-2 is resolved and AR-B9-1 has re-verified the documentation. Review the candidate now (analysis §3): one host `external-api.kalshi.com`; historical-tier prefixes plus the series, event, and fee-change metadata; live tier, private endpoints, WebSocket, and demo excluded.
+- *Recommended:* **defer** until D-B09-9 is ruled, A-2 is resolved, and AR-B9-1 has re-verified the documentation. **D-B09-2 cannot be approved before D-B09-9.** Review the candidate now (analysis §3): one host `external-api.kalshi.com`; exact endpoint templates (not broad prefixes) for the historical tier plus series and fee-change metadata; events only with `exclude_markets=true` and a settled-only filter; live tier, private endpoints, WebSocket, and demo excluded.
 - *Strongest reason:* approving hosts before knowing whether the use is permitted would invert the gate.
 - *Downside:* it delays the transport and pagination work by one decision cycle.
 - *If deferred:* nothing is lost now; the tooling cannot acquire this source anyway.
@@ -129,7 +129,7 @@ Only decisions that need the owner's action next. None is taken here.
 - *Unlocks:* an owner A-2 record (`licence_id`) and, if the answer is favorable, the L-ACQ check.
 
 **D-B09-5. A-3 backup option.**
-- *Recommended:* **Option 1** (encrypted external drive, offline) now for historical acquisitions. **Option 3** (adding an off-site copy) before irreplaceable prospective capture, and only after A-2 shows that third-party off-site storage is permitted.
+- *Recommended:* **Option 1** (encrypted external drive, offline) now for historical acquisitions, **with the owner explicitly accepting that acquired files stay single-site even though they count as irreplaceable** (`reproducible_from_provider: unknown`). **Option 3** (adding an off-site copy) before irreplaceable prospective capture, and only after A-2 shows that third-party off-site storage is permitted. The alternative is to require Option 3 for historical acquisitions too.
 - *Strongest reason:* Option 1 works with the existing directory-based backup code unchanged, and adds no third-party licence question.
 - *Downside:* it is single-site, with no protection from theft or fire.
 - *If deferred:* A-3 stays open. That blocks historical acquisition and live capture.
@@ -148,6 +148,19 @@ Only decisions that need the owner's action next. None is taken here.
 - *Downside:* it widens a deliberate safety rule (in a new, separately reviewed code path), and it adds engineering and review.
 - *If deferred:* this source stays unacquirable.
 - *Unlocks:* implementation of S1–S21 together with the production transport (B7-4), on synthetic data, then review.
+
+**D-B09-9. Classifying a Kalshi API host for acquisition: the rule 1 conflict (RT-B9-02).**
+- *Current requirement:* `docs/external_access.md` §1.1 rule 1 lets the owner classify an `api`-pattern host and path prefix otherwise, but ends: "No such classification ever covers a path that returns market observations". Kalshi's `/historical/*` paths return market observations. CLAUDE.md's Host-Class Rule says the strictest class applies and ambiguity fails closed.
+- *Concern:* the A-1 route in analysis §3 (and the B06/B07 `host_class_decisions` mechanism) assumes a §1.5 classification can authorize the acquisition tool. Read literally, rule 1 forbids that for any API source. The tension predates B09.
+- *Options:*
+  - (a) amend rule 1 (a governance edit): it would allow an acquisition-tool-only classification of exact historical-data templates for an owner-approved A-1 source, never for agents, never for live-tier paths, and never from a cycle's `T0 − m` for protected families;
+  - (b) confirm that, under current rules, an API-only source such as this cannot be acquired.
+- *Recommended:* (a), with that narrow wording and a Red-Team review of the amendment.
+- *Strongest reason:* rule 1 exists to stop agents reading live data. It was not meant to bar a gated, owner-approved tool from a historical API. Without (a), no official venue API is ever acquirable.
+- *Downside:* it weakens a fail-closed sentence, so the wording must be exact.
+- *If deferred:* D-B09-2 cannot be approved, and this source stays unacquirable.
+- *Unlocks:* D-B09-2.
+- *Urgency:* blocking for D-B09-2 only.
 
 **D-B09-8. External access for re-verification (AR-B9-1) and the status of AR-1.**
 - *Recommended:*
@@ -177,6 +190,7 @@ Agents do not contact Kalshi. The owner may adapt and send this after reading th
 > 6. Training statistical and machine-learning models on it.
 > 7. Retaining the derived features and model parameters, including after any account closure or end of API access.
 > 8. Using the resulting system solely to trade my own Kalshi account.
+> 9. Processing the data with third-party software tools and service providers, including hosted AI assistants used in developing the system, without giving them any right to redistribute it.
 >
 > I do not intend to redistribute, publish, sell, or share the data or derived datasets with third parties. Please also tell me:
 > - whether any deletion or retention obligations apply;

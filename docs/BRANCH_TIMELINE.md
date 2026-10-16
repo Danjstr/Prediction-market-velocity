@@ -95,7 +95,8 @@ Listed oldest first, and appended at each timeline update.
 
 | Commit | Content |
 |---|---|
-| (the commit adding this row) | B09 charter record, source-qualification analysis, owner-decision packet, Red-Team review, and status updates. Its hash is the branch tip; see `git ls-remote` |
+| `703fd7f` | B09 charter record, source-qualification analysis, owner-decision packet, and status updates (the Red-Team review subject) |
+| (the commit adding this row) | Red-Team review recorded (no BLOCKING; MAJOR RT-B9-01 and RT-B9-02), its fixes in the documents, D-B09-9 added. Its hash is the branch tip; see `git ls-remote` |
 
 ## Ancestry verification for B09 (2026-10-16)
 
