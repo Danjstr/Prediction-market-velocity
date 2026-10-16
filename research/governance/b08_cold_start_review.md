@@ -84,3 +84,72 @@ Added by the development coordinator, not the reviewer. Every finding was fixed 
 | m-8 | `docs/BRANCH_TIMELINE.md` describes `d52b46a` accurately and adds a row for the cold-start commit |
 | m-9 | `docs/protected_information.md` status line says B08 |
 | Outside Git | Auto-memory and untracked sandbox placeholders are not Git governance. The placeholders are the known sandbox `/dev/null` mounts recorded in the B06 record; they were not opened, and staging is by explicit path only |
+
+## Refresh after the owner's B8 decisions (2026-10-16)
+
+- **Reviewer:** fresh-context cold-start reviewer (new session, no chat context). Reconstructed only from files committed in Git. Read-only except for appending this section. No commit, push, network access, test run, or `check.sh` run. No real observation, protected path, credential, or untracked working-tree file was opened.
+- **Why a refresh:** after the review above (committed in `43c4283`), the owner decided B8-1 to B8-7 and modified B8-2 (per-frame environment identity, raw frame format v3) in `b3e8269`; `c2eca25` recorded the B8-2 Red-Team re-review and fixed RT-B8-15; `6fad8bd` recorded its verification and the `check.sh` result.
+
+### Git state at refresh
+
+| Check | Result |
+|---|---|
+| `git status --short --branch` | `## b08/prospective-capture-hardening`; no tracked modifications; untracked sandbox placeholders only (same set as "Working-tree note" above, including `secrets`; not opened) |
+| HEAD / `git log --oneline -10` | `6fad8bd` (HEAD), `c2eca25`, `b3e8269`, `43c4283`, `d52b46a`, `6dc2b51`, `7190f7f`, `222a7e7`, `1aa6c52` (B08); `9a6b212` (final B07) |
+| `git merge-base --is-ancestor 43c4283 HEAD` | `0` (the original cold-start state is an ancestor) |
+| `git merge-base --is-ancestor 9a6b212 HEAD` | `0` (final B07 is an ancestor) |
+| `git diff 9a6b212 HEAD --stat -- src/pmv/acquisition` | empty (reviewed acquisition code unchanged) |
+| `git log --merges 9a6b212..HEAD` | empty (no merge commit from `main` entered B08) |
+| `git diff --stat 43c4283 HEAD` | 17 files: docs (timeline, decision record, market_data, phase1, raw_data, Red-Team review), `src/pmv/capture_format.py`, `capture_store.py`, small edits in `capture_replay.py`, `events.py`, `timing.py`, `raw_storage.py`, and capture tests. CLAUDE.md, START_HERE.md, PROJECT_BRIEF.md, `.claude/` unchanged |
+| Code spot-check | `src/pmv/capture_format.py:96` `MAGIC = b"PMVRAW3\n"`, `:97` `V2_DRAFT_MAGIC = b"PMVRAW2\n"`, `:98` `V1_MAGIC`, `:100` `FORMAT_VERSION = 3`; payload/event header builders carry `venue_environment` and `deployment_environment` (`:290-302`, `:334-379`); `detect_format` dispatches 3/2/1 (`:308-313`); v2 draft refused by name (`:411-413`). `src/pmv/capture_store.py:136` `LAYOUT = "v3"`, layout `capture/v3/...` (`:12-18`), manifest `format_version: FORMAT_VERSION` (`:1611`). `src/pmv/capture_environment.py:75` `APPROVED_CAPTURE_ENDPOINTS = frozenset()`, refusal "live capture is not authorized" (`:215-219`) |
+
+### Reconstruction table (refresh)
+
+| # | Item | Rating | Evidence |
+|---|---|---|---|
+| 1 | PMV objective | CLEAR | CLAUDE.md:1-3, :91-110 (late-window, high-confidence, :99); PROJECT_BRIEF.md §3; START_HERE.md "Strategy at a Glance"; docs/phase1.md:8 |
+| 2 | Runtime LLM independence | CLEAR | CLAUDE.md:65-89 (":74 No LLM or agent inference is permitted or required in the production runtime"); docs/phase1.md:65 |
+| 3 | Current phase | CLEAR | Phase 1, Gate 0 passed: docs/phase1.md:5-9; START_HERE.md:1261; docs/gates.md:5; only a Gate 0 record exists in `docs/decisions/gates/` |
+| 4 | Branch continuity | CLEAR | B08 from final B07 `9a6b212`, not `main`: docs/BRANCH_TIMELINE.md:9-12, :38, :92-99; B08 record:7. B09 from final B08: BRANCH_TIMELINE.md:24, :117-122; B08 record:36. Rules: START_HERE.md:40-66; CLAUDE.md:433-438. Git confirms (above) |
+| 5 | Historical-development / prospective-holdout architecture | CLEAR | CLAUDE.md:171-212 (:176 prospective first cycle, H-1); docs/phase1.md:7, :34 (no cycle, `T0`, split, or scope); B08 record:82 |
+| 6 | Acquisition and live capture NOT authorized | CLEAR | docs/phase1.md:9, :350-351; BRANCH_TIMELINE.md:23; B08 record:19-27, :137-145; docs/raw_data.md:69; code registry empty (above). No overclaim found by search |
+| 7 | Protected-information rules | CLEAR | CLAUDE.md:212 onward (five classes, embargo, guard); docs/protected_information.md; docs/external_access.md. Unchanged since the original review |
+| 8 | B08 capture work | CLEAR | docs/phase1.md:298-321 (v3 wording, B8-2 "as modified"); docs/raw_data.md:65-193; docs/market_data.md:11, :38, :88-104; Red-Team rounds 1-3, the B8-2 re-review, and RT-B8-15 verification: b08_prospective_capture_red_team_review.md (sections "B8-2 modification" and "RT-B8-15 verification"); B08 record:86-102 |
+| 9 | Owner decisions B8-1..B8-7 | CLEAR in the decision record; CONTRADICTORY in one docs/phase1.md passage | B08 record:52-64: B8-1, B8-3, B8-4, B8-5, B8-7 **Confirmed**; B8-6 **Confirmed for now**, revisitable only after E-6 or another governed demo-use policy; B8-2 **Modified** (per-frame identity). Interpretation table :42-50 marks the original B8-2 reading "superseded". docs/phase1.md:95 agrees ("Owner decided B8-1 to B8-7 on 2026-10-16"), but docs/phase1.md:40-41 still asks the owner to "confirm or replace interpretations B8-1 to B8-7" (finding R-1) |
+| 10 | Frame-format version and compatibility | CLEAR | v3 (`PMVRAW3`, frame version 3, manifest `format_version` 3, layout `capture/v3/`); v2 draft recognised (`detect_format` returns 2) and refused with a named error, never reinterpreted, never salvaged; v1 separate, own magic, starts captures only in `test`, reading unchanged: B08 record:66-72; docs/raw_data.md:67, :137-149, :185; docs/phase1.md:303-308; Red-Team "B8-2 modification" (2); code (above). All remaining `v2`/`PMVRAW2`/`capture/v2` mentions are explicitly historical (raw_data.md:143-144, capture_format.py:7, statistician review scoped to `222a7e7`, phase1.md:357/:371 under a "Historical lists" heading, gate0_readiness.md:98 with the B08 status note at :107), except B08 record:13 (finding R-3) |
+| 11 | Remaining acquisition/source boundary | CLEAR | B08 record:126-136; docs/phase1.md:14-32 ("A-4 is not satisfied", :21); docs/acquisition_readiness.md "Remaining A-4 gaps" (scope and pagination defined after m-7) |
+| 12 | Gate 1 status | CLEAR | Undecided: docs/phase1.md:9, :350; BRANCH_TIMELINE.md:23; B08 record:82; docs/gates.md:5 |
+| 13 | Carried-forward residuals | CLEAR | Authoritative table B08 record:104-120 (adds RT-B8-15 residual: missing `time.session_started_at` raises `KeyError`, still fail-closed); docs/phase1.md:329-345 matches by deadline and defers to the record. RT-B8-15 itself closed (Red-Team "RT-B8-15 verification") |
+| 14 | `check.sh` numbers | CLEAR | B08 record:101: 2305 passed / 8 skipped before the owner decisions; 2322 passed / 8 skipped at `c2eca25`. No conflicting figure elsewhere for B08 (BRANCH_TIMELINE.md:70's 2123 is B07's). Not re-run by this reviewer |
+| 15 | Next owner action | AMBIGUOUS | docs/phase1.md:39-50: step 0 still lists confirming B8-1..B8-7 (already done), alongside the still-valid PR decision and merge; :52 "B08 (done, pending owner review)". A fresh session can infer that the remaining B08 action is the single B08 → `main` PR (BRANCH_TIMELINE.md:21; phase1.md:42-43), then owner steps 1-7, but the list does not say so cleanly (R-1) |
+
+### Findings
+
+No MAJOR finding. No statement claims that acquisition or live capture is authorized, that A-4 is satisfied, or that Gate 1 passed. No current-format statement still says v2, `PMVRAW2`, `capture/v2`, or segment-header-only environment, except as labelled history.
+
+| ID | Severity | Location | Quote | Problem | Fix |
+|---|---|---|---|---|---|
+| R-1 | MINOR | docs/phase1.md:40-41, :52 | "review B08 ...: - confirm or replace interpretations B8-1 to B8-7;" and "B08 (done, pending owner review)" | Stale after `b3e8269`: the owner already decided B8-1..B8-7 (B08 record:52-64; phase1.md:95 says so). A fresh session could think the owner still has to rule on them. | Replace the bullet with "B8-1 to B8-7 decided 2026-10-16 (B8-2 modified to frame format v3; B8-6 confirmed for now pending E-6)"; keep the PR-decision and merge bullets; change ":52" to "B08 (done; owner decisions recorded; awaiting the B08 → `main` PR decision)". |
+| R-2 | MINOR | docs/BRANCH_TIMELINE.md:90; B08 record:100 | "(the commit adding this row) \| RT-B8-15 verification, `check.sh` result, and cold-start refresh"; "Cold-start review: ... Verdict: YES with conditions. Its nine MINOR documentation findings were fixed" | Same pattern as m-8: the row was added by `6fad8bd`, which (per `git show --stat 6fad8bd`) contains no cold-start refresh; this refresh did not exist until now. The decision record's Outcome cites only the original review. | When this refresh is committed: describe `6fad8bd` as "RT-B8-15 verification, `check.sh` result, and timeline", add a tip row for the refresh commit, and add the refresh verdict to B08 record "Outcome" → "Cold-start review". |
+| R-3 | MINOR (optional) | docs/decisions/2026-10-16_b08_prospective_capture_hardening.md:13 | "F-12 with F-27: raw frame format v2 (monotonic receipt time, ...)" | Inside the charter summary, so historically correct, but not labelled; a skimming reader may take v2 as the current format. The same record states v3 at :45, :59, :66-70. | Append "(implemented as v3 after owner decision B8-2; see 'Owner decisions')". |
+| R-4 | MINOR (optional) | docs/phase1.md:97 | "**Implemented in B08** (interpretations B8-4 to B8-6)" | Does not say B8-6 is only "confirmed for now" and revisitable after E-6, though the same cell notes E-6 is open. | Add "B8-6 confirmed for now, revisitable after E-6". |
+
+### Out-of-Git notes
+
+- The user's auto-memory still names B07 / `cfd3e54` as active; Git (BRANCH_TIMELINE.md:7-24) governs and names B08. Not a repository finding.
+- The pushed tip cannot be checked without network (`git ls-remote`); no remote ref was consulted beyond local state.
+
+### Verdict (refresh)
+
+**YES, with conditions.** A fresh session reconstructs the post-decision B08 state correctly from Git: B08 from final B07 `9a6b212`, B09 from final B08; the owner's decisions (B8-1, B8-3, B8-4, B8-5, B8-7 confirmed; B8-6 confirmed for now pending E-6; B8-2 modified); frame format v3 with per-frame environment identity, the v2 draft recognised and refused, v1 separate; RT-B8-15 closed; acquisition and live capture not authorized, A-4 not satisfied, Gate 1 undecided; residuals and the open owner inputs unchanged; and the code agrees. Conditions (documentation only): fix R-1 (stale "confirm B8-1..B8-7" in the owner next steps) and R-2 (timeline row and Outcome entry for this refresh) when it is committed; R-3 and R-4 are optional.
+
+### Refresh dispositions (coordinator, 2026-10-16)
+
+Added by the development coordinator, not the reviewer. Documentation only.
+
+| ID | Fix |
+|---|---|
+| R-1 | `docs/phase1.md`: the owner step records B8-1 to B8-7 as decided on 2026-10-16. The B08 → `main` pull request is the remaining B08 owner action, and the agents' B08 line says the same |
+| R-2 | `docs/BRANCH_TIMELINE.md` describes `6fad8bd` accurately and adds a row for this refresh commit. The decision record's "Outcome" cites the refresh and its verdict |
+| R-3 | The charter summary's "raw frame format v2" is marked as historical wording, implemented as v3 |
+| R-4 | The `docs/phase1.md` F-37/RT-4 row states B8-6 as confirmed for now, revisitable after E-6 |

@@ -87,7 +87,8 @@ Listed oldest first, and appended at each timeline update.
 | `43c4283` | Cold-start review and its documentation fixes, plus the `check.sh` result (state presented for the owner's review of B8-1 to B8-7) |
 | `b3e8269` | Owner decisions on B8-1 to B8-7. Modified B8-2: per-frame environment identity, frame format v3 |
 | `c2eca25` | Red-Team re-review of the B8-2 change recorded, and RT-B8-15 closed. **Final reviewed capture code** |
-| (the commit adding this row) | RT-B8-15 verification, `check.sh` result, and cold-start refresh. Its hash is the branch tip; see `git ls-remote` |
+| `6fad8bd` | RT-B8-15 verification recorded, the `check.sh` result after B8-2 (2322 passed, 8 skipped), and timeline update |
+| (the commit adding this row) | Cold-start refresh after the owner's B8 decisions and its documentation fixes (R-1 to R-4). Its hash is the branch tip; see `git ls-remote` |
 
 ## Ancestry verification for B08 (2026-10-16)
 

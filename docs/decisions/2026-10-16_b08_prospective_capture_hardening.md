@@ -10,7 +10,7 @@
   - a coherent engineering-only batch exists on the prospective-capture side.
 - **Objective.** Complete the source-neutral prospective-capture engineering that needs no real endpoint, credential, market observation, source approval, or new parser dependency:
   - F-11: capture segmentation and salvage;
-  - F-12 with F-27: raw frame format v2 (monotonic receipt time, message direction, identity and versioning, ordering and provenance);
+  - F-12 with F-27: raw frame format v2 (monotonic receipt time, message direction, identity and versioning, ordering and provenance). *Historical charter wording: implemented as frame format v3 after owner decision B8-2.*
   - F-33: durability-ordering and crash-boundary tests;
   - F-37 and RT-4: test and demo boundaries, and refusal of the test environment;
   - order-book continuity: a rejected, malformed, missing, or invalid frame breaks book continuity;
@@ -97,7 +97,9 @@ The owner reviewed B8-1 to B8-7 explicitly, before the B08 pull request, and dec
 - **Statistician** (`research/governance/b08_statistician_review.md`; development self-review): **PASS WITH CONDITIONS.**
   - No look-ahead. Availability is still the wall-clock receipt time, and every new continuity rule is conservative.
   - No effect on protected data, `T0`, the split, or the holdout.
-- **Cold-start review:** `research/governance/b08_cold_start_review.md`. Verdict: YES with conditions. Its nine MINOR documentation findings were fixed (see that file, "Coordinator dispositions").
+- **Cold-start review:** `research/governance/b08_cold_start_review.md`.
+  - The first review gave YES with conditions. Its nine MINOR documentation findings were fixed (see "Coordinator dispositions" in that file).
+  - The refresh after the owner's B8 decisions also gave YES with conditions, with no MAJOR finding and no overclaim. Its MINOR findings R-1 to R-4 were fixed (see "Refresh dispositions" in that file).
 - **Quality gate:** `./scripts/check.sh` passed on 2026-10-16: 2305 passed and 8 skipped before the owner decisions, and 2322 passed and 8 skipped after the B8-2 modification and RT-B8-15 (at `c2eca25`). The 8 skips are the owner-run sentinel probes in `tests/integration/test_information_embargo.py`.
 - **Models used:** development and review used Claude Opus 5.5 (`claude-opus-5-5`). Nothing in B08 trains or selects a predictive model, and no cycle exists.
 
