@@ -149,6 +149,8 @@ Research and verify current official documentation for:
 - relevant BTC market/reference feeds;
 - relevant gold/reference feeds.
 
+Inventory existing historical data sources for the venues, BTC, gold, and their reference sources: coverage, granularity, timestamp semantics, contract metadata, outcomes, revisions, access, cost, licensing, provenance, and known gaps. Prefer verified existing historical data to waiting to regenerate equivalent observations, subject to the provenance, licensing, point-in-time, holdout, and source-quality requirements. Historical data exposed to development can never become protected holdout data.
+
 Determine:
 - historical depth;
 - timestamp resolution;
@@ -208,6 +210,8 @@ Gate 1 also requires the raw-data backup and retention policy to be in place, an
 - Statistician
 - API / Execution Engineer
 - Independent Statistical Auditor — only when Gate 2 independence requires it
+
+Perform general data cleaning and dataset engineering as designed in docs/phase2.md, for PMV captures and acquired historical data alike. That covers immutable raw preservation and provenance; schema, unit, and timestamp normalization; duplicates and cross-source reconciliation; missing data, staleness, and outliers; book and sequence continuity; point-in-time contract metadata and result revisions; reason-coded exclusions; source-quality tiers; deterministic derived datasets; split-safe fitted transformations; and the identity and dependence grouping that split isolation, purge and embargo, effective sample size, and uncertainty must respect.
 
 Define:
 - observation unit;

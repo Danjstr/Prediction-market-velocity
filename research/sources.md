@@ -120,3 +120,627 @@ Entries are append-only. Mark superseded entries rather than deleting them.
 - Result: HTTP 429 with a "Vercel Security Checkpoint" JavaScript challenge page, so no document content was obtained. The challenge was not circumvented. `https://kalshi.com/` also answered 429 to a HEAD request on 2026-10-15. `www.kalshi.com` is not on the network allowlist.
 - Consequence: the terms of service, the Developer Agreement, the fee schedule, and the contract-rule documents are **unverified**. See ACCESS REQUEST AR-3 in `docs/phase1.md`.
 - Source type: official (intended). Verification status: not retrieved.
+
+## Phase 1 batch 3: historical-data inventory sources (retrieved 2026-10-16)
+
+Merged from the three batch 3 inventory agents. Hashes identify the bytes retrieved. Inventories: `research/historical_data/inventory_*.md`.
+
+### Batch 3 group: Prediction markets (section A)
+
+These entries use the format of `research/sources.md`, for later merge by the lead. Every item was retrieved 2026-10-16 (UTC), between 02:05Z and 02:29Z. SHA-256 values identify the bytes retrieved. They were fetched with curl through the sandbox egress proxy, except where noted. No market API, RPC, subgraph, or query host was contacted. No dataset files or viewers were opened. Example payloads in documentation are illustrations, not data, and were not used as data.
+
+### Polymarket documentation set (docs.polymarket.com)
+- URL: `https://docs.polymarket.com/` (pages listed below, fetched as `.md`)
+- Retrieved: 2026-10-16
+- Access basis: owner direction 2026-10-16 (Polymarket documentation research approved for this inventory; no adapter, account, or collection)
+- Used for: historical endpoints and retention; trade and price-history timestamp semantics; on-chain event model; resolution sources (UMA; Chainlink TWAP); settlement-rule, fee, and taker-delay change dates; geoblock (US close-only); absence of a historical book endpoint
+- Source type: official documentation (the venue's own docs and the OpenAPI excerpts embedded in them)
+- Verification status: documented statements, not observed behavior
+
+| Path | SHA-256 |
+|---|---|
+| `llms.txt` | `bc1dd18d474ffad8154e7939c4b8e013d99b91895b67cecef112a53bb99888eb` |
+| `_llms/en/api-reference/predictions.txt` | `ee72a2ab5d10d9c4a1b8a6c7532db037dfe090f91b09f2f03e0b2cef9200bd10` |
+| `api-reference/markets/get-prices-history.md` (CLOB, legacy) | `e8e811fc15da9cedc750732e85db65ac4049a7d373ed264a2a7bace9d559d98d` |
+| `api-reference/markets/get-batch-prices-history.md` | `8e861601f816fa1af3d413dbabe8bc7096df5358130e725842c11a5d846de406` |
+| `api-reference/markets/get-a-tokens-price-history.md` (Data API v2) | `dbd5e33956200540998dd8f99a361ff12cafc28de019ccc562170ac7b2582faa` |
+| `api-reference/feeds/list-trades.md` (Data API v2 `/v2/trades`) | `507b47690c31d7d47657b667d304868e2d86aa959d368a42644691fa78ec2b5d` |
+| `api-reference/core/get-trades-for-a-user-or-markets.md` (v1) | `d8c04e1218d6fdc1e8c164c0182d7e3053b59cbfdf5416f484051e7f279a0886` |
+| `api-reference/markets/get-resolution-state.md` | `a703d0ebc6ff2c1bd32fd711cae2a72220aa88559058be4ea7c63ff5ca0f5441` |
+| `api-reference/service/get-data-freshness.md` | `371f32ca156ad0537d17049761cb806e8749695233067be668f84d18eb6d9a40` |
+| `api-reference/data-api/overview.md` | `ee1c773be5d18dbb3a554e45644ce6242c2d5fa0cb5bc5f90d2fcfcb8037ff2d` |
+| `api-reference/markets/list-markets.md` (Gamma) | `783670f60fbdacf179fb869af5b0265d4954402069383b6582147bd092032fa6` |
+| `api-reference/markets/get-market-by-id.md` | `1a52ff01572c8a39e176432c0720ed0bc27aca31a9ec1122885a7c4c8b778b52` |
+| `api-reference/events/list-events.md` | `ae4d57cf733a9b2cde990fade7227ee4432522ff96f5b8c2304da9a90b2a1e87` |
+| `api-reference/series/list-series.md` | `54d5131df88bf567bc34df25359e402320de50e83d569511eca925bf654f5443` |
+| `api-reference/market-data/get-order-book.md` | `85a606166da518d9c85523406bfeeeae76f4f069171320ea3b8c6c906974fcc4` |
+| `api-reference/wss/market.md` | `0828ba0ecbff80d9e611f6ceb3922ef48a9cd794feab97ede1ab879d7cbd5a79` |
+| `api-reference/wss/polybolt.md` | `c3870cb5efb7aca23893f353646ce9d36128bdd3b34dfc4aa311972cf38c264e` |
+| `api-reference/live-data/overview.md` | `0d1ead0547430d2b9411f7bc1cb5eb3a32482d205044f6f827f3ed915f35f2b5` |
+| `api-reference/rate-limits.md` | `1a238b502342564ff0afb087a725aad2bf16e5fa5978d19bcf414ea81d2a84a5` |
+| `api-reference/geoblock.md` | `0497c110220bd31c69acedcffbe478ff3c28c9b4a2c59bca45ab9028567cf0c3` |
+| `api-reference/predictions/overview.md` | `abf1388c44092ca4fcac0dd00563d8648ff4551b64278966439c32911cbaa59d` |
+| `concepts/resolution.md` | `2264660d3f55b7d3df875d73b68098d7d62c1489cdd252bd846932e3088cd047` |
+| `concepts/markets-events.md` | `89a0a338161924c0e65a935dfb0e6ac0bb6e0826b4f1643500712fb1d72f9244` |
+| `concepts/prices-orderbook.md` | `f3f23f21862272a505f098b3703c8954a52719f0dc45eb9c71bc7231b5ce0380` |
+| `market-data/overview.md` | `9d340c9cb056bfed11b189dcf02279db46e7ce9a4dad93bb9da87aa8b33c7568` |
+| `market-data/prices-order-books.md` | `438b620f7ac6c856c03444ac4f0d5893938c30510f533a25e0068907cec704cd` |
+| `market-data/market-details.md` | `00be2ab64b017c31524715c4ae43c08571e5bfa444e77ee885d0adc388aafd99` |
+| `market-data/discover-markets.md` | `a73c970113abf3a3eecdf2426fc385a81ff834a4baf8d6c0dd1894ce85a856ee` |
+| `market-data/public-analytics.md` | `f97802fc740bb129cafe3e393656732d3e3382a1e96e5c88c54a7e99d164a7c7` |
+| `market-data/realtime-data.md` | `adcc641bde699fc6e2196e80a84e21b680aa0d36b30183b29b753c910dd5671e` |
+| `market-data/chainlink-twap.md` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` (empty body; redirect, content not retrieved) |
+| `resources/blockchain-data.md` | `b43e28861d67e2b2a27cb02ec939ce09c99388dc3945107df46e00183acd81b7` |
+| `resources/onchain-position-data.md` | `3f6b9e31b5eecd4a7ab0f2d303a17ea2c75ea4364d5d034c69cf57de672ae5de` |
+| `resources/contracts.md` | `64ff1d4a6c51afb7cfda55de05ed5b3b417e4846ed13f7dcf4d85dae9d0a7113` |
+| `trading/fees.md` | `7409b13c646126ff1c3bacc478c0594a7b3db2a2e735fcdf6ddb59b3fdc44035` |
+| `trading/matching-engine.md` | `e064c6d50ac3b7de501346c736d24eef74e22ad0aa2049677eaf4b5a163c1498` |
+| `changelog/predictions.md` | `ff37e36331c9b7766e55f9aeda0077e6b3b354a95b635561f124c412ff7b11cd` |
+| `migrate/data-api-v1-to-v2.md` | `96955b89c27fe908979a73fbb77d31b30c50f9f5fdebca211b009c4ffb0d05fd` |
+| `migrate/rtds-to-polybolt.md` | `6e97f169e3a4562e9c3252a36fbadd4d394d1defe1a0aa18f8d8347bb5586bd8` |
+| `migrate/polymarket-v2/overview.md` | `4a680ef8f3d25279f528f8da83d5a27b39e5903de50834cd37b11401c8ee9d89` |
+
+Not fetched: `https://data-api.polymarket.com/v2/openapi.json` and `https://ws-live-v2.polymarket.com/asyncapi.json`, which are listed in `llms.txt`. Both are on API hosts, which the hard rules exclude. Their relevant content is embedded in the docs pages above.
+
+### polymarket.com Terms of Use page (attempted; body not retrievable)
+- URL: https://polymarket.com/tos
+- Retrieved: 2026-10-16. HTTP 200, SHA-256 `b2199996060a6242e14f70c7e0197a576bd35f87041e514036054f0c7ac2cc8d`
+- Used for: only the served banner "Trading is blocked in the United States on polymarket.com. Switch to polymarket.us". The terms text is JS-rendered and was not in the HTML.
+- Source type: official venue page
+- Verification status: observed page content (banner only). Data-use terms UNRESOLVED.
+
+### KalshiEX CFTC filing: BTC contract amendment (Rule 40.6), 2024-11-12
+- URL: https://www.cftc.gov/sites/default/files/filings/orgrules/24/11/rules1112248590.pdf
+- Retrieved: 2026-10-16. SHA-256 `ad45dba4b3863d7286842a2b647ef2ac885a6999ffe53d8892b27ad4326fe5b3`
+- Used for: BTC rulebook Underlying changed from 300 s to a 60 s BRTI average "excluding the highest and lowest 20% of values", effective 2024-11-27. Source Agency CF Benchmarks.
+- Source type: primary source (regulatory filing). Text was extracted with a local stdlib script. The PDF was treated as data, not executed.
+- Verification status: documented statement
+
+### KalshiEX CFTC filing: CRYPTO rulebook contract, 2025-07-18
+- URL: https://www.cftc.gov/sites/default/files/filings/ptc/25/07/ptc07182526860.pdf
+- Retrieved: 2026-10-16. SHA-256 `d6864df0bdcf33e0e55775ccd3e08e4db76c1ecf4515229882678b8d0ea4e765` (a WebFetch copy had identical bytes)
+- Used for: CRYPTO rulebook, a 60 s simple average of the CF index; "no data → affected strikes resolve to No"; Source Agency CF Benchmarks
+- Source type: primary source (regulatory filing)
+- Verification status: documented statement
+
+### KalshiEX CFTC filing: CRYPTOSHORT rulebook contract, 2026-03-11
+- URL: https://www.cftc.gov/sites/default/files/filings/ptc/26/03/ptc03112640675.pdf
+- Retrieved: 2026-10-16. SHA-256 `880a5516c31a8dbcebeffeb3ee3b265622eaaecf159494aed940fb7fe92ea8e2`
+- Used for: CRYPTOSHORT with a configurable `<lookbackduration>`; rounding before comparison; "no data → last piece of data available"; post-expiration CF corrections ignored; times in ET
+- Source type: primary source (regulatory filing)
+- Verification status: documented statement. Applicability to KXBTC15M is UNRESOLVED.
+
+### GitHub READMEs and schema docs (raw.githubusercontent.com)
+- Retrieved: 2026-10-16
+- Used for: dataset and tool descriptions, licences, coverage claims, and known pitfalls (V2 migration, double counting)
+- Source type: secondary (third-party repositories). Not cloned; no code was run.
+- Verification status: claims by the authors, unverified
+
+| Repository / file | SHA-256 |
+|---|---|
+| `Jon-Becker/prediction-market-analysis` README | `9596ded62210245b634814f9c99bf0560d05635ea0610cc8e78687da5bda9d71` |
+| `Jon-Becker/prediction-market-analysis` docs/SCHEMAS.md | `5e2746fe38c0e2e871fe0806bb5ac49af409cb4387fb5f09e2e12fd07ec6547a` |
+| `warproxxx/poly_data` README | `c5a4a3cb8ae14dcb9fb6b9d41a2b468f78338bca38124deb4e6a1f2e3c9f41b0` |
+| `Polymarket/polymarket-subgraph` README (official) | `a0940caf7ed68f1837c20443dff41446d95360dbefcb01361d0d05728c48c171` |
+| `Polymarket/agent-skills` market-data.md (official) | `447dafa4cabe127f8de9f7a38d900d09ca4ae5143e850fabdce3893e48f3c5bf` |
+| `PaulieB14/polymarket-v2-subgraphs` README | `96271893caab25b02be44d8cb877d94d762654beee25b04f0b1faeab5b215e49` |
+| `jdkatz21/Prediction_Markets_Public` README | `32613a1da34acd401904e2c92ff1e277b691a35c5336a081a0fdd373f0b8482e` |
+| `marketlenstrade/polymarket-historical-data` README | `1e6f3446b01970cd3d2aaca7cb02ed657551235c263f79f8c270721cf3028745` |
+| `JasonJSant/polymarket-skilled-traders` README | `8d5a096e36096ab320cf049ae5c6dd359b006f6503ce5a73ee78a37ee79e12ac` |
+| `manja316/polymarket-historical-data` README | `d692fd73333ce3231537bfd9155ed269e0557203584ec4b554d75626cf6271e5` |
+| `Polymarket/agents` README (ToS statement; grep only) | not hashed |
+
+### Hugging Face dataset cards (README.md via `huggingface.co/datasets/<id>/raw/main/README.md`; no viewer, no files)
+- Retrieved: 2026-10-16
+- Used for: coverage, schema, timestamp, licence, and provenance claims
+- Source type: secondary (dataset publishers)
+- Verification status: claims by the publishers, unverified
+
+| Dataset | SHA-256 of card |
+|---|---|
+| `TrevorJS/kalshi-trades` | `b9ec30d19b183b03f017470b2c42b7440de4a11ab4f7abbba161ad9f04e3de63` |
+| `DegenHedge/kalshi-btc-15m` (incidental exposure; see inventory) | `a91a55a2406f850f6423e99c730a3da81bf111e5793af503e31fc2d2a1d3f28c` |
+| `lerchen3/kalshi-orderbook-alpha` | `c87c603b276b1d7ac08b842fd101319377dcad97561789cdf3ad6280661c1916` |
+| `carpetxie/winniethepooh` | `494818940e92370a4a154c77376d83bfd7574348d41f948bd1b7cfd3e95a8b80` |
+| `thomaswmitch/kalshi-prediction-markets-betting` | `a3646dc628a16ee6a39cdcd20beccd33460b0edc41748e5ae5f2f64e7b0e1740` |
+| `thomaswmitch/kalshi-prediction-markets-markets` | `adea36be2c8b31151d518846dea435a426cb30245ca2154bda923a7bae9f0a33` |
+| `SII-WANGZJ/Polymarket_data` | `04addcffb36d97d7facaa5f544a7f5079dc73861e4d78e3c62659744f4c9dffc` |
+| `TimeSeventeen/Polymarket-v1` | `617f19d07415bcc4c4e06ad30a86bac703affd03a805c57f87c3432a1b699f36` |
+| `benjessel/polymarket_trades` | `db36d7a190075719e8bfde2b28bba10555bc184e9d44bfe672fd89ee845c426d` |
+| `BrockMisner/polymarket-btc-updown` | `eab1209e2050d79a3bb5841fca4b9e834a43ccd3cadca4476be38a671e2dd4ae` |
+| `sadaftkhan/sayf-episodes` (HTTP 401, gated) | `c18354b67a4658bc603a631038c7442f703b86b4ad54b894e1ebf06e4bc9d415` (error body) |
+
+### arXiv 2606.04217, "Polymarket-v1 Database" (abstract page)
+- URL: https://arxiv.org/abs/2606.04217
+- Retrieved: 2026-10-16. SHA-256 `6c1a7ae3e4c913538637b84b3eaf25fefa0d88b6877dd3e3b833ae15b5066c06`
+- Used for: coverage (2022-11-21 to 2026-04-28, V1 only) and the ground-truth aggressor claim for T9
+- Source type: secondary (preprint)
+- Verification status: authors' claim
+
+### Kaggle dataset page `hugobde/polymarket-bitcoin-15min-up-or-down` (metadata only)
+- URL: https://www.kaggle.com/datasets/hugobde/polymarket-bitcoin-15min-up-or-down
+- Retrieved: 2026-10-16. SHA-256 `f7f87efdf29d49b599cdd8328f44da71c4c6fe21c0a7aa84eb2cc734d444b3ec`
+- Used for: title, and licence "Unknown" from the page JSON. The coverage description came from a search snippet. The data tab was not opened.
+- Source type: secondary
+- Verification status: page metadata
+
+### WebSearch discovery results (not fetched pages)
+- Retrieved: 2026-10-16
+- Used for: SECONDARY claims only:
+  - KXBTC15M rules (BRTI 60 s, tie → YES);
+  - KXGOLD15M (Pyth GOLD 1-minute close, launched around August 2026);
+  - Polymarket gold daily markets on Pyth;
+  - the pre-2026-08-07 Polymarket Chainlink Data Streams snapshot;
+  - Polymarket US (separate venue, BTC 15m launched around 2026-09-22, conflicting settlement-source claims, no public tape);
+  - the locator of `kalshi-public-docs.s3.amazonaws.com/contract_terms/CRYPTO15M.pdf`;
+  - vendor coverage claims (Marketlens, PolymarketData.co, PolyHistorical, PMData, PolyOrderbooks).
+- Source type: secondary (search-engine summaries of third-party sites)
+- Verification status: assumption until verified against the official sources in AR-A1, AR-A3, AR-A5, AR-A6, and AR-3
+
+### Refused or not attempted (no content)
+- Proxy-refused: docs.goldsky.com, thegraph.com, docs.dune.com, dune.com, docs.uma.xyz, oracle.uma.xyz, docs.chain.link, data.chain.link, docs.cfbenchmarks.com, learn.polymarket.com, docs.polymarket.us, polymarketexchange.com, integrity.polymarket.com, www.polymarketdata.co, polyhistorical.com, pmdata.dev, polyorderbooks.com, marketlens.trade, www.telonex.io, predictionmarketspicks.com, calipermarkets.com, www.pyth.network, docs.pyth.network, pythdata.app, docs.allium.so, crypto.clickhouse.com, polygonscan.com, docs.envio.dev, degenhedge.com
+- Anti-bot: kalshi.com (HTTP 429; AR-3)
+- Not attempted (outside D1, needs its own access request): help.kalshi.com, kalshi-public-docs.s3.amazonaws.com
+- Reachable but deliberately not used: web.archive.org (archive or mirror routes to blocked content are prohibited); www.cfbenchmarks.com (reference-feed scope, not section A)
+
+### Batch 3 group: BTC and gold underlyings and reference sources (sections B, C)
+
+These entries use the format of `research/sources.md`. They are staged here for review and are not yet appended there. Retrieval date for every entry: **2026-10-16 (UTC)**, between 02:15Z and 02:31Z. Each SHA-256 covers the bytes as retrieved by `curl` through the sandbox egress proxy. HTML pages change often, so a hash only identifies the retrieved copy. Where no hash is given, the content came from a WebSearch summary and is SECONDARY. No market-data API host was contacted. Kalshi documentation was accessed under AR-1 (docs only).
+
+### CF Benchmarks: BRTI index page
+- URL: https://www.cfbenchmarks.com/data/indices/BRTI
+- Retrieved: 2026-10-16
+- Used for: BRTI publication frequency; the provider's statement that BRTI is the settlement input for Kalshi event contracts; licensing statements; the website terms that prohibit automated access (after which no further fetches were made)
+- Source type: official documentation (benchmark administrator)
+- Verification status: documented statement
+- SHA-256: `ade8b08c5fe9c7540462ee57a8d213395829c3f8fe578a2aa23c055bf9c8abab`
+
+### Kalshi docs: CF Benchmarks REST Passthrough
+- URL: https://docs.kalshi.com/cfbenchmarks/rest-passthrough.md
+- Retrieved: 2026-10-16 (AR-1)
+- Used for: availability of historical, tick-level BRTI values through the authenticated, entitlement-gated Kalshi passthrough
+- Source type: official documentation
+- Verification status: documented statement
+- SHA-256: `bf0ef09aae3c97542090c17bce999e04441f830e6db390c6d392e67929996b51`
+
+### Kalshi docs: Pyth Value Feed
+- URL: https://docs.kalshi.com/websockets/pyth-value.md
+- Retrieved: 2026-10-16 (AR-1)
+- Used for: Pyth gold feed symbols and IDs (`Metal.XAU/USD` 346, `Metal.Index.GOLD/USD` 3153, `Metal.Index.1OZGOLD/USD` 3712); price of USD 1,000/month; timestamp handling
+- Source type: official documentation
+- Verification status: documented statement
+- SHA-256: `70c0e8062402b316e6398bf86e079eafb74ca905606c1f8a60858664f11a0a5b`
+
+### Kalshi docs index (llms.txt)
+- URL: https://docs.kalshi.com/llms.txt
+- Retrieved: 2026-10-16 (AR-1); hash identical to the batch 2 copy
+- Used for: locating the reference-feed pages
+- Source type: official documentation
+- Verification status: documented statement
+- SHA-256: `4b97d36e6e5c0b949d0a9bdced42fe0499be277a0a9c2dc8f66342fae14520f0`
+
+### Polymarket docs: Resolution
+- URL: https://docs.polymarket.com/concepts/resolution.md
+- Retrieved: 2026-10-16
+- Used for: Chainlink TWAP as the resolution source for up/down markets; tie rule (Up when final price ≥ price to beat)
+- Source type: official documentation
+- Verification status: documented statement
+- SHA-256: `2264660d3f55b7d3df875d73b68098d7d62c1489cdd252bd846932e3088cd047`
+
+### Polymarket docs: Predictions changelog
+- URL: https://docs.polymarket.com/changelog/predictions.md
+- Retrieved: 2026-10-16
+- Used for: TWAP resolution from 2026-08-07; 5-minute markets moved to a 60-second window on 2026-08-14; PolyBolt `source` field and Chainlink default (2026-09-29 and 2026-10-02)
+- Source type: official documentation
+- Verification status: documented statement
+- SHA-256: `ff37e36331c9b7766e55f9aeda0077e6b3b354a95b635561f124c412ff7b11cd`
+
+### Polymarket docs: Real-Time Data (Chainlink TWAP / reference prices)
+- URL: https://docs.polymarket.com/market-data/chainlink-twap
+- Retrieved: 2026-10-16
+- Used for: TWAP `windowSeconds: 60` lookback semantics; snapshot of two minutes of history; payload timestamp fields; `xauusd` reference symbol; carried-forward handling
+- Source type: official documentation
+- Verification status: documented statement. Example payloads are illustrations and were not read as data.
+- SHA-256: `4cc6b7b91de6207101804b5026a40117f97827ed4995c2cb3d94f1e8698da244`
+
+### Polymarket docs: RTDS to PolyBolt migration; docs index
+- URLs: https://docs.polymarket.com/migrate/rtds-to-polybolt.md ; https://docs.polymarket.com/llms.txt
+- Retrieved: 2026-10-16
+- Used for: navigation only
+- Source type: official documentation
+- Verification status: documented statement
+- SHA-256: `6e97f169e3a4562e9c3252a36fbadd4d394d1defe1a0aa18f8d8347bb5586bd8` ; `bc1dd18d474ffad8154e7939c4b8e013d99b91895b67cecef112a53bb99888eb`
+
+### Coinbase Exchange docs: candles, trades, WebSocket channels, pagination
+- URLs: https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-candles.md ; .../get-product-trades.md ; https://docs.cdp.coinbase.com/exchange/websocket-feed/channels.md ; https://docs.cdp.coinbase.com/exchange/rest-api/pagination.md ; index https://docs.cdp.coinbase.com/_llms/api-reference/coinbase-exchange-api.txt
+- Retrieved: 2026-10-16
+- Used for: candle granularities and limits; candle incompleteness warning; trade_id pagination; level2 now requiring authentication; level2_batch at 50 ms; sequence numbers
+- Source type: official documentation
+- Verification status: documented statement
+- SHA-256: candles `ce66414274ecc32b6c5317d6a595f8e131f7db602596b9cad0bac485e987548f`; trades `4cbf49585ca519b91f8374751059cf16f1a41c27cb8797a544e2f799a4f59464`; channels `21b5c86683e63f322c6edd7735d27e7016a0a52d11fbc654fa3ad932f8b552dc`; pagination `ce96bdac919a320f41ffc0c9d6abba00053d4f0ad6c9a4580018762c23b304f7`; index `e381926dde3f0af97a56b485d69036bfa5a319f24e25bec8a9b097d3c2566050`
+
+### Kraken API docs (landing page and llms.txt)
+- URLs: https://docs.kraken.com/api/ ; https://docs.kraken.com/llms.txt
+- Retrieved: 2026-10-16
+- Used for: WebSocket v2 book/level3 channels and CRC32 checksums
+- Source type: official documentation
+- Verification status: documented statement
+- SHA-256: landing `29c8acc1a04cbf49202806909f9631daca64c8555d88a0cd80512d7c3b3cac92`
+
+### Kraken downloadable historical data (support articles 360047543791 and 360047124832)
+- URL: https://support.kraken.com/articles/360047543791-downloadable-historical-market-data-time-and-sales- ; https://support.kraken.com/articles/360047124832-downloadable-historical-ohlcvt-open-high-low-close-volume-trades-data
+- Retrieved: not fetched (WebSearch summary 2026-10-16)
+- Used for: archive coverage (trades through 2026-09-30, OHLCVT through 2026-06-30), part files, SHA-256 sums
+- Source type: official documentation (via secondary summary)
+- Verification status: assumption until fetched (AR-U5)
+
+### Binance public data README and Vision Dataset Terms
+- URLs: https://github.com/binance/binance-public-data/blob/master/README.md ; https://raw.githubusercontent.com/binance/binance-public-data/master/TERMS_AND_CONDITIONS.md
+- Retrieved: 2026-10-16
+- Used for: dataset types; microsecond timestamps from 2025-01-01; archive updates and checksums; **licence CC BY-NC-SA 4.0 with a prohibition on live proprietary trading use (terms v1.0, updated 2026-08-26)**
+- Source type: official documentation (the provider's GitHub repository)
+- Verification status: documented statement
+- SHA-256: README page `0f54390aa2573f10e09c7b9f0333b2abf725cefee48b9c20d51ee4320c3652e2`; terms `dcf358e9d18f598a7a635fac80f6e643fa24a0e111a4d39bda47f1e246b31eb1`
+
+### Databento blog: CME history extended to 2010
+- URL: https://databento.com/blog/CME-history-extended-to-2010
+- Retrieved: 2026-10-16
+- Used for: GLBX.MDP3 coverage from 2010-06-06; MBO only from 2017-05-21; tag-52 timestamps and `F_BAD_TS_RECV` before 2017-05-21
+- Source type: official documentation (vendor)
+- Verification status: documented statement
+- SHA-256: `73c0a6af1898798fd0c81cd79f814749f4937b0580cd93825271a1b5beef5b9a`
+
+### Databento blog: Upcoming changes to CME data normalization
+- URL: https://databento.com/blog/cme-normalization-changes-2026-07
+- Retrieved: 2026-10-16
+- Used for: retroactive renormalization of the full history at the 2026-08-08 cutover (F_LAST record, per-leg definitions, price limits, implied matching status)
+- Source type: official documentation (vendor)
+- Verification status: documented statement
+- SHA-256: `bad78d7767252fa3b9631ed3b563b04f1d0942070bddaac9ed7d05b137d0af54`
+
+### Databento blog: new CME pricing plans; exchange licence fees FAQ
+- URLs: https://databento.com/blog/introducing-new-cme-pricing-plans ; https://databento.com/blog/understanding-exchange-fees
+- Retrieved: 2026-10-16
+- Used for: usage-based historical pricing retained; licensing referral process
+- Source type: official documentation (vendor)
+- Verification status: documented statement (2025 plan prices are superseded; current prices are SECONDARY)
+- SHA-256: `80d588f1fefa06b2b3ac59b39f8139e7d05950177722f3ac310908be4cf51c50` ; `1aed25e0e4c791b6202cb81d175c6689c5a10192869280795c81fa47185bacae`
+
+### Databento blog: Core Indices; historical CME event contract data
+- URLs: https://databento.com/blog/databento-core-indices ; https://databento.com/blog/historical-cme-event-contract-data
+- Retrieved: 2026-10-16
+- Used for: DBIX.CORE crypto index providers (no CF Benchmarks listed); CME event contracts on Bitcoin and Gold in GLBX.MDP3 from 2025-09-25
+- Source type: official documentation (vendor)
+- Verification status: documented statement
+- SHA-256: `5c53c6d18ef808f6b2f613eb64abc9d7b13d00447ddaef214947bd10a20ac70f` ; `55576aaf276b8a4cdfea7eb21dce8a7d0a01f412bfa402d5f3e3aea7d9fdadf0`
+
+### Databento GLBX.MDP3 docs and pricing pages
+- URLs: https://databento.com/docs/venues-and-datasets/glbx-mdp3 ; https://databento.com/pricing
+- Retrieved: 2026-10-16 (JavaScript shells, no usable content)
+- Used for: nothing (recorded as a source-access limitation)
+- Source type: official documentation
+- Verification status: not usable
+- SHA-256: `ea3c0d4de144020a714ce7e12f554c96111a6ba692d6c7aff795a0844847a5e5` ; `9470ffac8372982123f75ba7a3b497ef41d49f6da73a1696d59b08462fe8e9e9`
+
+### CME Group datamine_python README (GitHub)
+- URL: https://github.com/CMEGroupPublic/datamine_python
+- Retrieved: 2026-10-16
+- Used for: DataMine dataset tags (TICK, MBO, CRYPTOCURRENCY with second-interval BRTI, STL); CME's own reference for its datasets
+- Source type: official documentation (CME's public repository)
+- Verification status: documented statement
+- SHA-256: `79fbbe7f81b513769eafd590c308a6b2bb6890c717b849596308aa670235b279`
+
+### LBMA: LBMA Gold Price page
+- URL: https://www.lbma.org.uk/prices-and-data/lbma-gold-price
+- Retrieved: 2026-10-16
+- Used for: IBA administration; requirement for a usage licence; list of direct participants
+- Source type: official documentation
+- Verification status: documented statement
+- SHA-256: `daa4b5bae721201a3506dc637a0446427fb01d5cc3da8fd122ff2adeeb9de0f0`
+
+### ICE Benchmark Administration: LBMA Gold Price
+- URL: https://www.ice.com/iba/lbma-gold-price
+- Retrieved: 2026-10-16
+- Used for: auction times (10:30 and 15:00 London), round mechanics, licensing, holiday calendars
+- Source type: official documentation (administrator)
+- Verification status: documented statement
+- SHA-256: `c0d1e6440ed36a4f9e2f51ccf8281c9cdc27fd502f52f700bdd4bc436305e776`
+
+### Kaiko docs: timestamp, tick-level trades, raw order book snapshot
+- URLs: https://docs.kaiko.com/rest-api/general/getting-started/api-output/timestamp.md ; https://docs.kaiko.com/rest-api/cefi-spot-market-data/tick-level-trades.md ; https://docs.kaiko.com/cloud-delivery/cefi-spot-market-data/raw-order-book-snapshot.md ; index https://docs.kaiko.com/llms.txt
+- Retrieved: 2026-10-16
+- Used for: UTC millisecond timestamps; trade timestamp is either the exchange's or Kaiko's collection time; book snapshots at least once per minute, to 10% depth, stamped at request time
+- Source type: official documentation (vendor)
+- Verification status: documented statement
+- SHA-256: `056cd8698ad0f1a3517a39e84546b004c3654323a841e906966bdeb4d85b101b` ; `e220b18826fc6e4424b24be3223834aa39f943bc740ab05c112ae4bcad32f6b6` ; `a9887948dd73ca84203d27be9885cbef705f56d1f22752268dc7fded17e8b44e` ; `efa7b848fe2f3842eca945df64d1bb37c88b9c2a0550e6250e8490717d78f05b`
+
+### Coin Metrics docs landing page
+- URL: https://docs.coinmetrics.io/
+- Retrieved: 2026-10-16
+- Used for: product structure only; detail pages blocked
+- Source type: official documentation (vendor)
+- Verification status: documented statement (structure only)
+- SHA-256: `0ca784cee6102c3b14e99edc49c383a3ca60affdc0ccc7f09eb2340af4cb021b`
+
+### CFTC filing: KalshiEX LLC, 2026-09-08 (GOLDPERP)
+- URL: https://www.cftc.gov/filings/ptc/ptc09082624176.pdf
+- Retrieved: 2026-10-16
+- Used for: nothing substantive. The text could not be extracted, and the WebFetch summary was hallucinated and discarded.
+- Source type: primary source (regulatory filing)
+- Verification status: unread
+- SHA-256: `19fca70eab778293c36c5de96ad2033462690fdeeaa70c1debc755fe1f556df5`
+
+### Secondary sources used only as leads (WebSearch summaries; not fetched; no hashes)
+- Tardis.dev docs (coverage, `local_timestamp`, pricing, ToS): https://docs.tardis.dev/historical-data-details/coinbase, .../kraken, .../bitstamp, .../gemini, https://docs.tardis.dev/faq/billing-and-subscriptions, https://docs.tardis.dev/legal/terms-of-service: secondary; assumption.
+- CF Benchmarks constituent list and RTI methodology v17: https://docs.cfbenchmarks.com/CME%20CF%20Constituent%20Exchanges.pdf, https://docs.cfbenchmarks.com/CME%20CF%20Real%20Time%20Indices%20Methodology.pdf: secondary (official documents not fetched because of the site terms); assumption.
+- Chainlink Data Streams docs (REST API, v2 schema, report timestamps, sign-up): https://docs.chain.link/data-streams/...: secondary; assumption.
+- Pyth blog and Pyth Indices press release: https://www.pyth.network/blog/24-7-finance-needs-24-7-price-infrastructure-introducing-pyth-indices, https://www.businesswire.com/news/home/20260610193791/en/: secondary; assumption.
+- Third-party Kalshi and Polymarket rule explainers (predictionmarketspicks.com, calipermarkets.com, genfinity.io, tradoxvps.com): secondary; assumption. The venue agent must verify against official rules.
+- Databento CME licensing and plan prices (roadmap, X post, third-party comparisons); CME fee list mirror at api.databento.com (not fetched: API host): secondary; assumption.
+- CME GC settlement procedure, contract specs, 1OZ FAQ, 24/7 press release, DataMine overview, DDLA/ILA: https://www.cmegroup.com/... (site blocks automated clients): secondary; assumption. Owner-supplied copies requested (AR-U6).
+- FRED notice on removal of IBA data (2022-01-31): https://fred.stlouisfed.org/series/GOLDAMGBD228NLBM (not fetched; the page displays values): secondary; assumption.
+- Gold futures vendors (Tick Data, AlgoSeek, PortaraCQG, Kibot, FirstRate, Barchart, Norgate, Nasdaq Data Link CHRIS GitHub issue); Dukascopy; OANDA licence PDFs: secondary; assumption.
+- Coin Metrics community terms, CoinDesk Data (CCData), Amberdata, Gemini Market Data Agreement, Bitstamp and Bullish API behaviour: secondary; assumption.
+
+### Batch 3 group: Open datasets, literature, software, regulatory (sections D, E, F)
+
+Status: research record, not an approved requirement. Entries are in research/sources.md format, staged for append. Retrieval date for all: 2026-10-16 (UTC). Documentation and metadata only; no dataset files opened and no market values used.
+
+### Hugging Face Hub datasets API (metadata only)
+- URL: https://huggingface.co/api/datasets
+- Retrieved: 2026-10-16
+- Used for: discovery and metadata (license, revision SHA, file paths) for all HF records in section D
+- Source type: secondary (platform metadata)
+- Verification status: observed behavior (metadata as served)
+
+### TrevorJS/kalshi-trades dataset card
+- URL: https://huggingface.co/datasets/TrevorJS/kalshi-trades
+- Retrieved: 2026-10-16
+- Used for: D-K1 schema, coverage, provenance claims
+- Source type: secondary (third-party redistribution)
+- Verification status: documented claim by redistributor
+
+### jon-becker/prediction-market-analysis README
+- URL: https://github.com/jon-becker/prediction-market-analysis
+- Retrieved: 2026-10-16
+- Used for: D-K2 dataset and indexers; list of papers using it
+- Source type: secondary
+- Verification status: documented claim
+
+### DegenHedge/kalshi-btc-15m dataset card
+- URL: https://huggingface.co/datasets/DegenHedge/kalshi-btc-15m
+- Retrieved: 2026-10-16
+- Used for: D-K5 settlement-rule description and provenance; incidental exposure G-1
+- Source type: secondary
+- Verification status: documented claim
+
+### lerchen3/kalshi-orderbook-alpha dataset card
+- URL: https://huggingface.co/datasets/lerchen3/kalshi-orderbook-alpha
+- Retrieved: 2026-10-16
+- Used for: D-K6 recorder design and timestamp semantics
+- Source type: secondary
+- Verification status: documented claim
+
+### SII-WANGZJ/Polymarket_data dataset card
+- URL: https://huggingface.co/datasets/SII-WANGZJ/Polymarket_data
+- Retrieved: 2026-10-16
+- Used for: D-P1 on-chain OrderFilled schema, coverage, revision history
+- Source type: secondary (primary-verifiable on Polygon)
+- Verification status: documented claim
+
+### vgregoire/polymarket-users dataset card
+- URL: https://huggingface.co/datasets/vgregoire/polymarket-users
+- Retrieved: 2026-10-16
+- Used for: D-P1 academic replication dataset, sample period, ToS caveat
+- Source type: secondary
+- Verification status: documented claim
+
+### Joseph3222/polymarket-orderbook dataset card (pmxt-derived)
+- URL: https://huggingface.co/datasets/Joseph3222/polymarket-orderbook
+- Retrieved: 2026-10-16
+- Used for: D-P2 historical Polymarket book coverage, gaps, timestamp resolution
+- Source type: secondary
+- Verification status: documented claim
+
+### mileswangs/polymarket-btc-updown-5m-orderbook-tick-data dataset card
+- URL: https://huggingface.co/datasets/mileswangs/polymarket-btc-updown-5m-orderbook-tick-data
+- Retrieved: 2026-10-16
+- Used for: D-P2 dual-timestamp WebSocket and Chainlink recording design
+- Source type: secondary
+- Verification status: documented claim
+
+### aliplayer1/polymarket-crypto-updown dataset card
+- URL: https://huggingface.co/datasets/aliplayer1/polymarket-crypto-updown
+- Retrieved: 2026-10-16
+- Used for: D-P2 crypto up/down markets, ticks, BBO, spot feeds
+- Source type: secondary
+- Verification status: documented claim
+
+### polyorderbooks/polymarket-crypto-updown-orderbooks-l2 dataset card (Zenodo 10.5281/zenodo.22084114)
+- URL: https://huggingface.co/datasets/polyorderbooks/polymarket-crypto-updown-orderbooks-l2
+- Retrieved: 2026-10-16
+- Used for: D-P2 1-second L2 capture method
+- Source type: secondary
+- Verification status: documented claim
+
+### delmiron27/cryptolake-binance-futures-btc dataset card
+- URL: https://huggingface.co/datasets/delmiron27/cryptolake-binance-futures-btc
+- Retrieved: 2026-10-16
+- Used for: D-B2 flagged as probable vendor-terms breach
+- Source type: secondary
+- Verification status: documented claim
+
+### CarlosSilva1/xauusd-ticks dataset card
+- URL: https://huggingface.co/datasets/CarlosSilva1/xauusd-ticks
+- Retrieved: 2026-10-16
+- Used for: D-G1 gold tick provenance (unnamed broker)
+- Source type: secondary
+- Verification status: documented claim
+
+### Kaggle public datasets list API
+- URL: https://www.kaggle.com/api/v1/datasets/list
+- Retrieved: 2026-10-16
+- Used for: discovery of Kaggle Polymarket/Kalshi/BTC/gold datasets (titles, licenses)
+- Source type: secondary (platform metadata)
+- Verification status: observed behavior
+
+### Harvard Dataverse doi:10.7910/DVN/KHX5QY (Chernoff 2026)
+- URL: https://doi.org/10.7910/DVN/KHX5QY
+- Retrieved: 2026-10-16
+- Used for: D-P4 matched-pair metadata, CC0
+- Source type: secondary
+- Verification status: documented claim
+
+### Young (2026) OpenMarket, arXiv:2607.26245
+- URL: https://arxiv.org/abs/2607.26245
+- Retrieved: 2026-10-16
+- Used for: E#3 null-result analogue and paired corpus
+- Source type: primary (research paper)
+- Verification status: documented claim (abstract)
+
+### Lee et al. (2026) Cryptocurrency prediction markets through the derivatives lens, IRFA
+- URL: https://doi.org/10.1016/j.irfa.2026.105433
+- Retrieved: 2026-10-16
+- Used for: E#2 digital-option view of BTC 15m on both venues
+- Source type: primary (research paper)
+- Verification status: citation verified via Crossref; content via search summary
+
+### Bürgi, Deng, Whelan, Makers and Takers (SSRN 5502658)
+- URL: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5502658
+- Retrieved: 2026-10-16
+- Used for: E#1 Kalshi FLB and maker/taker returns
+- Source type: primary (research paper)
+- Verification status: search-result metadata
+
+### Dai, Jia, Yu (2026) Settlement Manipulation in Prediction Markets, arXiv:2606.31675
+- URL: https://arxiv.org/abs/2606.31675
+- Retrieved: 2026-10-16
+- Used for: E#4 settlement-window manipulation risk
+- Source type: primary (research paper)
+- Verification status: documented claim (abstract)
+
+### Dubach (2026) Anatomy of a Decentralized Prediction Market, arXiv:2604.24366
+- URL: https://arxiv.org/abs/2604.24366
+- Retrieved: 2026-10-16
+- Used for: E#5 feed vs chain timestamp and direction
+- Source type: primary (research paper)
+- Verification status: documented claim (abstract)
+
+### Qin, Yang (2026) Polymarket-v1 Database, arXiv:2606.04217
+- URL: https://arxiv.org/abs/2606.04217
+- Retrieved: 2026-10-16
+- Used for: E#6 ground-truth aggressor side; OFI/VPIN bias
+- Source type: primary (research paper)
+- Verification status: documented claim (abstract)
+
+### Cont, Kukanov, Stoikov (2014) The Price Impact of Order Book Events
+- URL: https://doi.org/10.1093/jjfinec/nbt003
+- Retrieved: 2026-10-16
+- Used for: E#17 OFI feature
+- Source type: primary (research paper)
+- Verification status: citation verified via Crossref
+
+### Kull, Silva Filho, Flach (2017) Beta calibration, PMLR 54
+- URL: https://proceedings.mlr.press/v54/kull17a.html
+- Retrieved: 2026-10-16
+- Used for: E#32 calibration method
+- Source type: primary (research paper)
+- Verification status: search-result metadata
+
+### Gneiting, Raftery (2007) Strictly Proper Scoring Rules
+- URL: https://doi.org/10.1198/016214506000001437
+- Retrieved: 2026-10-16
+- Used for: E#28 scoring rules
+- Source type: primary (research paper)
+- Verification status: citation verified via Crossref
+
+### Bailey, Borwein, López de Prado, Zhu (2016) Probability of Backtest Overfitting
+- URL: https://doi.org/10.21314/JCF.2016.322
+- Retrieved: 2026-10-16
+- Used for: E#35 PBO
+- Source type: primary (research paper)
+- Verification status: citation verified via Crossref
+
+### Bailey, López de Prado (2014) The Deflated Sharpe Ratio
+- URL: https://doi.org/10.3905/jpm.2014.40.5.094
+- Retrieved: 2026-10-16
+- Used for: E#36 DSR
+- Source type: primary (research paper)
+- Verification status: citation verified via Crossref
+
+### Howard, Ramdas, McAuliffe, Sekhon, Time-uniform confidence sequences, arXiv:1810.08240
+- URL: https://arxiv.org/abs/1810.08240
+- Retrieved: 2026-10-16
+- Used for: E#40 always-valid monitoring
+- Source type: primary (research paper)
+- Verification status: citation verified via arXiv page
+
+### Baker, McHale (2013) Optimal Betting Under Parameter Uncertainty
+- URL: https://doi.org/10.1287/deca.2013.0271
+- Retrieved: 2026-10-16
+- Used for: E#43 uncertainty-adjusted Kelly
+- Source type: primary (research paper)
+- Verification status: citation verified via Crossref
+
+### Shin (1993) Measuring the Incidence of Insider Trading in a Market for State-Contingent Claims
+- URL: https://doi.org/10.2307/2234240
+- Retrieved: 2026-10-16
+- Used for: E#45 margin removal
+- Source type: primary (research paper)
+- Verification status: citation verified via Crossref
+
+### Andersen, Bollerslev, Diebold, Vega (2003) Micro Effects of Macro Announcements
+- URL: https://doi.org/10.1257/000282803321455151
+- Retrieved: 2026-10-16
+- Used for: E#27 basis for macro release-time features
+- Source type: primary (research paper)
+- Verification status: citation verified via Crossref
+
+### Aït-Sahalia, Mykland, Zhang (2005) How Often to Sample… Microstructure Noise
+- URL: https://doi.org/10.1093/rfs/hhi016
+- Retrieved: 2026-10-16
+- Used for: E#21 RV under noise
+- Source type: primary (research paper)
+- Verification status: citation verified via Crossref
+
+### GitHub REST API repository metadata (license, pushed_at, archived) for E.6 projects
+- URL: https://api.github.com/repos/
+- Retrieved: 2026-10-16
+- Used for: software license and maintenance status
+- Source type: secondary (platform metadata)
+- Verification status: observed behavior
+
+### CFTC press release 8302-20, CFTC Designates KalshiEX LLC as a Contract Market
+- URL: https://www.cftc.gov/PressRoom/PressReleases/8302-20
+- Retrieved: 2026-10-16
+- Used for: F-1 venue legal basis
+- Source type: official documentation
+- Verification status: documented (title verified)
+
+### CFTC press releases 9194-26, 9249-26, 9310-26, 9179-26 (2026 event-contract rulemaking track)
+- URL: https://www.cftc.gov/PressRoom/PressReleases/9249-26
+- Retrieved: 2026-10-16
+- Used for: F-2 regulatory change risk
+- Source type: official documentation
+- Verification status: titles and dates verified; content via search summary
+
+### CFTC press release 8478-22, Polymarket (Blockratize) $1.4M penalty
+- URL: https://www.cftc.gov/PressRoom/PressReleases/8478-22
+- Retrieved: 2026-10-16
+- Used for: F-4 Polymarket jurisdiction context
+- Source type: official documentation
+- Verification status: documented (title verified)
+
+### CFTC Commitments of Traders index
+- URL: https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm
+- Retrieved: 2026-10-16
+- Used for: F-7 COT availability
+- Source type: official documentation
+- Verification status: page reachable; content not analysed
+
+### BEA release schedule
+- URL: https://www.bea.gov/news/schedule
+- Retrieved: 2026-10-16
+- Used for: F-5 macro release-time calendar
+- Source type: official documentation
+- Verification status: page reachable
