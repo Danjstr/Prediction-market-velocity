@@ -5,11 +5,15 @@ Each test reproduces a finding in
 input built in ``tmp_path``, and pins the fix.
 """
 
+import bz2
 import gzip
 import io
+import lzma
 import os
 import tarfile
 import zipfile
+import zlib
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -18,6 +22,7 @@ from pmv.acquisition.archive import ArchiveRefusedError, ExtractionLimits, extra
 from pmv.acquisition.backup import BackupError, backup_and_verify_restore
 from pmv.acquisition.formats import FileFormat, FormatRefusedError, check_format
 from pmv.acquisition.quarantine import Quarantine, QuarantineError
+from pmv.acquisition.receipts import ReceiptJournal
 from pmv.acquisition.records import AcquisitionManifest, ManifestFile
 from pmv.acquisition.strict_parse import (
     StrictParseError,
@@ -28,6 +33,13 @@ from pmv.acquisition.strict_parse import (
 from pmv.integrity import sha256_hex
 
 LIMITS = ExtractionLimits(free_space_margin_bytes=0)
+
+
+def _journal(directory: Path) -> ReceiptJournal:
+    path = directory / "receipts.jsonl"
+    if not path.exists():
+        ReceiptJournal.create(path)
+    return ReceiptJournal(path)
 
 
 def _dest(tmp_path: Path) -> Path:
@@ -203,7 +215,7 @@ def test_swapped_quarantine_file_is_never_released(tmp_path: Path) -> None:
     quarantine_dir.mkdir()
     released.mkdir()
     data = b"a,b\n1,2\n"
-    quarantine = Quarantine(quarantine_dir)
+    quarantine = Quarantine(quarantine_dir, journal=_journal(tmp_path))
     quarantine.receive("a.csv", [data])
     swapped = quarantine_dir / "a.csv"
     swapped.unlink()
@@ -219,7 +231,7 @@ def test_invalid_utf8_after_the_head_is_refused_on_release(tmp_path: Path) -> No
     quarantine_dir.mkdir()
     released.mkdir()
     data = b"a,b\n" + b"1,2\n" * 1000 + b"\xff\xfe\n"
-    quarantine = Quarantine(quarantine_dir)
+    quarantine = Quarantine(quarantine_dir, journal=_journal(tmp_path))
     quarantine.receive("a.csv", [data])
     with pytest.raises(QuarantineError, match="UTF-8"):
         quarantine.release("a.csv", _manifest("a.csv", data, "csv"), released)
@@ -471,3 +483,313 @@ def test_zip_with_prepended_data_is_refused(tmp_path: Path) -> None:
     raw = inner.getvalue()
     path.write_bytes(raw[:4] + raw)  # starts with PK\x03\x04, real members are shifted
     _refused(path, _dest(tmp_path), r"before its first member|corrupt|unreadable")
+
+
+# --- round 4 (B06 continuation) -----------------------------------------------------------
+
+# RT-B6-19: a file swapped between passes cannot write beyond the plan.
+
+
+def test_swap_between_passes_writes_nothing_beyond_the_plan(tmp_path: Path) -> None:
+    path = _write(tmp_path, _header(b"a.txt", b"0", 2) + _pad(b"a\n") + END)
+    big = b"b\n" * 50_000
+    swapped = _header(b"a.txt", b"0", len(big)) + _pad(big) + END
+    written = {"bytes": 0}
+
+    def swap_then_report(_destination: Path) -> int:
+        path.write_bytes(swapped)  # the second pass reads the substituted archive
+        return 1 << 40
+
+    def counting_writer(fd: int, chunk: bytes) -> None:
+        written["bytes"] += len(chunk)
+        os.write(fd, chunk)
+
+    destination = _dest(tmp_path)
+    with pytest.raises(ArchiveRefusedError, match="changed between validation and extraction"):
+        extract_archive(
+            path,
+            destination,
+            limits=LIMITS,
+            disk_free=swap_then_report,
+            write_chunk=counting_writer,
+        )
+    assert written["bytes"] == 0
+    assert list(destination.iterdir()) == []
+
+
+def test_extra_member_after_the_plan_is_refused_before_writing(tmp_path: Path) -> None:
+    path = _write(tmp_path, _header(b"a.txt", b"0", 2) + _pad(b"a\n") + END)
+    extra = _header(b"a.txt", b"0", 2) + _pad(b"a\n") + _header(b"b.txt", b"0", 2)
+    extra += _pad(b"b\n") + END
+    written: list[int] = []
+
+    def swap_then_report(_destination: Path) -> int:
+        path.write_bytes(extra)
+        return 1 << 40
+
+    def recording_writer(fd: int, chunk: bytes) -> None:
+        written.append(fd)
+        os.write(fd, chunk)
+
+    destination = _dest(tmp_path)
+    with pytest.raises(ArchiveRefusedError, match="changed between"):
+        extract_archive(
+            path,
+            destination,
+            limits=LIMITS,
+            disk_free=swap_then_report,
+            write_chunk=recording_writer,
+        )
+    assert len(written) == 1  # only the planned a.txt was written, then rolled back
+    assert list(destination.iterdir()) == []
+
+
+# RT-B6-20: bytes after the last bzip2 or xz stream must form another stream.
+
+
+@pytest.mark.parametrize(
+    ("suffix", "compress"),
+    [("tar.bz2", bz2.compress), ("tar.xz", lzma.compress)],
+)
+@pytest.mark.parametrize("trailer", [b"junk", b"\x00" * 16, b"BZh9"])
+def test_trailing_bytes_after_last_stream_are_refused(
+    tmp_path: Path, suffix: str, compress: Callable[[bytes], bytes], trailer: bytes
+) -> None:
+    data = compress(_header(b"a.txt", b"0", 2) + _pad(b"a\n") + END) + trailer
+    _refused(_write(tmp_path, data, f"t.{suffix}"), _dest(tmp_path), "compressed stream")
+
+
+@pytest.mark.parametrize(
+    ("suffix", "compress"),
+    [("tar.bz2", bz2.compress), ("tar.xz", lzma.compress)],
+)
+def test_concatenated_streams_and_clean_end_are_accepted(
+    tmp_path: Path, suffix: str, compress: Callable[[bytes], bytes]
+) -> None:
+    tar = _header(b"a.txt", b"0", 2) + _pad(b"a\n") + END
+    data = compress(tar[:512]) + compress(tar[512:])
+    extracted = extract_archive(
+        _write(tmp_path, data, f"t.{suffix}"), _dest(tmp_path), limits=LIMITS
+    )
+    assert [item.name for item in extracted] == ["a.txt"]
+
+
+@pytest.mark.parametrize(
+    ("suffix", "compress"),
+    [("tar.bz2", bz2.compress), ("tar.xz", lzma.compress)],
+)
+def test_truncated_or_corrupt_strict_stream_is_refused(
+    tmp_path: Path, suffix: str, compress: Callable[[bytes], bytes]
+) -> None:
+    payload = b"a\n" * 3000
+    data = compress(_header(b"a.txt", b"0", len(payload)) + _pad(payload) + END)
+    _refused(
+        _write(tmp_path, data[: len(data) - 7], f"cut.{suffix}"), _dest(tmp_path), "compressed"
+    )
+    corrupt = bytearray(data)
+    corrupt[len(corrupt) // 2] ^= 0xFF
+    other = tmp_path / "other"
+    other.mkdir()
+    _refused(_write(other, bytes(corrupt), f"bad.{suffix}"), _dest(other), ".")
+
+
+# RT-B6-21: one unambiguous name per member.
+
+
+def test_duplicate_pax_keys_are_refused(tmp_path: Path) -> None:
+    record = b"14 path=a.txt\n14 path=b.txt\n"
+    data = _header(b"pax", b"x", len(record)) + _pad(record)
+    data += _header(b"c.txt", b"0", 2) + _pad(b"c\n") + END
+    _refused(_write(tmp_path, data), _dest(tmp_path), "repeats a key")
+
+
+@pytest.mark.parametrize("pax_first", [True, False])
+def test_pax_path_with_gnu_long_name_is_refused(tmp_path: Path, pax_first: bool) -> None:
+    record = b"16 path=pax.txt\n"
+    pax = _header(b"pax", b"x", len(record)) + _pad(record)
+    long_name = b"long.txt"
+    gnu = _header(b"././@LongLink", b"L", len(long_name)) + _pad(long_name)
+    data = (pax + gnu) if pax_first else (gnu + pax)
+    data += _header(b"short.txt", b"0", 2) + _pad(b"s\n") + END
+    _refused(_write(tmp_path, data), _dest(tmp_path), "both a pax path and a GNU long name")
+
+
+def test_gnu_magic_ignores_the_ustar_prefix_field(tmp_path: Path) -> None:
+    header = bytearray(_header(b"a.txt", b"0", 2))
+    header[257:265] = b"ustar  \x00"
+    header[345:356] = b"14737327162"  # a GNU atime, not a path prefix
+    header[148:156] = b"        "
+    header[148:156] = f"{sum(header):06o}\x00 ".encode()
+    data = bytes(header) + _pad(b"a\n") + END
+    extracted = extract_archive(_write(tmp_path, data), _dest(tmp_path), limits=LIMITS)
+    assert [item.name for item in extracted] == ["a.txt"]
+
+
+# RT-B6-22: the released name must be the inode that was verified.
+
+
+def test_release_refuses_a_replaced_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from pmv.acquisition import quarantine as module
+
+    quarantine_dir = tmp_path / "q"
+    released = tmp_path / "released"
+    quarantine_dir.mkdir()
+    released.mkdir()
+    data = b"a,b\n1,2\n"
+    quarantine = Quarantine(quarantine_dir, journal=_journal(tmp_path))
+    quarantine.receive("a.csv", [data])
+    original = module._link_fd
+
+    def link_then_swap(fd: int, dir_fd: int, name: str) -> None:
+        original(fd, dir_fd, name)
+        target = released / "a.csv"
+        target.unlink()
+        target.write_bytes(b"a,b\n6,6\n")
+
+    monkeypatch.setattr(module, "_link_fd", link_then_swap)
+    with pytest.raises(QuarantineError, match="not the verified copy"):
+        quarantine.release("a.csv", _manifest("a.csv", data, "csv"), released)
+    assert (quarantine_dir / "a.csv").exists()
+    assert [entry.event.value for entry in quarantine.journal.entries] == ["received"]
+
+
+# --- round 4b (after the round 4 re-verification) ------------------------------------------
+
+# RT-B6-23: xz means the XZ container only, with a decoder memory limit.
+
+
+def test_legacy_lzma_stream_after_xz_is_refused(tmp_path: Path) -> None:
+    tar = _header(b"a.csv", b"0", 4) + _pad(b"a,b\n") + _header(b"b.csv", b"0", 4)
+    tar += _pad(b"c,d\n") + END
+    data = lzma.compress(tar[:1024]) + lzma.compress(tar[1024:], format=lzma.FORMAT_ALONE)
+    _refused(_write(tmp_path, data, "mixed.tar.xz"), _dest(tmp_path), "compressed stream")
+
+
+def test_lone_legacy_lzma_named_xz_is_refused(tmp_path: Path) -> None:
+    tar = _header(b"a.csv", b"0", 4) + _pad(b"a,b\n") + END
+    data = lzma.compress(tar, format=lzma.FORMAT_ALONE)
+    _refused(_write(tmp_path, data, "alone.tar.xz"), _dest(tmp_path), "not a supported")
+
+
+def _xz_with_dict_property(data: bytes, prop: int) -> bytes:
+    """Rewrite the LZMA2 dictionary-size byte in the first block header (no big encoder)."""
+    out = bytearray(data)
+    start = 12  # after the stream header
+    size = (out[start] + 1) * 4
+    flags = out[start + 1]
+    offset = start + 2
+    for present in (flags & 0x40, flags & 0x80):  # optional compressed/uncompressed sizes
+        if present:
+            while out[offset] & 0x80:
+                offset += 1
+            offset += 1
+    assert out[offset : offset + 2] == b"\x21\x01"  # LZMA2, one property byte
+    out[offset + 2] = prop
+    out[start + size - 4 : start + size] = zlib.crc32(out[start : start + size - 4]).to_bytes(
+        4, "little"
+    )
+    return bytes(out)
+
+
+def test_xz_decoder_memory_limit_is_enforced(tmp_path: Path) -> None:
+    tar = _header(b"a.csv", b"0", 4) + _pad(b"a,b\n") + END
+    data = _xz_with_dict_property(lzma.compress(tar, format=lzma.FORMAT_XZ), 39)  # 3 GiB
+    _refused(_write(tmp_path, data, "bigdict.tar.xz"), _dest(tmp_path), "compressed stream")
+
+
+# RT-B6-24: empty names never fall back to another name.
+
+
+def test_empty_pax_path_is_refused(tmp_path: Path) -> None:
+    record = b"8 path=\n"
+    data = _header(b"pax", b"x", len(record)) + _pad(record)
+    data += _header(b"h.csv", b"0", 4) + _pad(b"a,b\n") + END
+    _refused(_write(tmp_path, data), _dest(tmp_path), "empty path")
+
+
+@pytest.mark.parametrize("long_name", [b"", b"\x00\x00"])
+def test_empty_gnu_long_name_is_refused(tmp_path: Path, long_name: bytes) -> None:
+    data = _header(b"././@LongLink", b"L", len(long_name)) + _pad(long_name)
+    data += _header(b"h.csv", b"0", 4) + _pad(b"a,b\n") + END
+    _refused(_write(tmp_path, data), _dest(tmp_path), "long name is empty")
+
+
+# RT-B6-25: the copy has no name in the destination until it is verified and linked.
+
+
+def test_unverified_copy_never_has_a_name(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from pmv.acquisition import quarantine as module
+
+    quarantine_dir = tmp_path / "q"
+    released = tmp_path / "released"
+    quarantine_dir.mkdir()
+    released.mkdir()
+    data = b"a,b\n1,2\n"
+    quarantine = Quarantine(quarantine_dir, journal=_journal(tmp_path))
+    quarantine.receive("a.csv", [data])
+    seen: list[list[str]] = []
+    original = module._check_copied_format
+
+    def observe(fd: int, name: str, size: int, declared: FileFormat) -> None:
+        seen.append(sorted(os.listdir(released)))
+        original(fd, name, size, declared)
+
+    monkeypatch.setattr(module, "_check_copied_format", observe)
+    quarantine.release("a.csv", _manifest("a.csv", data, "csv"), released)
+    assert seen == [[]]
+    assert (released / "a.csv").read_bytes() == data
+
+
+def test_failed_check_leaves_no_file_in_the_destination(tmp_path: Path) -> None:
+    quarantine_dir = tmp_path / "q"
+    released = tmp_path / "released"
+    quarantine_dir.mkdir()
+    released.mkdir()
+    data = b"a,b\n\x00\n"
+    quarantine = Quarantine(quarantine_dir, journal=_journal(tmp_path))
+    quarantine.receive("a.csv", [data])
+    with pytest.raises(QuarantineError):
+        quarantine.release("a.csv", _manifest("a.csv", data, "csv"), released)
+    assert os.listdir(released) == []
+    assert (quarantine_dir / "a.csv").exists()
+
+
+# RT-B6-28: directory entries are made durable in a safe order.
+
+
+def test_release_fsyncs_directories_in_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import stat as stat_module
+
+    quarantine_dir = tmp_path / "q"
+    released = tmp_path / "released"
+    quarantine_dir.mkdir()
+    released.mkdir()
+    data = b"a,b\n1,2\n"
+    quarantine = Quarantine(quarantine_dir, journal=_journal(tmp_path))
+    quarantine.receive("a.csv", [data])
+    labels = {
+        (path.stat().st_dev, path.stat().st_ino): label
+        for label, path in (("dest", released), ("quarantine", quarantine_dir))
+    }
+    events: list[str] = []
+    real_fsync = os.fsync
+
+    def recording_fsync(fd: int) -> None:
+        status = os.fstat(fd)
+        label = labels.get((status.st_dev, status.st_ino))
+        if stat_module.S_ISDIR(status.st_mode) and label is not None:
+            events.append(f"fsync:{label}")
+        real_fsync(fd)
+
+    original_append = quarantine.journal.append
+
+    def recording_append(*args: object, **kwargs: object) -> object:
+        events.append("journal")
+        return original_append(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(os, "fsync", recording_fsync)
+    monkeypatch.setattr(quarantine.journal, "append", recording_append)
+    quarantine.release("a.csv", _manifest("a.csv", data, "csv"), released)
+    assert events == ["fsync:dest", "journal", "fsync:quarantine"]

@@ -11,6 +11,7 @@ passed through it. It is exercised only with synthetic fixtures:
 - ``strict_parse``: strict JSON, JSONL, CSV, and decimal parsing (A-4);
 - ``archive``: bounded, link-free, traversal-free archive extraction (A-4);
 - ``quarantine``: hash-on-receipt intake and manifest-gated release from quarantine (A-4, A-5);
+- ``receipts``: the durable, hash-chained receipt journal for intake and release (A-5);
 - ``backup``: backup copy and restore verification against a manifest (A-3).
 
 Passing these controls is necessary but never sufficient: every acquisition still needs

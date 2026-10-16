@@ -10,11 +10,19 @@ from pmv.acquisition.backup import (
 )
 from pmv.acquisition.formats import FileFormat
 from pmv.acquisition.quarantine import Quarantine, QuarantineError, hash_file
+from pmv.acquisition.receipts import ReceiptJournal
 from pmv.acquisition.records import AcquisitionManifest, ManifestFile
 from pmv.acquisition.strict_parse import parse_csv, parse_jsonl
 from pmv.integrity import sha256_hex
 
 DATA = b"synthetic,row\ntrue,0\n"
+
+
+def _journal(directory: Path) -> ReceiptJournal:
+    path = directory / "receipts.jsonl"
+    if not path.exists():
+        ReceiptJournal.create(path)
+    return ReceiptJournal(path)
 
 
 def _manifest(name: str, data: bytes, file_format: str = "csv") -> AcquisitionManifest:
@@ -54,7 +62,7 @@ def _dirs(tmp_path: Path, *names: str) -> list[Path]:
 
 def test_receive_hashes_and_release_moves(tmp_path: Path) -> None:
     quarantine_dir, released = _dirs(tmp_path, "q", "released")
-    quarantine = Quarantine(quarantine_dir)
+    quarantine = Quarantine(quarantine_dir, journal=_journal(tmp_path))
     receipt = quarantine.receive("a.csv", [DATA[:5], DATA[5:]])
     assert receipt.sha256 == sha256_hex(DATA)
     quarantine.release("a.csv", _manifest("a.csv", DATA), released)
@@ -66,19 +74,19 @@ def test_quarantine_must_start_empty(tmp_path: Path) -> None:
     (quarantine_dir,) = _dirs(tmp_path, "q")
     (quarantine_dir / "left.csv").write_bytes(b"")
     with pytest.raises(QuarantineError, match="empty"):
-        Quarantine(quarantine_dir)
+        Quarantine(quarantine_dir, journal=_journal(tmp_path))
 
 
 @pytest.mark.parametrize("name", ["../a.csv", "a/b.csv", "", ".", ".."])
 def test_receive_refuses_unsafe_names(tmp_path: Path, name: str) -> None:
     (quarantine_dir,) = _dirs(tmp_path, "q")
     with pytest.raises(QuarantineError, match="plain component"):
-        Quarantine(quarantine_dir).receive(name, [DATA])
+        Quarantine(quarantine_dir, journal=_journal(tmp_path)).receive(name, [DATA])
 
 
 def test_tampered_file_stays_in_quarantine(tmp_path: Path) -> None:
     quarantine_dir, released = _dirs(tmp_path, "q", "released")
-    quarantine = Quarantine(quarantine_dir)
+    quarantine = Quarantine(quarantine_dir, journal=_journal(tmp_path))
     quarantine.receive("a.csv", [DATA])
     target = quarantine_dir / "a.csv"
     target.chmod(0o600)
@@ -91,7 +99,7 @@ def test_tampered_file_stays_in_quarantine(tmp_path: Path) -> None:
 
 def test_manifest_mismatch_and_absence_refuse_release(tmp_path: Path) -> None:
     quarantine_dir, released = _dirs(tmp_path, "q", "released")
-    quarantine = Quarantine(quarantine_dir)
+    quarantine = Quarantine(quarantine_dir, journal=_journal(tmp_path))
     quarantine.receive("a.csv", [DATA])
     with pytest.raises(QuarantineError, match="does not match"):
         quarantine.release("a.csv", _manifest("a.csv", b"other\n"), released)
@@ -104,7 +112,7 @@ def test_manifest_mismatch_and_absence_refuse_release(tmp_path: Path) -> None:
 def test_format_check_runs_before_release(tmp_path: Path) -> None:
     quarantine_dir, released = _dirs(tmp_path, "q", "released")
     pickle_bytes = b"\x80\x04\x95\x05\x00\x00\x00\x00\x00\x00\x00}\x94."
-    quarantine = Quarantine(quarantine_dir)
+    quarantine = Quarantine(quarantine_dir, journal=_journal(tmp_path))
     quarantine.receive("p.parquet", [pickle_bytes])
     with pytest.raises(QuarantineError, match="pickle"):
         quarantine.release("p.parquet", _manifest("p.parquet", pickle_bytes, "parquet"), released)
@@ -114,7 +122,7 @@ def test_format_check_runs_before_release(tmp_path: Path) -> None:
 def test_release_never_overwrites(tmp_path: Path) -> None:
     quarantine_dir, released = _dirs(tmp_path, "q", "released")
     (released / "a.csv").write_bytes(b"existing")
-    quarantine = Quarantine(quarantine_dir)
+    quarantine = Quarantine(quarantine_dir, journal=_journal(tmp_path))
     quarantine.receive("a.csv", [DATA])
     with pytest.raises(FileExistsError):
         quarantine.release("a.csv", _manifest("a.csv", DATA), released)

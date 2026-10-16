@@ -15,12 +15,17 @@ interpret the bytes differently. The walker:
 - requires two zero blocks followed only by zero padding;
 - bounds the total decompressed bytes and the expansion ratio;
 - reads the compressed stream to its end, so a gzip, bzip2, or xz integrity error is
-  detected.
+  detected, and refuses bytes after the last bzip2 or xz stream that do not form another
+  complete stream;
+- refuses duplicate pax keys and a pax ``path`` combined with a GNU long name, and ignores
+  the ustar prefix field under GNU magic (where those bytes hold other fields).
 
 The first pass validates every member and the limits, and hashes the raw archive bytes.
 The second pass walks the same bytes again and writes the files, hashing the raw bytes
-again. If the two hashes or the two member lists differ (the file was swapped or
-changed), everything written is rolled back.
+again. Each entry of the second pass must equal the planned entry at the same position
+before anything is written for it, so a swapped file cannot write more than the plan. If
+the two hashes or the two member lists differ (the file was swapped or changed),
+everything written is rolled back.
 
 **Zip.** Zip archives are read with ``zipfile``. Encrypted members, unsupported
 compression methods, link, device, and FIFO members, and prepended data (a first local
@@ -71,12 +76,14 @@ _BLOCK: Final = 512
 _ZERO_BLOCK: Final = bytes(_BLOCK)
 _MAX_META_BYTES: Final = 64 * 1024
 _MIN_STREAM_ALLOWANCE: Final = 1024 * 1024
+_XZ_MEMLIMIT: Final = 128 * 1024 * 1024
 _ALLOWED_ZIP_METHODS: Final = frozenset({zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED})
 _REGULAR_TYPES: Final = frozenset({b"0", b"\x00"})
 _PAX_ALLOWED_KEYS: Final = frozenset(
     {b"path", b"mtime", b"atime", b"ctime", b"uid", b"gid", b"uname", b"gname"}
 )
-_USTAR_MAGICS: Final = frozenset({b"ustar\x0000", b"ustar  \x00"})
+_GNU_MAGIC: Final = b"ustar  \x00"
+_USTAR_MAGICS: Final = frozenset({b"ustar\x0000", _GNU_MAGIC})
 _FORMAT_BY_EXTENSION: Final = {
     extension: file_format for file_format, names in EXTENSIONS.items() for extension in names
 }
@@ -192,17 +199,68 @@ class _HashingReader:
             pass
 
 
+class _Decompressor(Protocol):
+    @property
+    def eof(self) -> bool: ...
+    @property
+    def needs_input(self) -> bool: ...
+    @property
+    def unused_data(self) -> bytes: ...
+    def decompress(self, data: bytes, max_length: int = -1) -> bytes: ...
+
+
+class _StrictStreams:
+    """bzip2 or xz reader that refuses anything after the last stream except another stream.
+
+    ``BZ2File`` and ``LZMAFile`` silently ignore trailing bytes that are not a valid
+    stream (RT-B6-20). Here every byte after a stream's end must start another complete
+    stream, or decompression fails and the archive is refused.
+    """
+
+    def __init__(self, raw: _HashingReader, factory: Callable[[], _Decompressor]) -> None:
+        self._raw = raw
+        self._factory = factory
+        self._decompressor = factory()
+        self._done = False
+
+    def read(self, size: int = -1, /) -> bytes:
+        limit = _CHUNK if size is None or size < 0 else size
+        while not self._done:
+            if self._decompressor.eof:
+                data = self._decompressor.unused_data or self._raw.read(_CHUNK)
+                if not data:
+                    self._done = True
+                    break
+                self._decompressor = self._factory()
+            elif self._decompressor.needs_input:
+                data = self._raw.read(_CHUNK)
+                if not data:
+                    raise ArchiveRefusedError("compressed stream is truncated")
+            else:
+                data = b""
+            try:
+                out = self._decompressor.decompress(data, limit)
+            except (OSError, EOFError, lzma.LZMAError, ValueError, MemoryError):
+                raise ArchiveRefusedError("compressed stream is corrupt") from None
+            if out:
+                return out
+        return b""
+
+
+def _xz_decompressor() -> lzma.LZMADecompressor:
+    """XZ container only (never legacy ``.lzma`` or raw), with a decoder memory limit."""
+    return lzma.LZMADecompressor(format=lzma.FORMAT_XZ, memlimit=_XZ_MEMLIMIT)
+
+
 @contextmanager
 def _decompressed(raw: _HashingReader, kind: str) -> Iterator[_Readable]:
     if kind == "tar.gz":
         with gzip.GzipFile(fileobj=raw, mode="rb") as stream:  # type: ignore[call-overload]
             yield stream
     elif kind == "tar.bz2":
-        with bz2.BZ2File(raw, mode="rb") as stream:  # type: ignore[call-overload]
-            yield stream
+        yield _StrictStreams(raw, bz2.BZ2Decompressor)
     elif kind == "tar.xz":
-        with lzma.LZMAFile(raw, mode="rb") as stream:  # type: ignore[arg-type]
-            yield stream
+        yield _StrictStreams(raw, _xz_decompressor)
     else:
         yield raw
 
@@ -233,6 +291,7 @@ def _octal(field: bytes) -> int:
 def _parse_pax(data: bytes) -> bytes | None:
     """Validate pax records; return the ``path`` value if present."""
     path: bytes | None = None
+    seen: set[bytes] = set()
     offset = 0
     while offset < len(data):
         space = data.find(b" ", offset)
@@ -247,7 +306,12 @@ def _parse_pax(data: bytes) -> bytes | None:
             raise ArchiveRefusedError("pax header is malformed")
         if key not in _PAX_ALLOWED_KEYS:
             raise ArchiveRefusedError("pax header has a disallowed key")
+        if key in seen:
+            raise ArchiveRefusedError("pax header repeats a key")
+        seen.add(key)
         if key == b"path":
+            if not value:
+                raise ArchiveRefusedError("pax header has an empty path")
             path = value
         offset += length
     return path
@@ -325,6 +389,8 @@ def _walk_tar(
                 if pending_long is not None:
                     raise ArchiveRefusedError("archive has consecutive long-name headers")
                 pending_long = data[:size].rstrip(b"\x00")
+                if not pending_long:
+                    raise ArchiveRefusedError("GNU long name is empty")
             continue
         if kind == b"5":
             if size != 0:
@@ -333,12 +399,15 @@ def _walk_tar(
             raise ArchiveRefusedError("archive contains a link, device, FIFO, or sparse member")
         if size > limits.max_member_bytes:
             raise ArchiveRefusedError("member exceeds the per-member size limit")
+        if pending_path and pending_long is not None:
+            raise ArchiveRefusedError("member has both a pax path and a GNU long name")
         if pending_path:
             raw_name = pending_path
         elif pending_long:
             raw_name = pending_long
         else:
-            prefix = block[345:500].split(b"\x00", 1)[0]
+            gnu = block[257:265] == _GNU_MAGIC
+            prefix = b"" if gnu else block[345:500].split(b"\x00", 1)[0]
             base = block[0:100].split(b"\x00", 1)[0]
             raw_name = prefix + b"/" + base if prefix else base
         pending_path = None
@@ -532,8 +601,13 @@ def _extract_tar(
     if disk_free(destination) < budget.total + limits.free_space_margin_bytes:
         raise ArchiveRefusedError("insufficient free disk space for extraction")
     extracted: list[ExtractedFile] = []
+    position = 0
 
     def write(entry: _Entry, data: _Readable | None) -> None:
+        nonlocal position
+        if position >= len(planned) or entry != planned[position]:
+            raise ArchiveRefusedError("archive changed between validation and extraction")
+        position += 1
         if data is None:
             destination.joinpath(*entry.name.split("/")).mkdir(parents=True, exist_ok=True)
         else:
