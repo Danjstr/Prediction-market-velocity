@@ -347,6 +347,23 @@ Four points deserve emphasis:
   - Report a provably complete subset as a sensitivity analysis.
   - A source with no possible bound stays discovery-only.
 
+## Strategy evaluation strata (owner direction, 2026-10-16)
+
+The strategy objective is in PROJECT_BRIEF.md §3: late-window, high-confidence entries in the final few minutes of a contract. Everything below is a **development hypothesis**. Band edges and thresholds are tested only on development data, and are frozen in the audit-candidate manifest before protected evaluation.
+
+**Strata.** Every strategy result is reported by both of these strata, separately and crossed:
+- **Entry-price band**, on the executable price of the side bought (the ask actually payable, never the midpoint), initially about: 0.85–0.89, 0.90–0.92, 0.93–0.95, 0.96–0.97, >0.97.
+- **Remaining-time band**, measured from the decision time to the contract's `ref_end` (identity table), initially about: ≤1 minute, 1–2 minutes, 2–3 minutes, 3–5 minutes. Decisions that fall inside a settlement averaging window are flagged and reported separately, because part of the settlement value is already observed at decision time.
+
+**Rules:**
+- **Bands are reporting strata, not entry rules.** No band admits or rejects a trade by itself. Entry requires calibrated probability materially above the executable, cost-adjusted break-even probability (payout structure, fees, spread, slippage, latency, execution uncertainty, and the preregistered safety and uncertainty margin).
+- **Candidate-generation floor.** Decision rows are generated for executable prices at or above a preregistered floor, initially about $0.85. The floor bounds the search; it is not a signal. Rows below it are outside the intended strategy, and any analysis of them is labelled exploratory.
+- **No imposed distribution.** The distribution of trades across bands must emerge from the decision rule on development data. Nothing forces it toward the expected $0.93–$0.97 concentration, a normal shape, or any other target.
+- **Per-stratum reporting.** For each band and crossed cell: the eligible decision count; the trade count; the effective sample size by `outcome_cell_id` and `time_block_id` (Policies 4 and 5); predicted versus realized frequency with block-bootstrap intervals; after-cost EV per trade with an interval; and the fill and latency assumptions in force. Sparse cells are reported as sparse, never pooled after looking.
+- **High-probability-tail calibration is a primary criterion.** Reliability is reported in fine bins over the candidate region (at least ≥0.85), with calibration error, interval estimates, and the Brier and log-loss decomposition restricted to that region. AUC or overall ranking metrics never substitute for it. The tail-calibration acceptance criterion is preregistered with the primary estimand.
+- **Selection discipline.** Choosing bands, floors, margins, or time windows after seeing stratified results is a research degree of freedom. It is logged in the experiment ledger and covered by the Development-Validation Discipline (START_HERE.md). Selection comparisons use `RECEIPT` + `PIT_CAPTURED` folds (see "The split"). A band is never chosen because it looked best.
+- **Freeze.** The final band edges, floor, remaining-time window, confidence and edge thresholds, and safety margin are frozen in the audit-candidate manifest before Gate 6. They are never tuned on the protected holdout.
+
 ## The split (unchanged requirements, applied to this design)
 
 - The frozen split follows START_HERE.md Phase 2 exactly: an identified snapshot, explicit UTC boundaries, purge and embargo at both ends, a hashed definition in `research/splits/<split_id>.yaml`, and HOLDOUT_ACCESS_LOG.md.
@@ -357,6 +374,7 @@ Four points deserve emphasis:
   - Under prospective formation, the "~70/30" target applies to the **PMV-capture span** `[C0, T_end]`, where `C0` is the start of release-eligible PMV capture. It does not apply to historical development data.
   - The protected span must also meet the F-07 power requirement for the preregistered primary estimand. The power requirement is a floor. The protected span is at least the power-required span. It is lengthened (by a later `T_end` or a larger stopping count, never by an earlier `T0`) where the ~30% target falls short of power, and the deviation from 70/30 is recorded.
   - `T0`, the margin, `C0`, and either `T_end` or an outcome-blind stopping rule (an eligible-cell count from the trusted collector, with a calendar maximum) are fixed in the gate record at cycle registration, before any release. They are never extended or shortened on protected information, and after `T0 − m` only under a preregistered technical contingency (H-1).
+  - **One preregistered re-sizing (owner ruling E-B4-8).** Before `T0 − m`, one preregistered re-estimate of the required sample size may use development receipt-time data only. It may only increase the required sample count or the calendar maximum. It never moves `T0` earlier or weakens the test, and it is logged in HOLDOUT_ACCESS_LOG.md.
 - **A cycle's development data may mix historical archive rows and PMV-captured rows (S-9).** Mixing is governed by these rules:
   - Every result reports `RECEIPT` and `SYNTHETIC_ARCHIVE` rows, and `PIT_CAPTURED` and `POST_HOC` rows, separately.
   - Any validation result used for selection (features, model family, hyperparameters, calibration, thresholds, policy) is computed on `RECEIPT` + `PIT_CAPTURED` rows only. Archive-validated folds are discovery only.
@@ -384,6 +402,7 @@ Four points deserve emphasis:
 - The exclusion ledger.
 - Deterministic, rebuildable dataset manifests.
 - The observation unit, targets, settlement logic, remaining-time representation, eligibility, and horizons (START_HERE.md Phase 2).
+- The strategy evaluation strata (entry-price and remaining-time bands) and the high-probability-tail calibration reporting above.
 - The frozen split manifest, purge and embargo.
 - The Development-Validation Discipline design (START_HERE.md).
 - Statistician review, and an Independent Statistical Auditor review where Gate 2 independence requires it. The Statistician co-authored the dependence design here, so the independent audit applies to it.

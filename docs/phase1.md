@@ -1,6 +1,19 @@
-# Phase 1: Data Feasibility and Live Collection — Plan and Status
+# Phase 1: Data Feasibility, Historical Acquisition, and Prospective Capture — Plan and Status
 
 Working record for Phase 1. The authoritative requirements are START_HERE.md (Phase 1, Gate 1, Project-Wide Controls), CLAUDE.md, and PROJECT_BRIEF.md; where this file summarizes them, they win. This is not a gate record and not an owner-decision record.
+
+## Current status and next step (as of 2026-10-16, B06)
+
+- **Phase:** Phase 1. No cycle, `T0`, split, or protected scope exists. No real market observation has been acquired, captured, or released to agents. The guard refuses every real request.
+- **Strategy:** late-window, high-confidence (PROJECT_BRIEF.md §3; START_HERE.md "Strategy at a Glance").
+- **Gate status:** Gate 0 passed. Gate 1 has not been decided.
+- **Active branch:** `b06/governance-continuity-sync` (B06; `docs/BRANCH_TIMELINE.md`). It contains batch 4 (B05, `a1752b4`) and the B06 governance continuity sync (`docs/decisions/2026-10-16_b06_governance_continuity_sync.md`). It integrates into `main` through one pull request; merging is the owner's decision.
+- **Owner actions pending outside agent sessions** (`docs/owner_actions/README.md`):
+  1. apply the F-09 host-class settings patch. This is a priority blocker for any historical acquisition;
+  2. apply the agent-file split-wording patch.
+- **Blockers before the first historical acquisition** (`docs/external_access.md` §2): a per-source owner approval naming its hosts (A-1); an owner licence determination from verbatim terms (A-2); the raw backup policy and a synthetic restore test (A-3); a reviewed safe-parsing acquisition tool with passing fault-injection fixtures (A-4); provenance and source-quality entries (A-5, A-6); committed F-09 denies.
+- **Blockers before agents see any real observation:** a registered cycle with `T0` and `m` (which first requires the pre-T0 owner checklist P-1 to P-4 in START_HERE.md); and the H-2 per-row release tool, built, reviewed, and approved through an owner governance change (`docs/protected_information.md`).
+- **Recommended next step:** after the owner applies the F-09 patch, a no-network engineering batch to build and test the deterministic acquisition and safe-parsing tool against synthetic fixtures (A-4), together with the raw backup and restore policy (A-3). In parallel, the owner may pursue the licence terms for the first candidate source (Kalshi official historical data; AR-3).
 
 ## Owner direction for Phase 1 (batch charter, 2026-10-15)
 
@@ -208,6 +221,16 @@ Governance and policy only. No real market dataset was acquired or inspected, an
 - reconciled the "oldest 70% / newest 30%" wording with the prospective holdout;
 - added the host-class rule and the historical acquisition gate (`docs/external_access.md`);
 - created the exposure register (`docs/exposure_register.md`).
+
+**Owner rulings on the batch 4 reviews (2026-10-16):**
+- B4S-1 and B4S-8 were confirmed.
+- Approved: E-B4-1, E-B4-3, E-B4-4 (modified), E-B4-6 (modified), E-B4-8, and E-B4-9(a). E-B4-5 was approved as a pre-T0 analysis requirement.
+- E-B4-7 was rejected as proposed; the reconstruction-based principle was adopted instead.
+- E-B4-2 and E-B4-9(b) were deferred, but are mandatory decisions before `T0`.
+- All four review tightenings were approved.
+- The owner also directed that the late-window, high-confidence strategy objective be recorded (PROJECT_BRIEF.md §3).
+
+Full rulings and the pre-T0 checklist are in the decision record.
 
 ## Recommended next batches
 

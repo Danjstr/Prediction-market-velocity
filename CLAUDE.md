@@ -96,6 +96,10 @@ If all Claude accounts and agents disappeared after development, the finished so
 - Primary research direction: short-horizon velocity and related quantitative market dynamics.
 - Support entering partway through a market window and forecasting only the remaining horizon.
 - Time remaining must be treated as a first-class variable.
+- The strategy is late-window and high-confidence: relatively infrequent opportunities in the final few minutes of a contract, where calibrated model probability materially exceeds the executable, cost-adjusted break-even probability. It forecasts only the remaining final minutes, not the contract from inception. Canonical statement: PROJECT_BRIEF.md §3.
+- Price bands are never sufficient trade criteria. The ~$0.93–$0.97 sweet spot and the ~$0.85 candidate-generation floor describe where opportunities are expected, not when to trade. Entry requires calibrated probability materially above break-even after payout, costs, latency, execution uncertainty, and a safety margin.
+- Every price, time, confidence, and edge threshold is a development hypothesis until it is frozen before protected evaluation. Never hard-code one as an empirically proven truth, and never force the trade distribution into a predetermined shape.
+- High-probability-tail calibration is a core success criterion; AUC or ranking performance alone is not sufficient.
 
 # Prediction Objective
 
@@ -122,6 +126,10 @@ A model is only useful if it produces positive expected value after:
 Prefer executable prices over midpoint assumptions where possible.
 
 Prefer conservative assumptions.
+
+Do not assume a $1 payout where the actual economic payout differs; break-even is computed from the actual entry price and payout structure.
+
+Tax treatment is part of strategy viability. Never assume a fixed tax classification (gambling, capital gains, ordinary income, §1256, or other) for prediction-market products. Report pre-tax EV, the tax assumptions or scenarios, and after-tax or tax-adjusted EV where classification can reasonably be modelled; never present a pre-tax result as deployable without considering material tax consequences. Tax assumptions in a protected evaluation are frozen like other economic assumptions or reported as sensitivity scenarios. Real-money scaling requires current authoritative verification and, where appropriate, qualified tax or legal advice. See PROJECT_BRIEF.md §5 and START_HERE.md Phase 4.5.
 
 # Data
 
@@ -209,8 +217,10 @@ Real observations fall into five classes, with different rules:
 1. **Approved historical and development data.** Real historical market observations may be used for development once the owner has approved the source and its use, it has been acquired under the acquisition gate or captured by the trusted collector, and its rows have been released to agents by the owner-controlled, fail-closed, per-row release and logged. Until that release path exists for a declared cycle, none is agent-visible.
 2. **Incidental public research exposure.** Agents do not deliberately seek real observations through public research. Values or outcome statistics met incidentally are not recorded or used. The exposure event (source, observable family, period, granularity; never the value) is entered in `docs/exposure_register.md`. Opening a page whose subject is data or statistics of a protected observable family (for example a dataset card, README, viewer, or dashboard) counts as exposure for the period it covers, whether or not a value was noticed. Registered exposures constrain the start of every later protected interval. From a cycle's `T0 − m` until its holdout is consumed, any such exposure is a contamination event for that cycle.
 3. **Prospective protected holdout.** Never accessed, requested, reconstructed, or inferred before authorized final evaluation, from any source, including equivalent observables and research content covering the protected interval (docs/external_access.md).
-4. **Live or real-time observations.** Agents do not view live or recent observations, whether from APIs, streams, or live display pages, unless an owner-issued batch charter (quoted in the batch record) or a separate owner decision explicitly authorizes it for that host, purpose, and observable family. Such authorization never applies to a protected observable family from a declared cycle's `T0 − m` until its holdout is consumed (class 3 always prevails). Every authorized view is entered in `docs/exposure_register.md`. Deterministic collectors may capture live data into the protected raw store under the approved collection rule.
+4. **Live or real-time observations.** Agents do not view live or recent observations, whether from APIs, streams, or live display pages, unless an owner-issued batch charter (quoted in the batch record) or a separate owner decision explicitly authorizes it for that host, purpose, and observable family. Such authorization never applies to a protected observable family from a declared cycle's `T0 − m` until its holdout is consumed (class 3 always prevails). Every authorized view is entered in `docs/exposure_register.md`. A viewed value serves only the authorized purpose (for example schema or connectivity verification); it is not development data, and enters an experiment only if the same observation is released through class 1. Deterministic collectors may capture live data into the protected raw store under the approved collection rule.
 5. **Credentialed or private data.** Account, order, position, wallet, and other private data, and data reachable only with a credential, are never exposed to agent sessions unless separately owner-authorized, and credentials themselves never are.
+
+Correlation alone never puts a source inside the protected-information boundary. A source belongs inside it only when it is itself a protected observable, a direct equivalent observable (including settlement-reference inputs), or permits deterministic or near-deterministic reconstruction or inference of the protected observation or label, alone or in combination with other allowed information. The quantitative criterion is fixed by owner decision before `T0` (START_HERE.md pre-T0 checklist).
 
 Project market data is obtained only through the deterministic data-access controls (the data-access guard, and the per-row release tool once adopted and reviewed), which refuse overlapping, equivalent, or undeterminable requests. Agents may propose data needs; they never override the guard. When uncertain, treat information as protected. If protected information is exposed accidentally, stop using it, do not investigate further, and escalate; when it could influence development, record a contamination event under HOLDOUT_ACCESS_LOG.md. See docs/protected_information.md.
 
@@ -414,6 +424,18 @@ Every important experiment should record:
 - evaluation metrics.
 
 Results that cannot be reproduced should not drive production decisions.
+
+# Repository Continuity
+
+Git is the only durable project memory. Conversations, Claude or ChatGPT memory, scratchpads, recaps, and agent-session state are never authoritative governance. A material owner decision, strategy requirement, threshold hypothesis, phase change, safety rule, gate requirement, or unresolved mandatory decision must be recorded in canonical repository documents or `docs/decisions/` before any session relies on it.
+
+The phase order (0–12, including 4.5 and 5.5) is fixed in START_HERE.md "Phase Roadmap".
+
+Branch continuity (START_HERE.md "Repository Continuity"; `docs/BRANCH_TIMELINE.md`):
+- work only on the **current active ground-truth branch** named in `docs/BRANCH_TIMELINE.md`; verify the branch name and expected HEAD before substantive work;
+- create each new development branch (`bNN/<short-purpose>`) only from the newest approved cumulative branch, never from `main` or an older branch while a newer one exists;
+- older branches are historical checkpoints, never competing requirement sources; switch to them only for explicit historical review;
+- if the expected predecessor is not an ancestor of the branch point, stop and escalate; never fork project history.
 
 # Development Behavior
 

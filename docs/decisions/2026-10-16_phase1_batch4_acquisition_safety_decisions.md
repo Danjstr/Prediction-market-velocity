@@ -1,6 +1,6 @@
 # Phase 1 batch 4: owner decisions on acquisition safety and holdout formation (2026-10-16)
 
-**Approver:** the project owner, in the batch 4 charter given on 2026-10-16 (branch `phase1/acquisition-safety-decisions`). The charter states the decisions below as approved and instructs the governance edits listed under "Documents changed". The development session wrote this record. The owner should confirm its wording before merge.
+**Approver:** the project owner, in the batch 4 charter given on 2026-10-16 (branch `phase1/acquisition-safety-decisions`). The charter states the decisions below as approved and instructs the governance edits listed under "Documents changed". The development session wrote this record. The owner reviewed it and issued follow-up rulings on 2026-10-16, recorded under "Owner rulings on the batch 4 reviews" below. The owner restated the same rulings in the B06 recovery charter (`docs/decisions/2026-10-16_b06_governance_continuity_sync.md`, C-6), and the session checked them against this record. The owner confirms the final wording by merging the B06 pull request.
 
 **Limitation:** this record is procedural. The system does not cryptographically prove who approved it (F-42 in `docs/decisions/2026-10-14_phase0_step11_owner_decisions.md`).
 
@@ -23,7 +23,7 @@ The protected holdout is **prospective**. It begins at a declared future start `
   - a citation, by hash, of the exposure register (H-8 and the pre-cycle part);
   - the preregistered outcome if the calendar maximum is reached before the eligible-cell count. Default: evaluate once at the calendar maximum against the unchanged PASS / FAIL / INCONCLUSIVE criteria, with the power shortfall recorded;
   - the preregistered technical contingencies (for example a collector outage) under which the end may move, and the mechanical rule for moving it, which depends only on the trusted collector's outcome-blind eligible-cell count.
-- **Change control** *(Statistician B4S-8; for owner confirmation, because it refines owner-attributed text)*. These conditions are never changed on protected information. After `T0 − m` they are not changed at all, except mechanically under a preregistered technical contingency. Any amendment, including one before `T0 − m`, is a logged HOLDOUT_ACCESS_LOG.md event giving its reason and the information it used. A discretionary change after `T0 − m` is treated by the auditor as potentially informed by protected outcomes.
+- **Change control** *(Statistician B4S-8; **confirmed by the owner**, 2026-10-16)*. These conditions are never changed on protected information. After `T0 − m` they are not changed at all, except mechanically under a preregistered technical contingency. Any amendment, including one before `T0 − m`, is a logged HOLDOUT_ACCESS_LOG.md event giving its reason and the information it used. A discretionary change after `T0 − m` is treated by the auditor as potentially informed by protected outcomes.
 - **Power floor.** Where no development `RECEIPT` data exist at registration, as in the first cycle, the floor uses documented, conservative assumed values with a sensitivity table (`docs/phase2.md` Policy 6).
 - **Sizing (Statistician S-11, adopted by this decision).** The approximately 70/30 target applies to the **PMV-capture span** `[C0, T_end]`, where `C0` is the start of release-eligible PMV capture. It does not apply to historical development data. The power requirement is a floor: where the ~30% target falls short of it, the protected span is lengthened (by a later `T_end` or a larger stopping count, never by an earlier `T0`), and the deviation is recorded.
 - **Historical data.** Every admissible observation before `T0 − m`, historical or captured, may become development data for the cycle, subject to the contract-interval eligibility rule in `docs/phase2.md` (Policy 2): a labelled contract is development-eligible only if `ref_end + Δ_label < T0 − m`, and the label's own observation or receipt time also precedes `T0 − m`. No period or observation that has been exposed to development, historical or PMV-captured, may later be promoted into a protected holdout (batch 3 P2).
@@ -60,7 +60,7 @@ It is **not**, by itself, proof of executable historical EV, unless decision-tim
 Every availability assumption for an archive row without a PMV receipt time is:
 - **explicit**, recorded with a `policy_id`;
 - **fixed before the experiment**, before any outcome-dependent inspection of the data it applies to;
-- **conservative against the hypothesis**: each uncertain delay is resolved in the direction that weakens the claim under test. For a lead-lag claim, information the model uses as a predictor (the underlying and other inputs) is made available **later**. The prediction-market price used as the market baseline, comparator, or response is made available **earlier**, meaning less stale. Where one series plays both roles, each role gets its own conservative time. The asymmetry is stated in the preregistration. *(Statistician B4S-1 corrected the explanatory clause in the first draft of this record, which said every uncertain delay resolves toward later availability; that would have manufactured the S-8 lead-lag artifact on the prediction-market side. The owner's principle is unchanged. For owner confirmation.)*
+- **conservative against the hypothesis**: each uncertain delay is resolved in the direction that weakens the claim under test. For a lead-lag claim, information the model uses as a predictor (the underlying and other inputs) is made available **later**. The prediction-market price used as the market baseline, comparator, or response is made available **earlier**, meaning less stale. Where one series plays both roles, each role gets its own conservative time. The asymmetry is stated in the preregistration. *(Statistician B4S-1 corrected the explanatory clause in the first draft of this record, which said every uncertain delay resolves toward later availability; that would have manufactured the S-8 lead-lag artifact on the prediction-market side. The owner's principle is unchanged. **Confirmed by the owner**, 2026-10-16.)*
 - **evaluated over a latency ladder**: a preregistered ladder over the relative latency, with results reported at every rung. The headline result is the preregistered conservative primary rung, never the best rung. Rungs more favorable than the primary are diagnostics only. Survival is judged by a preregistered criterion at a stated stress rung (`docs/phase2.md` §4).
 - A revision of an availability policy uses only outcome-blind latency measurements, gets a new `policy_id`, re-runs earlier results, and is counted as a research degree of freedom.
 
@@ -141,21 +141,49 @@ These were raised as O-7 and RT-B3-12 in batch 3. The owner approved resolving t
 
 - **Statistician:** `research/governance/batch4_statistician_review.md` (development self-review, not an independent audit). 19 findings: 1 BLOCKING (B4S-1, fixed above), 9 MAJOR, 8 MINOR, 1 optional escalation. Every finding tagged KEEPS was applied. B4S-4 found no conflict between H-4 and the `RECEIPT` + `PIT_CAPTURED` selection rule, and its clarification was added to `docs/phase2.md`.
 - **Reliability / Red-Team:** `research/governance/batch4_red_team_review.md`. No BLOCKING finding, 13 MAJOR, 8 MINOR, 6 owner escalations. The wording fixes were applied, including the four recommended before merge (RT-B4-01, 03, 08, 17). The parts that extend a decision are listed below and were not adopted.
-- **Edits to owner-attributed text, for owner confirmation:** B4S-1 (the H-5 direction clause) and B4S-8 (H-1 change control).
+- **Edits to the first draft's elaborations of owner decisions:** B4S-1 (the H-5 direction clause) and B4S-8 (H-1 change control). In both cases the corrected sentence was the development session's own elaboration, not the owner's charter wording. The owner confirmed both corrections on 2026-10-16.
 
-## Open owner decisions raised by the batch 4 reviews (not taken)
+## Owner rulings on the batch 4 reviews (2026-10-16)
 
-| ID | Decision | Source |
+The owner reviewed the decision-review report and ruled as follows. Where a ruling and earlier text in this record differ, the ruling governs.
+
+| ID | Ruling | Effect |
 |---|---|---|
-| E-B4-1 | Whether a value viewed under a charter-authorized live view can never be development data unless it is also released through class 1. That would narrow O-6. The rest of RT-B4-02 (owner-issued charter, class 3 prevails, every view registered) was applied as consistency with existing rules | RT-B4-02 |
-| E-B4-2 | Make H-8 preventive: from `T0 − m`, sessions check configured model IDs against Part B at start and refuse unregistered or late-cutoff models. Model pinning in settings is an owner action | RT-B4-13 |
-| E-B4-3 | A preliminary L-PROD licence check before the Gate 6 freeze, so that a holdout is never spent on a candidate that cannot lawfully trade | RT-B4-12 |
-| E-B4-4 (optional) | Allowlist-default WebFetch until F-09 is committed | RT-B4-21 |
-| E-B4-5 (optional) | Weigh cycle length (S-5 suggests about 510 days) against the H-8 and O-9 burden; consider shorter or staged cycles | RT-B4-20 |
-| E-B4-6 | During a protected interval: deterministic denies for dataset hosts, and post-`T0 − m` BTC and gold literature read only as owner-screened copies | RT-B4-07 |
-| E-B4-7 | Extend the embargo granularity to highly informative proxies (ETH, crypto indices, BTC futures and ETFs; gold futures and ETFs, spot XAU, related metals). This interacts with the open ETH decision in `docs/protected_information.md` item 3, where correlation alone is currently not a reason to block | B4S-6 |
-| E-B4-8 (optional) | One blinded, preregistered re-sizing before `T0 − m` that may only increase the required count | B4S-9 |
-| E-B4-9 (optional) | A default consequence of a confirmed H-8 or O-9 contamination (for example, a PASS reportable only as "PASS, contaminated"), and S-10's search-space freeze at `T0` | B4S-19 |
+| B4S-1 | **Confirmed** | "Conservative against the hypothesis" is role-specific (H-5 above): uncertain predictor or input availability resolves later; the prediction-market baseline or comparator resolves earlier, meaning less stale. An implementation correction; the owner's principle is unchanged. |
+| B4S-8 | **Confirmed** | H-1 change control above: no discretionary change to cycle conditions after `T0 − m`, only preregistered mechanical technical contingencies. Amendments before `T0 − m` remain possible and are logged. `C0`, the calendar-maximum rule, and the outage / eligible-cell contingency mechanism are kept. |
+| E-B4-1 | **Approved (modified)** | A value an agent views under a live-view authorization is used only for the authorized purpose (for example schema or connectivity verification). It is not development data, and enters an experiment only if the same observation is released through the per-row release (CLAUDE.md class 1). |
+| E-B4-2 | **Deferred; mandatory before `T0`** | No rule change beyond H-8 now. Before `T0`, the Statistician and Reliability / Red-Team present the practical options for model-cutoff enforcement and model pinning, together with cycle length (E-B4-5) and contamination consequences (E-B4-9). Pre-T0 checklist item P-1. |
+| E-B4-3 | **Approved** | A preliminary production-use licence check of every input `licence_id` is required before the Gate 6 candidate freeze. It does not replace the L-PROD recheck before shadow or live use. |
+| E-B4-4 | **Approved (modified)** | Before `T0 − m`, committed F-09 class denies are sufficient. From `T0 − m` until the protected holdout is consumed, agent web access (WebFetch, and WebSearch, which cannot be host-restricted) fails closed by default, except for owner-listed permitted hosts. This does not remove the requirement that F-09 class denies be committed before the first historical acquisition (A-1). |
+| E-B4-5 | **Approved as an analysis requirement** | Before `T0`, the Statistician presents cycle-length alternatives (one long cycle, and reasonable shorter or staged alternatives), each with statistical power, H-8 model-cutoff burden, O-9 research-embargo burden, and governance cost. The owner chooses the cycle design. The cycle rule does not change now. Pre-T0 checklist item P-2. |
+| E-B4-6 | **Approved (modified)** | From `T0 − m` through holdout consumption: deterministic denies cover the dataset hosts, pages, and files registered at cycle registration as able to reveal protected-interval information; BTC, gold, and prediction-market literature published during the protected interval is not read by agents by default. The owner may optionally supply a screened copy with interval-specific results removed. Owner screening is optional, never a mandatory ongoing workload. |
+| E-B4-7 | **Original proposal rejected; reconstruction principle adopted** | Correlation alone never puts a source inside the protected-information boundary. A source belongs inside it only when it is itself a protected observable, a direct equivalent observable (including settlement-reference inputs), or permits deterministic or near-deterministic reconstruction or inference of the protected observation or label, alone or in combination with other allowed information. ETH, crypto indices, futures, ETFs, metals, and other features are **not** embargoed merely because they are correlated. The quantitative meaning of "near-deterministic" is not fixed today: before `T0`, the Statistician proposes a quantitative criterion, using development data only, at the protected label's native granularity, and the owner approves it. ETH and similar cases are then measured under that criterion, not decided categorically. Pre-T0 checklist item P-3. |
+| E-B4-8 | **Approved** | One preregistered power and sample-size re-estimate before `T0 − m`, using development receipt-time data only. It may only increase the required sample count or the calendar maximum. It never moves `T0` earlier or weakens the test. It is logged. |
+| E-B4-9(a) | **Approved** | The consequence of a confirmed H-8 or O-9 contamination is preregistered at cycle registration. Default: a passing result is reported as "PASS, contaminated", and it cannot support a Phase 7 PASS determination or any later phase without an owner decision made with the independent auditor and recorded in HOLDOUT_ACCESS_LOG.md. |
+| E-B4-9(b) | **Deferred; mandatory before `T0`** | Before `T0`, present the trade-off between freezing the feature, model, and regime search space at `T0` (S-10) and allowing continued development during holdout accumulation. Resolved before the cycle begins. Pre-T0 checklist item P-4. |
+
+**Review tightenings approved by the owner** (applied during this batch as wording, now explicitly approved):
+- opening a protected-family dataset page counts as exposure whether or not a value was noticed (CLAUDE.md class 2);
+- the detailed A-4 safe-parsing allowlist and fault controls remain (`docs/external_access.md` §2);
+- committed F-09 denies are required before any historical acquisition (A-1);
+- every authorized live view is registered as exposure (CLAUDE.md class 4).
+
+## Mandatory pre-T0 owner decision checklist
+
+A cycle cannot be registered, and `T0` cannot be declared, while any item below is unresolved. Each item is resolved by an owner decision record in `docs/decisions/` before registration, and the cycle's gate record cites each one. "Deferred" never means "may stay open at registration". The list is mirrored in START_HERE.md (Protection of Holdout-Eligible Data).
+
+| # | Decision | Prepared by | Source |
+|---|---|---|---|
+| P-1 | Model-cutoff enforcement and model pinning (prevention vs record-only H-8) | Statistician and Reliability / Red-Team | E-B4-2 |
+| P-2 | Cycle design: one long cycle vs shorter or staged cycles, with power, H-8 burden, O-9 burden, and governance cost | Statistician | E-B4-5 |
+| P-3 | The quantitative "near-deterministic" reconstruction / inference criterion, at the protected label's native granularity, from development data only; ETH and similar sources measured under it | Statistician | E-B4-7 |
+| P-4 | Search-space freeze at `T0` vs continued development during accumulation | Statistician | E-B4-9(b) |
+
+The other registration-time items (H-1 conditions, the E-B4-9(a) contamination consequence, the E-B4-6 registered dataset hosts, the E-B4-8 re-sizing date if used, the power floor) are recorded in the cycle's gate record as H-1 already requires.
+
+## Strategy objective (owner direction, 2026-10-16)
+
+In the same ruling the owner directed that the project's main objective, refined in conversation, be recorded in the repository so that it is not lost across sessions. PROJECT_BRIEF.md §3 ("Strategy objective: late-window, high-confidence") is now the canonical statement. START_HERE.md ("Strategy at a Glance") mirrors it, CLAUDE.md (Strategy Scope) carries the invariant, and `docs/phase2.md` ("Strategy evaluation strata") carries the price-band and remaining-time-band evaluation requirement. Every price, time, confidence, and edge threshold in it is a development hypothesis, tested only on development data and frozen before protected evaluation.
 
 ## Not changed by this batch
 
@@ -167,8 +195,8 @@ These were raised as O-7 and RT-B3-12 in batch 3. The owner approved resolving t
 
 ## Owner actions outside the sandbox
 
-1. **Agent files.** `data-scientist.md`, `ml-engineer.md`, `statistician.md`, `independent-statistical-auditor.md`, `reliability-red-team.md`, and `risk-performance-engineer.md` under `.claude/agents/` still say "oldest approximately 70%" and "the development 70%" or "the protected final 30%". The CLAUDE.md definition governs how they are read. Aligning their wording is recommended, but it is not blocking.
-2. **Deterministic host-class denies (F-09).** `.claude/settings.json` cannot be edited from agent sessions. Committing WebFetch and network deny patterns for the trading, live-data, and live-display classes in `docs/external_access.md` would turn the policy from a rule into a deterministic control. This is **required before Phase 1 real collection and before any agent web research (WebFetch or WebSearch) after `T0 − m`**. It is strongly recommended before the next research batch.
+1. **Agent files.** `data-scientist.md`, `ml-engineer.md`, `statistician.md`, `independent-statistical-auditor.md`, `reliability-red-team.md`, and `risk-performance-engineer.md` under `.claude/agents/` still say "oldest approximately 70%" and "the development 70%" or "the protected final 30%". The CLAUDE.md definition governs how they are read, but fresh agents read these files first, so the owner directed that they be fixed. An owner-appliable patch and validation procedure are in `docs/owner_actions/` (README.md).
+2. **Deterministic host-class denies (F-09).** `.claude/settings.json` cannot be edited from agent sessions. Committing WebFetch and network deny patterns for the trading, live-data, and live-display classes in `docs/external_access.md` would turn the policy from a rule into a deterministic control. The owner designated this a **priority blocker**. It is **required before the first historical acquisition (A-1), before Phase 1 real collection, and before any agent web research (WebFetch or WebSearch) after `T0 − m`**. An owner-appliable settings patch, based on verified Claude Code permission syntax, and its validation procedure are in `docs/owner_actions/` (README.md).
 
 ## Documents changed
 
@@ -176,4 +204,5 @@ These were raised as O-7 and RT-B3-12 in batch 3. The owner approved resolving t
 - PROJECT_BRIEF.md §7.
 - START_HERE.md: Evaluation Cycles, Protection of Holdout-Eligible Data, Phase 2 allocation, Agent Cost Discipline.
 - HOLDOUT_ACCESS_LOG.md: **not changed** (hash-pinned; see "Wording conflicts resolved").
-- `docs/external_access.md` (new), `docs/exposure_register.md` (new), `docs/protected_information.md`, `docs/phase2.md`, `docs/phase1.md`, and a status note in the batch 3 decision record.
+- `docs/external_access.md` (new), `docs/exposure_register.md` (new), `docs/protected_information.md`, `docs/phase2.md`, `docs/phase1.md`, `docs/conventions.md`, and a status note in the batch 3 decision record.
+- Follow-up (owner rulings and strategy objective): PROJECT_BRIEF.md §3, START_HERE.md (Strategy at a Glance; pre-T0 checklist), CLAUDE.md (Strategy Scope; Protected Information Rule), `docs/phase2.md`, `docs/external_access.md`, `docs/protected_information.md`, `docs/exposure_register.md`, `docs/phase1.md`, and `docs/owner_actions/` (new).
