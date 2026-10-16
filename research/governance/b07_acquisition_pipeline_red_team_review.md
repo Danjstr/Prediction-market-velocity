@@ -228,3 +228,41 @@ No regressions found. The remaining docs nit: the fetch section's "so a partial 
   - the G-7 owner inputs (real A-3 backup policy and restore test, and the per-source A-1, A-2, A-5, and A-6 records);
   - a fresh A-4 record citing the final reviewed commit.
 - **Recommendation: proceed with conditions.** Fix RT-B7-14 (a one-line change plus a check) and RT-B7-04(a) before any real acquisition. Any further change to `src/pmv/acquisition/` requires re-review. Acquisition remains unauthorized.
+
+## Re-verification (round 4)
+
+- **Date:** 2026-10-16
+- **Subject:** commit `cd9ef17`. Scope is `git diff ae693e2 cd9ef17 -- src tests`.
+- **Independence:** unchanged. The coordinator wrote this remediation; I wrote no code.
+- **Method:**
+  - Ran targeted tests one at a time: `tests/failure_injection/test_acquisition_b07_regressions.py` (18 passed), then `tests/unit/test_acquisition_state.py` (34 passed).
+  - Re-ran the shadow-root probe (`$TMPDIR/rt7/shadowroot/`, exact `_BOOTSTRAP`, `env -i python -I -S -c`) with:
+    - a planted `csv.py`;
+    - a sourceless `csv.pyc`;
+    - planted `nt.py`, `_winapi.py`, and `_wmi.py`.
+  - Wrote `unresolved.py`, which appends a logging finder to the end of `sys.meta_path` in front of the real bootstrap. It lists every module name the worker looks up that the stdlib cannot resolve, during the `probe` and `verify` (csv+gzip) operations.
+  - Checked the `STAGE_FAILED` transitions programmatically.
+  - Synthetic data only, no network. The planted files were removed afterwards.
+
+### Dispositions
+
+| ID | Disposition |
+|---|---|
+| RT-B7-14 | **PARTIALLY FIXED; still open, MINOR.** The root is now appended, and the bootstrap exits 71 unless `pmv` resolves to `<root>/pmv/__init__.py`. Stdlib shadowing is closed: neither the planted `csv.py` nor the sourceless `csv.pyc` executed. **But the worker still imports from the root any name the stdlib looks up and does not have on Linux.** `unresolved.py` shows the worker probing `nt`, `_winapi`, and `_wmi` (in both `probe` and `verify`), from stdlib `try/except ImportError` paths (`platform`, `os`/`ntpath`-style checks). Planted as `nt.py`, `_winapi.py`, and `_wmi.py` in the package root, each one **executed before confinement**: `nt` ran several times, and the worker still exited 0. As a sourceless `.pyc` such a file is hidden by the `*.pyc` gitignore rule from the real-mode clean-tree check, and worker identity does not pin it. Exploiting it still needs write access to the tool checkout. **Fix:** do not put the root on `sys.path`. Instead, install a meta-path finder that answers only for `pmv` and `pmv.*`, using `importlib.machinery.PathFinder.find_spec(name, [root])` for the top-level package. Alternatively, launch from a dedicated directory that contains only `pmv`, or refuse to launch if the root contains any top-level entry other than the expected package directories (no `*.py`, `*.pyc`, `*.so`, or `*.pth`). Add `nt`/`_winapi`/`_wmi` plants to the regression test. |
+| RT-B7-04(a) | **FIXED, verified.** `STAGE_FAILED` is bound (v2 only) and carries the receipt's size and hash. Its detail schema is closed (`stage`, `code`). It is allowed only as a **self-transition** from RECEIVED, INTEGRITY_VERIFIED, PARSER_VERIFIED, or BACKUP_VERIFIED; I verified that no `STAGE_FAILED` transition changes state. It is refused in NONE, APPROVED, FETCH_FAILED, STORED, and REJECTED, and after `completed`. It therefore cannot skip a stage or alter state, and replay stays a pure function of the journal. It does not disturb `record()`, which takes the stage events by type, or REJECTED recovery, which reads `last.detail` only in the REJECTED state. `_Run.stop` appends before raising, for environmental parser stops and the unverified-backup stop. A backup target that *raises* is still not journaled; that is acceptable because it fails closed. Repeated stops grow the journal toward its 64 MiB cap, which also fails closed. |
+| RT-B7-08 | Residual still open, MINOR, documented. |
+| RT-B7-05 | Accepted, documented. |
+| `__pycache__` timestamp residual | Still open, MINOR, documented. It is pre-existing and affects parent and worker alike: timestamp-validated bytecode can differ from the hashed sources. |
+
+No other regressions were found in this diff.
+
+### Final verdict (round 4)
+
+- **Reviewed code (`cd9ef17`): no unresolved BLOCKING finding? YES.**
+- **MAJOR open? NO.** The open findings are all MINOR: RT-B7-14 (non-stdlib names imported from the package root before confinement), the RT-B7-08 residual, and the `__pycache__` residual. RT-B7-05 is accepted. All of them need local write access to the tool checkout or the journal directory, or fail closed.
+- **A-4 satisfied? NO.** These remain:
+  - the Parquet and DBN readers and zstd (owner dependency approval);
+  - a reviewed production transport (G-4);
+  - the G-7 owner inputs (real A-3 backup policy and restore test on the real medium, and the per-source A-1, A-2, A-5, and A-6 records);
+  - a fresh A-4 record citing the final reviewed commit.
+- **Recommendation: proceed with conditions.** The code is acceptable for continued synthetic development. Close RT-B7-14 (restrict the worker's import resolution to `pmv` only) before any real acquisition. Any further change to `src/pmv/acquisition/` requires re-review. Acquisition remains unauthorized.

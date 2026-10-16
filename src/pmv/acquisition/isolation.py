@@ -145,16 +145,28 @@ def expected_identity() -> dict[str, object]:
 # confinement (RT-B7-13). The project has no runtime dependency, so the only path the worker
 # needs is the directory that contains the ``pmv`` package, added explicitly.
 _PACKAGE_ROOT: Final = str(Path(__file__).resolve().parents[2])
-# The root is appended, never prepended, so a planted module in it cannot shadow the
-# standard library; ``pmv`` must then resolve to exactly that root (RT-B7-14).
-_BOOTSTRAP: Final = (
-    "import sys, importlib.util, os; root = sys.argv.pop(1); sys.path.append(root); "
-    "spec = importlib.util.find_spec('pmv'); "
-    "sys.exit(71) if spec is None or spec.origin is None or "
-    "os.path.dirname(os.path.dirname(spec.origin)) != root else None; "
-    "import runpy; "
-    "runpy.run_module('pmv.acquisition.parse_worker', run_name='__main__', alter_sys=True)"
-)
+# The package root is never put on ``sys.path``. A finder appended to ``sys.meta_path``
+# answers only for ``pmv`` and ``pmv.*``, and only from that root, so no other name (a
+# stdlib module, or one the stdlib merely probes for, such as ``nt``) can ever be loaded
+# from the checkout before confinement (RT-B7-14). The worker then exits unless ``pmv``
+# came from exactly that root.
+_BOOTSTRAP: Final = """
+import importlib.machinery, importlib.util, os, runpy, sys
+root = sys.argv.pop(1)
+class PmvOnly:
+    @staticmethod
+    def find_spec(name, path=None, target=None):
+        if name == "pmv":
+            return importlib.machinery.PathFinder.find_spec(name, [root])
+        if name.startswith("pmv."):
+            return importlib.machinery.PathFinder.find_spec(name, path)
+        return None
+sys.meta_path.append(PmvOnly)
+spec = importlib.util.find_spec("pmv")
+if spec is None or spec.origin != os.path.join(root, "pmv", "__init__.py"):
+    sys.exit(71)
+runpy.run_module("pmv.acquisition.parse_worker", run_name="__main__", alter_sys=True)
+"""
 
 
 def _command(parameters: Mapping[str, object]) -> list[str]:

@@ -429,14 +429,17 @@ def test_worker_internal_error_stops_without_rejecting(
 # --- B07 Red-Team round 3 regression (RT-B7-14) --------------------------------------------
 
 
-def test_a_planted_module_in_the_package_root_cannot_shadow_the_stdlib(tmp_path: Path) -> None:
+def test_nothing_but_pmv_is_ever_loaded_from_the_package_root(tmp_path: Path) -> None:
     from pmv.acquisition import isolation
 
     root = tmp_path / "root"
     root.mkdir()
     (root / "pmv").symlink_to(Path(isolation._PACKAGE_ROOT) / "pmv")
     marker = tmp_path / "shadow-ran"
-    (root / "csv.py").write_text(f"open({str(marker)!r}, 'w').close()\nraise SystemExit(99)\n")
+    for planted in ("csv", "nt", "_winapi", "_wmi", "sitecustomize"):
+        (root / f"{planted}.py").write_text(
+            f"open({str(marker)!r}, 'w').close()\nraise SystemExit(99)\n"
+        )
     parameters = canonical_json({"operation": "probe", "limits": WorkerLimits().as_parameters()})
     result = run_worker(
         wp.Operation.PROBE,
