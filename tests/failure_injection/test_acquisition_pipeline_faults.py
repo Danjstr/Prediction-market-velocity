@@ -248,7 +248,9 @@ def test_backup_failure_stops_without_rejecting_and_a_retry_completes(env: Env) 
     transport = _transport()
     with pytest.raises(PipelineError, match="backup_not_verified"):
         env.pipeline(transport, backup=FailingBackup()).run(_inputs())
-    assert env.entries()[-1].event is ReceiptEvent.PARSER_VERIFIED
+    last = env.entries()[-1]
+    assert last.event is ReceiptEvent.STAGE_FAILED
+    assert last.detail == {"stage": "backup", "code": "backup_not_verified"}
     assert env.pipeline(transport).run(_inputs()).outcome is Outcome.COMPLETED
 
 
@@ -281,7 +283,9 @@ def test_environmental_isolation_failure_stops_without_rejecting(
     monkeypatch.setattr(isolation, "verify_file", broken)
     with pytest.raises(PipelineError, match="isolation_identity_mismatch"):
         env.pipeline(transport).run(_inputs())
-    assert env.entries()[-1].event is ReceiptEvent.INTEGRITY_VERIFIED
+    entries = env.entries()
+    assert entries[-1].event is ReceiptEvent.STAGE_FAILED
+    assert entries[-2].event is ReceiptEvent.INTEGRITY_VERIFIED  # state unchanged
     monkeypatch.undo()
     assert env.pipeline(transport).run(_inputs()).outcome is Outcome.COMPLETED
 

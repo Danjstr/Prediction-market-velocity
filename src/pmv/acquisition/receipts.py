@@ -92,6 +92,7 @@ class ReceiptEvent(StrEnum):
     DISCARDED = "discarded"
     COMPLETED = "completed"
     TAIL_RECOVERED = "tail_recovered"
+    STAGE_FAILED = "stage_failed"
 
 
 V1_EVENTS: Final = frozenset({ReceiptEvent.RECEIVED, ReceiptEvent.RELEASED})
@@ -122,6 +123,8 @@ DETAIL_KEYS: Final[dict[ReceiptEvent, dict[str, str]]] = {
     ReceiptEvent.DISCARDED: {"reason": _TEXT, "moved_to": _TEXT},
     ReceiptEvent.COMPLETED: {"record_path": _TEXT, "files": _INT},
     ReceiptEvent.TAIL_RECOVERED: {"attestation": _TEXT, "evidence_file": _TEXT},
+    # Non-terminal: a stage stopped for an environmental reason; the state is unchanged.
+    ReceiptEvent.STAGE_FAILED: {"stage": _TEXT, "code": _TEXT},
 }
 _MAX_TEXT: Final = 2048
 

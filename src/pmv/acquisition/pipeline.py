@@ -1100,18 +1100,32 @@ class _Run:
         )
         self.p._faults("after_integrity")
 
-    def _isolated(self, call: Callable[[], dict[str, object]]) -> dict[str, object]:
+    def stop(self, item: PlannedFile, stage: str, code: str) -> PipelineError:
+        """Journal an environmental stop (state unchanged) and return the error to raise."""
+        receipt = self.received(item)
+        self.append(
+            ReceiptEvent.STAGE_FAILED,
+            item.name,
+            receipt.size_bytes,
+            receipt.sha256,
+            {"stage": stage, "code": code},
+        )
+        return PipelineError(f"{'isolation_' if stage == 'parser' else ''}{code}")
+
+    def _isolated(
+        self, item: PlannedFile, call: Callable[[], dict[str, object]]
+    ) -> dict[str, object]:
         try:
             return call()
         except isolation.WorkerRefusedError as refused:
             if refused.code in _WORKER_ENVIRONMENTAL:
-                raise PipelineError(f"isolation_{refused.code.value}") from None
+                raise self.stop(item, "parser", refused.code.value) from None
             raise _RejectedError("parser", refused.code.value) from None
         except ArchiveRefusedError:
             raise _RejectedError("parser", "archive_refused") from None
         except isolation.IsolationError as error:
             if error.failure in _ENVIRONMENTAL:
-                raise PipelineError(f"isolation_{error.failure.value}") from None
+                raise self.stop(item, "parser", error.failure.value) from None
             raise _RejectedError("parser", error.failure.value) from None
 
     def verify_parser(self, item: PlannedFile) -> None:
@@ -1136,9 +1150,9 @@ class _Run:
                     os.close(fd)
                 return {"kind": "file", "verification": verification.document()}
 
-            document = self._isolated(single)
+            document = self._isolated(item, single)
         else:
-            document = self._isolated(lambda: self._verify_archive(item, path, receipt))
+            document = self._isolated(item, lambda: self._verify_archive(item, path, receipt))
         data = canonical_line(document)
         self._replace_unjournaled(self.evidence, _evidence_name(item, "verification"), data)
         identity = isolation.expected_identity()
@@ -1225,7 +1239,7 @@ class _Run:
             ],
         )
         if evidence.policy_id != self.prepared.policy.policy_id or not evidence.verified:
-            raise PipelineError("backup_not_verified")
+            raise self.stop(item, "backup", "backup_not_verified")
         data = canonical_line(evidence.document())
         self._replace_unjournaled(self.evidence, _evidence_name(item, "backup"), data)
         self.append(

@@ -424,3 +424,34 @@ def test_worker_internal_error_stops_without_rejecting(
         pipeline.run(inputs)
     monkeypatch.undo()
     assert pipeline.run(inputs).outcome is pipeline_module.Outcome.COMPLETED
+
+
+# --- B07 Red-Team round 3 regression (RT-B7-14) --------------------------------------------
+
+
+def test_a_planted_module_in_the_package_root_cannot_shadow_the_stdlib(tmp_path: Path) -> None:
+    from pmv.acquisition import isolation
+
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "pmv").symlink_to(Path(isolation._PACKAGE_ROOT) / "pmv")
+    marker = tmp_path / "shadow-ran"
+    (root / "csv.py").write_text(f"open({str(marker)!r}, 'w').close()\nraise SystemExit(99)\n")
+    parameters = canonical_json({"operation": "probe", "limits": WorkerLimits().as_parameters()})
+    result = run_worker(
+        wp.Operation.PROBE,
+        {},
+        input_fd=None,
+        limits=WorkerLimits(wall_clock_seconds=60.0),
+        command=[
+            sys.executable,
+            "-I",
+            "-S",
+            "-c",
+            isolation._BOOTSTRAP,
+            str(root),
+            parameters.decode("ascii"),
+        ],
+    )
+    assert not marker.exists()
+    assert result.result["status"] == "ok"

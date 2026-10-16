@@ -145,8 +145,14 @@ def expected_identity() -> dict[str, object]:
 # confinement (RT-B7-13). The project has no runtime dependency, so the only path the worker
 # needs is the directory that contains the ``pmv`` package, added explicitly.
 _PACKAGE_ROOT: Final = str(Path(__file__).resolve().parents[2])
+# The root is appended, never prepended, so a planted module in it cannot shadow the
+# standard library; ``pmv`` must then resolve to exactly that root (RT-B7-14).
 _BOOTSTRAP: Final = (
-    "import sys; sys.path.insert(0, sys.argv[1]); del sys.argv[1]; import runpy; "
+    "import sys, importlib.util, os; root = sys.argv.pop(1); sys.path.append(root); "
+    "spec = importlib.util.find_spec('pmv'); "
+    "sys.exit(71) if spec is None or spec.origin is None or "
+    "os.path.dirname(os.path.dirname(spec.origin)) != root else None; "
+    "import runpy; "
     "runpy.run_module('pmv.acquisition.parse_worker', run_name='__main__', alter_sys=True)"
 )
 

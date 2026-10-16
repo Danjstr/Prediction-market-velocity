@@ -10,6 +10,7 @@ Every file of an acquisition moves through these states, and only along these ar
     PARSER_VERIFIED --backup_verified--> BACKUP_VERIFIED   (A-3 backup and restore)
     BACKUP_VERIFIED --stored--> STORED       (accepted into the protected raw store)
     any state before STORED --rejected--> REJECTED   (terminal)
+    RECEIVED .. BACKUP_VERIFIED --stage_failed--> the same state (environmental stop)
     APPROVED or FETCH_FAILED --discarded--> FETCH_FAILED (unjournaled bytes set aside)
 
 When every file is STORED, one ``completed`` entry closes the acquisition. There is no
@@ -70,6 +71,16 @@ TRANSITIONS: Final[dict[tuple[FileState, ReceiptEvent], FileState]] = {
     (FileState.PARSER_VERIFIED, ReceiptEvent.BACKUP_VERIFIED): FileState.BACKUP_VERIFIED,
     (FileState.BACKUP_VERIFIED, ReceiptEvent.STORED): FileState.STORED,
     **{(state, ReceiptEvent.REJECTED): FileState.REJECTED for state in _PRE_STORE},
+    # An environmental stop of a stage is recorded without changing the state (RT-B7-04).
+    **{
+        (state, ReceiptEvent.STAGE_FAILED): state
+        for state in (
+            FileState.RECEIVED,
+            FileState.INTEGRITY_VERIFIED,
+            FileState.PARSER_VERIFIED,
+            FileState.BACKUP_VERIFIED,
+        )
+    },
 }
 ACQUISITION_NAME: Final = "*"
 
