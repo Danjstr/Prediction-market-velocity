@@ -32,8 +32,10 @@ Rules, each fail-closed:
 
 The body is written into an unnamed ``O_TMPFILE`` inode in the quarantine directory and
 hashed as it is written. Only after every check passes is the inode given its name
-(``linkat``, which never overwrites). On any failure nothing is named, so no partial file
-can reach quarantine, let alone release.
+(``linkat``, which never overwrites). On any failure nothing stays named: a failure after
+the link (directory fsync, identity check) unlinks the name again if it is still ours. A
+crash in that window leaves a named, unjournaled file, which the pipeline sets aside as an
+orphan. No partial file can reach quarantine, let alone release.
 """
 
 import contextlib
@@ -375,18 +377,26 @@ class Fetcher:
             try:
                 os.fsync(fd)
                 _link_fd(fd, directory_fd, request.name)
-                os.fsync(directory_fd)
             except FileExistsError:
                 raise FetchError(FetchFailure.NAME_EXISTS) from None
             except OSError as error:
                 raise _write_failure(error) from None
-            linked = os.stat(request.name, dir_fd=directory_fd, follow_symlinks=False)
-            mine = os.fstat(fd)
-            if not stat.S_ISREG(linked.st_mode) or (linked.st_dev, linked.st_ino) != (
-                mine.st_dev,
-                mine.st_ino,
-            ):
-                raise FetchError(FetchFailure.WRITE_FAILED)
+            try:
+                os.fsync(directory_fd)
+                linked = os.stat(request.name, dir_fd=directory_fd, follow_symlinks=False)
+                mine = os.fstat(fd)
+                if not stat.S_ISREG(linked.st_mode) or (linked.st_dev, linked.st_ino) != (
+                    mine.st_dev,
+                    mine.st_ino,
+                ):
+                    raise FetchError(FetchFailure.WRITE_FAILED)
+            except BaseException as error:
+                # A failure after the link must not leave the name behind (RT-B7-06), but
+                # only our own inode is ever unlinked.
+                _unlink_if_ours(directory_fd, request.name, fd)
+                if isinstance(error, OSError):
+                    raise _write_failure(error) from None
+                raise
         finally:
             os.close(fd)
         return FetchedFile(
@@ -445,6 +455,15 @@ def _call_transport[T](call: Callable[[], T]) -> T:
         raise FetchError(FetchFailure.TRANSPORT_ERROR) from None
     except Exception:  # noqa: BLE001 - outside the transport contract: fail closed
         raise FetchError(FetchFailure.AMBIGUOUS_TRANSPORT_OUTCOME) from None
+
+
+def _unlink_if_ours(directory_fd: int, name: str, fd: int) -> None:
+    with contextlib.suppress(OSError):
+        named = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        mine = os.fstat(fd)
+        if (named.st_dev, named.st_ino) == (mine.st_dev, mine.st_ino):
+            os.unlink(name, dir_fd=directory_fd)
+            os.fsync(directory_fd)
 
 
 def _write_failure(error: OSError) -> FetchError:

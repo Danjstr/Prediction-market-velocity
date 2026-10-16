@@ -23,8 +23,10 @@ Failures raise ``IsolationError`` with a closed ``IsolationFailure`` code. A wor
 of its input raises ``WorkerRefusedError`` with the worker's closed ``RefusalCode``.
 Neither carries file content.
 
-``verify_file`` binds a verification to exact bytes: the worker reports the SHA-256 of
-every input byte it read, and it must equal the expected hash. ``isolated_extract`` lets
+``verify_file`` checks that the worker reports the SHA-256 of every input byte it read and
+that it equals the expected hash. That is a consistency check on the worker's own report,
+not an independent proof (RT-B7-10). The stored bytes are protected by the parent's own
+hashes at receipt, integrity check, backup, and store copy. ``isolated_extract`` lets
 the worker decompress and walk an archive while this process is the only writer: it
 re-validates every member name, re-applies every count, size, total, ratio, and
 case-collision limit itself, checks each member's hash, and rolls back everything on any
@@ -50,7 +52,13 @@ from typing import Final
 
 from pmv.acquisition import archive, readers
 from pmv.acquisition import worker_protocol as wp
-from pmv.acquisition.confinement import WorkerLimits, probe_names, supported
+from pmv.acquisition.confinement import (
+    ConfinementError,
+    WorkerLimits,
+    harden_parent,
+    probe_names,
+    supported,
+)
 from pmv.acquisition.formats import (
     EXTENSIONS,
     FileFormat,
@@ -186,6 +194,7 @@ class _Stream:
             if kind != wp.HELLO:
                 raise IsolationError(IsolationFailure.PROTOCOL_MISMATCH)
             self.hello = _json(payload)
+            _check_hello(self.hello)  # before any other frame is acted on (RT-B7-10)
             return
         if kind == wp.HELLO:
             raise IsolationError(IsolationFailure.MALFORMED_OUTPUT)
@@ -265,6 +274,10 @@ def run_worker(
     """
     if not supported():
         raise IsolationError(IsolationFailure.UNSUPPORTED_PLATFORM)
+    try:
+        harden_parent()
+    except (OSError, ConfinementError):
+        raise IsolationError(IsolationFailure.SPAWN_FAILED) from None
     document = {"operation": operation.value, "limits": limits.as_parameters(), **parameters}
     argv = list(command) if command is not None else _command(document)
     deadline = time.monotonic() + limits.wall_clock_seconds

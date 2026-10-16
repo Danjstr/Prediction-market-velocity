@@ -2,8 +2,8 @@
 
 This package holds deterministic, fail-closed building blocks for the historical
 acquisition gate. Nothing in it contacts a network host, and no real observation has
-passed through it. It is exercised only with synthetic fixtures. Acquisition stores bytes; it never makes a
-row visible to an agent (A-8):
+passed through it. It is exercised only with synthetic fixtures. Acquisition stores
+bytes; it never makes a row visible to an agent (A-8):
 
 - ``hosts``: per-source host and URL-prefix allowlists, with host-class refusal (A-1, F-09);
 - ``records``: approval, licence, acquisition-manifest, and source-quality records

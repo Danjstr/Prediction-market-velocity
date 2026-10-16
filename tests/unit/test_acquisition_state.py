@@ -231,7 +231,7 @@ def test_torn_tail_is_preserved_and_recovered_with_attestation(journal: ReceiptJ
     journal.path.write_bytes(data + torn)
     with pytest.raises(ReceiptJournalError, match="torn tail"):
         ReceiptJournal(journal.path)
-    entry = recover_torn_tail(journal.path, DECISION, clock=_clock)
+    entry = recover_torn_tail(journal.path, DECISION, committed=lambda _p: True, clock=_clock)
     assert entry.event is ReceiptEvent.TAIL_RECOVERED
     assert entry.size_bytes == len(torn)
     assert entry.plan_sha256 == GENESIS
@@ -250,7 +250,7 @@ def test_torn_tail_recovery_needs_an_owner_attestation(
 ) -> None:
     journal.path.write_bytes(b'{"partial')
     with pytest.raises(ReceiptJournalError, match="attestation"):
-        recover_torn_tail(journal.path, attestation)
+        recover_torn_tail(journal.path, attestation, committed=lambda _p: True)
     assert journal.path.read_bytes() == b'{"partial'
 
 
@@ -259,8 +259,8 @@ def test_torn_tail_recovery_refuses_a_whole_journal_or_tampered_body(
 ) -> None:
     _happy(journal)
     with pytest.raises(ReceiptJournalError, match="no torn tail"):
-        recover_torn_tail(journal.path, DECISION)
+        recover_torn_tail(journal.path, DECISION, committed=lambda _p: True)
     data = journal.path.read_bytes().replace(b'"attempt":1', b'"attempt":2', 1)
     journal.path.write_bytes(data + b"{")
     with pytest.raises(ReceiptJournalError, match="wrong entry hash"):
-        recover_torn_tail(journal.path, DECISION)
+        recover_torn_tail(journal.path, DECISION, committed=lambda _p: True)

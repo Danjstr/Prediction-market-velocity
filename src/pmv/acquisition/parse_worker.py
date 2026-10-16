@@ -36,12 +36,14 @@ import os
 import platform
 import stat
 import sys
+import sysconfig
 import zipfile
 import zlib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Final
 
+from pmv import integrity
 from pmv.acquisition import archive, confinement, formats, readers, strict_parse
 from pmv.acquisition import worker_protocol as wp
 from pmv.acquisition.formats import FileFormat
@@ -56,6 +58,7 @@ IDENTITY_MODULES: Final = (
     readers,
     strict_parse,
     wp,
+    integrity,
     sys.modules[__name__],
 )
 
@@ -81,10 +84,37 @@ def worker_identity() -> dict[str, object]:
     return {
         "python": platform.python_version(),
         "implementation": sys.implementation.name,
+        "executable_sha256": _file_sha256(Path(os.path.realpath(sys.executable))),
+        "startup_hooks_sha256": _startup_hooks_sha256(),
         "zlib_runtime": zlib.ZLIB_RUNTIME_VERSION,
         "modules": modules,
         "readers": {fmt.value: spec.identity() for fmt, spec in readers.READERS.items()},
     }
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _startup_hooks_sha256() -> str:
+    """Hash of every ``.pth`` file in the interpreter's site directories.
+
+    ``.pth`` files run at interpreter start, before confinement, so they are part of the
+    code that the worker's identity must pin.
+    """
+    digest = hashlib.sha256()
+    directories = {sysconfig.get_path("purelib"), sysconfig.get_path("platlib")}
+    for directory in sorted(entry for entry in directories if os.path.isdir(entry)):
+        for name in sorted(os.listdir(directory)):
+            if name.endswith(".pth"):
+                path = Path(directory, name)
+                digest.update(f"{path}\0".encode())
+                digest.update(_file_sha256(path).encode())
+    return digest.hexdigest()
 
 
 def _write_all(data: bytes) -> None:

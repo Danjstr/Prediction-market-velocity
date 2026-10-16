@@ -11,9 +11,12 @@ identity (name and version) and a recorded adoption status:
 
 **Compression.** A single compressed file (``.csv.gz``, ``.jsonl.bz2``, ``.json.xz``,
 ``.txt.gz``) is an encoding of one allowlisted format, not a container. gzip, bzip2, and xz
-are decoded with the standard library, strictly (every byte after a stream must start
-another complete stream; xz container only, with a decoder memory limit), and bounded by a
-decoded-size cap and an expansion-ratio cap. zstd needs a third-party package and is not
+are decoded with the standard library and bounded by a decoded-size cap and an
+expansion-ratio cap. bzip2 and xz are strict: every byte after a stream must start
+another complete stream, and xz is the container format only, with a decoder memory
+limit. gzip refuses corrupt, truncated, and non-zero trailing data, but, like GNU gzip,
+tolerates zero-byte padding after the last member (RT-B7-05). Those bytes are covered by
+the raw-file hash and decode to nothing. zstd needs a third-party package and is not
 adopted. Compressed Parquet and DBN are refused with their formats.
 
 **Schemas.** A CSV, JSON, or JSONL file must declare its expected schema
@@ -382,14 +385,22 @@ class ByteSource(Protocol):
 
 
 class LineReader:
-    """``readline(limit)`` over a byte source, hashing and counting what it yields."""
+    """``readline(limit)`` over a byte source, hashing and counting what it yields.
+
+    Reads by offset into its buffer and compacts only when it refills, so the cost is
+    linear in the input however short its lines are (RT-B7-03).
+    """
 
     def __init__(self, source: ByteSource) -> None:
         self._source = source
         self._buffer = b""
+        self._pos = 0
         self._eof = False
         self.digest = hashlib.sha256()
         self.size = 0
+
+    def _available(self) -> int:
+        return len(self._buffer) - self._pos
 
     def _fill(self) -> bool:
         if self._eof:
@@ -398,28 +409,33 @@ class LineReader:
         if not chunk:
             self._eof = True
             return False
-        self._buffer += chunk
+        self._buffer = self._buffer[self._pos :] + chunk
+        self._pos = 0
         return True
 
     def peek(self, count: int) -> bytes:
         """Return up to ``count`` leading bytes without consuming them."""
-        while len(self._buffer) < count and self._fill():
+        while self._available() < count and self._fill():
             pass
-        return self._buffer[:count]
+        return self._buffer[self._pos : self._pos + count]
 
     def readline(self, limit: int = -1, /) -> bytes:
-        bound = limit if limit > 0 else len(self._buffer) + _CHUNK
+        bound = limit if limit > 0 else self._available() + _CHUNK
+        searched = 0
         while True:
-            newline = self._buffer.find(b"\n", 0, bound)
+            end = min(self._pos + bound, len(self._buffer))
+            newline = self._buffer.find(b"\n", self._pos + searched, end)
             if newline >= 0:
-                return self._take(newline + 1)
-            if len(self._buffer) >= bound:
+                return self._take(newline + 1 - self._pos)
+            if self._available() >= bound:
                 return self._take(bound)
+            searched = self._available()
             if not self._fill():
-                return self._take(len(self._buffer))
+                return self._take(self._available())
 
     def _take(self, count: int) -> bytes:
-        line, self._buffer = self._buffer[:count], self._buffer[count:]
+        line = self._buffer[self._pos : self._pos + count]
+        self._pos += count
         self.digest.update(line)
         self.size += len(line)
         return line

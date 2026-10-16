@@ -30,7 +30,11 @@ synthetic records, require the store root inside the protected raw location, a c
 committed tool tree, every cited decision and review file committed unchanged, the F-09
 commit and the reviewed commit as ancestors of ``HEAD`` with no acquisition-code change
 since the review, an A-4 record that says A-4 is satisfied, and a reviewed production
-transport. **No production transport exists, so a real run always refuses today.**
+transport. **No production transport exists, so a real run always refuses today.** The
+caller cannot change that: in real mode the transport must be listed in the code-level
+``PRODUCTION_TRANSPORTS`` registry (empty) and defined in this package, and every Git fact
+is read from the tool's own checkout (``TOOL_ROOT``), never from an injected repository
+(RT-B7-02).
 
 **Storage is not release (A-8).** The pipeline writes only under its store root. The
 stored artifact is exactly the received bytes. Decompressed and extracted plaintext exists
@@ -119,7 +123,9 @@ _MAX_RECORD_BYTES: Final = 64 * 1024 * 1024
 _RESERVED_SUFFIXES: Final = (".example", ".test", ".invalid")
 _RESERVED_DOMAINS: Final = ("example.com", "example.net", "example.org")
 _ACQUISITION_CODE: Final = "src/pmv/acquisition"
-# Isolation failures caused by the environment, not by the input: never a rejection.
+# Isolation failures that stop the run without rejecting the file (RT-B7-04): the
+# environment is wrong, or the worker ran out of time, CPU, or memory, or died. The state is
+# kept and a later run retries; only the owner decides that such a file is unacquirable.
 _ENVIRONMENTAL: Final = frozenset(
     {
         isolation.IsolationFailure.UNSUPPORTED_PLATFORM,
@@ -128,8 +134,18 @@ _ENVIRONMENTAL: Final = frozenset(
         isolation.IsolationFailure.NOT_CONFINED,
         isolation.IsolationFailure.PROTOCOL_MISMATCH,
         isolation.IsolationFailure.PROBE_FAILED,
+        isolation.IsolationFailure.TIMEOUT,
+        isolation.IsolationFailure.CPU_LIMIT,
+        isolation.IsolationFailure.SIGNALED,
+        isolation.IsolationFailure.ABNORMAL_EXIT,
     }
 )
+# Reviewed production transports, by qualified class name. Empty: none exists (B7-4).
+# Adding one is a change to acquisition code, so it needs a fresh A-4 review, and a real
+# run refuses while any acquisition code differs from the reviewed commit (RT-B7-02).
+PRODUCTION_TRANSPORTS: Final[frozenset[str]] = frozenset()
+# The tool's own checkout; a real run always reads Git facts from here, never from a caller.
+TOOL_ROOT: Final = Path(__file__).resolve().parents[3]
 
 FaultHook = Callable[[str], None]
 WallClock = Callable[[], datetime]
@@ -489,9 +505,16 @@ def _move_aside(source: Path, target_dir: Path, name: str) -> None:
     if target.exists() or target.is_symlink():
         raise PipelineError("move_target_exists")
     os.link(source, target, follow_symlinks=False)
+    _fsync_dir(target_dir)  # the new name is durable before the old one goes (RT-B7-07)
     os.unlink(source)
-    _fsync_dir(target_dir)
     _fsync_dir(source.parent)
+
+
+def _inside(path: Path, base: Path) -> bool:
+    """Whether ``path`` is inside ``base`` literally or after resolving symlinks (RT-B7-09)."""
+    lexical = Path(os.path.normpath(path)).is_relative_to(os.path.normpath(base))
+    resolved = Path(os.path.realpath(path)).is_relative_to(os.path.realpath(base))
+    return lexical or resolved
 
 
 def _reserved_host(url: str) -> bool:
@@ -529,7 +552,6 @@ class AcquisitionPipeline:
         transport: Transport,
         backup: BackupTarget,
         repository: Repository,
-        production_transports: frozenset[type] = frozenset(),
         clock: WallClock = _utc_now,
         monotonic: Callable[[], float] = time.monotonic,
         fetch_disk_free: Callable[[int], int] | None = None,
@@ -538,8 +560,10 @@ class AcquisitionPipeline:
         self._settings = settings
         self._transport = transport
         self._backup = backup
-        self._repository = repository
-        self._production_transports = production_transports
+        # A real run never trusts a caller-supplied repository (RT-B7-02).
+        self._repository: Repository = (
+            GitRepository(TOOL_ROOT) if settings.mode is RunMode.REAL else repository
+        )
         self._clock = clock
         self._monotonic = monotonic
         self._fetch_disk_free = fetch_disk_free
@@ -561,7 +585,7 @@ class AcquisitionPipeline:
         if self._settings.mode is RunMode.REAL:
             if protected_raw_root_problem(root) is not None:
                 return ["A-7: a real store root must resolve inside the protected raw location"]
-        elif protected_raw_root_problem(root, PROTECTED_ROOT) is None:
+        elif _inside(root, PROTECTED_ROOT):
             return ["A-7: a synthetic run must not write inside ~/pmv-protected"]
         return []
 
@@ -687,9 +711,11 @@ class AcquisitionPipeline:
         ]
         if any(is_synthetic(identifier) for identifier in identifiers) or prepared.policy.synthetic:
             failures.append("mode: a real run refuses synthetic records")
+        kind = type(self._transport)
         if (
             getattr(self._transport, "synthetic", None) is not False
-            or type(self._transport) not in self._production_transports
+            or not kind.__module__.startswith("pmv.acquisition.")
+            or f"{kind.__module__}.{kind.__qualname__}" not in PRODUCTION_TRANSPORTS
         ):
             failures.append("G-4: no reviewed production transport")
         if self._backup.synthetic:

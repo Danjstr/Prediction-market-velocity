@@ -419,22 +419,33 @@ MAX_TORN_TAIL_BYTES: Final = 1024 * 1024
 RECOVERY_BINDING: Final = Binding(acquisition_id="journal_recovery", plan_sha256=GENESIS)
 
 
-def recover_torn_tail(path: Path, attestation: str, *, clock: Clock = _utc_now) -> JournalEntry:
+def recover_torn_tail(
+    path: Path,
+    attestation: str,
+    *,
+    committed: Callable[[str], bool],
+    clock: Clock = _utc_now,
+) -> JournalEntry:
     """Owner-run recovery of a journal whose final entry was torn by a crash (RT-B6-26 d).
 
     A torn tail (bytes after the last newline) is indistinguishable, by the bytes alone,
     from deliberate truncation-and-append tampering. This tool therefore runs only with an
-    owner attestation: ``attestation`` must cite the ``docs/decisions/`` record in which the
-    owner states that the crash happened. Every complete entry must still verify. The torn
-    bytes are preserved, never discarded: they are written to a new read-only evidence file
-    beside the journal, then the journal is truncated to its last complete entry, and a
-    ``tail_recovered`` entry recording the evidence file, its size and SHA-256, and the
-    attestation is appended. Nothing is repaired silently.
+    owner attestation: ``attestation`` must cite a ``docs/decisions/`` record, and
+    ``committed`` (for example ``GitRepository.committed_unchanged``) must confirm that the
+    record is committed unchanged (RT-B7-08). Every complete entry must still verify.
+
+    The torn bytes are preserved, never discarded: they are first written to a new
+    read-only evidence file beside the journal (which also marks the recovery as pending),
+    then the journal is truncated to its last complete entry, and a ``tail_recovered``
+    entry recording the evidence file, its size and SHA-256, and the attestation is
+    appended. If a crash interrupts the recovery after truncation, running this again with
+    the same attestation finds the pending evidence file and appends the missing entry.
+    Nothing is repaired silently.
     """
     if not isinstance(attestation, str) or _ATTESTATION.fullmatch(attestation) is None:
         raise ReceiptJournalError("attestation must cite a docs/decisions record")
-    if ".." in attestation:
-        raise ReceiptJournalError("attestation must cite a docs/decisions record")
+    if ".." in attestation or not committed(attestation):
+        raise ReceiptJournalError("attestation must cite a committed docs/decisions record")
     try:
         fd = os.open(path, os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC)
     except OSError as error:
@@ -448,23 +459,27 @@ def recover_torn_tail(path: Path, attestation: str, *, clock: Clock = _utc_now) 
             raise ReceiptJournalError("receipt journal exceeds its size limit")
         data = pread_all(fd, size)
         if not data or data.endswith(b"\n"):
-            raise ReceiptJournalError("receipt journal has no torn tail")
-        cut = data.rfind(b"\n") + 1
-        entries = verify_journal(data[:cut])
-        tail = data[cut:]
-        if len(tail) > MAX_TORN_TAIL_BYTES:
-            raise ReceiptJournalError("torn tail is larger than one entry could be")
-        digest = sha256_hex(tail)
-        evidence = path.parent / f"{path.name}.torn-{len(entries)}-{digest[:16]}"
-        evidence_fd = os.open(evidence, NEW_FILE_FLAGS, 0o400)
-        try:
-            append_exact(evidence_fd, tail, 0)
-            os.fsync(evidence_fd)
-        finally:
-            os.close(evidence_fd)
-        _fsync_dir(path.parent)
-        os.ftruncate(fd, cut)
-        os.fsync(fd)
+            entries = verify_journal(data)
+            pending = _pending_evidence(path, len(entries))
+            if pending is None:
+                raise ReceiptJournalError("receipt journal has no torn tail")
+            evidence, tail = pending
+        else:
+            cut = data.rfind(b"\n") + 1
+            entries = verify_journal(data[:cut])
+            tail = data[cut:]
+            if len(tail) > MAX_TORN_TAIL_BYTES:
+                raise ReceiptJournalError("torn tail is larger than one entry could be")
+            evidence = path.parent / _evidence_name(path, len(entries), tail)
+            evidence_fd = os.open(evidence, NEW_FILE_FLAGS, 0o400)
+            try:
+                append_exact(evidence_fd, tail, 0)
+                os.fsync(evidence_fd)
+            finally:
+                os.close(evidence_fd)
+            _fsync_dir(path.parent)
+            os.ftruncate(fd, cut)
+            os.fsync(fd)
     finally:
         os.close(fd)
     journal = ReceiptJournal(path, clock=clock)
@@ -475,11 +490,29 @@ def recover_torn_tail(path: Path, attestation: str, *, clock: Clock = _utc_now) 
             new_session_id(),
             evidence.name,
             len(tail),
-            digest,
+            sha256_hex(tail),
             {"attestation": attestation, "evidence_file": evidence.name},
         )
     finally:
         journal.close()
+
+
+def _evidence_name(path: Path, seq: int, tail: bytes) -> str:
+    return f"{path.name}.torn-{seq}-{sha256_hex(tail)[:16]}"
+
+
+def _pending_evidence(path: Path, seq: int) -> tuple[Path, bytes] | None:
+    """An evidence file for entry ``seq`` whose ``tail_recovered`` entry was never written."""
+    prefix = f"{path.name}.torn-{seq}-"
+    found = sorted(entry for entry in path.parent.iterdir() if entry.name.startswith(prefix))
+    if not found:
+        return None
+    if len(found) != 1 or found[0].is_symlink():
+        raise ReceiptJournalError("ambiguous torn-tail evidence files")
+    tail = found[0].read_bytes()
+    if found[0].name != _evidence_name(path, seq, tail):
+        raise ReceiptJournalError("torn-tail evidence file does not match its name")
+    return found[0], tail
 
 
 def _fsync_dir(directory: Path) -> None:

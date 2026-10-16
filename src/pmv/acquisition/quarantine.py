@@ -159,6 +159,12 @@ class Quarantine:
             os.unlink(self.directory / name)
             raise
         os.close(fd)
+        # The new name is durable before the journal says "received" (RT-B7-07).
+        directory_fd = os.open(self.directory, DIR_FLAGS)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
         receipt = Receipt(name=name, size=size, sha256=digest.hexdigest())
         try:
             self.journal.append(
