@@ -26,7 +26,7 @@ Real market captures are holdout-eligible plaintext. The deterministic collector
 - **Agent sessions cannot read it.** `~/pmv-protected` is denied to the built-in Read and Edit tools and to the Bash sandbox (`.claude/settings.json`). The collector therefore runs outside Claude Code.
 - **Where it is enforced.** `pmv.config.load_config` refuses a non-test configuration with a root outside the protected location, so every entrypoint that loads a real configuration fails closed, including a future collector. `python -m pmv.data_access_guard check-config`, run by `scripts/check.sh`, loads every committed `configs/*.toml` and reports any violation.
 - **What is exempt.** The low-level store (`RawCaptureStore`, `RawStorageConfig`) is deliberately not restricted, so unit tests and synthetic fixtures keep using temporary directories. The `test` environment is likewise exempt.
-- **What agents work with.** Agents work only with synthetic fixtures until the release architecture (Step 11 F-08) is decided and built.
+- **What agents work with.** Agents work only with synthetic fixtures until the H-2 per-row release tool (F-08, decided in batch 4) is built, reviewed, and approved (`docs/release_tool_design.md`).
 
 ## Layout
 

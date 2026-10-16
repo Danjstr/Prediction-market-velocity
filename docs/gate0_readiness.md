@@ -1,6 +1,6 @@
 # Gate 0 Readiness Evidence (Phase 0 Steps 10–11)
 
-**This is readiness evidence for the Gate 0 decision. It is not the Gate 0 decision.** No Gate 0 record exists.
+**This is readiness evidence for the Gate 0 decision. It is not the Gate 0 decision.** No Gate 0 record existed when this file was written. *Status (2026-10-16): Gate 0 PASS was recorded at `db09acd` (`docs/decisions/gates/`). The deferred findings below remain the current deadline list.*
 
 **Roadmap.** Step 10 → Step 11 (a full Reliability/Red-Team-led audit, then the approved corrections and a narrow re-audit) → owner Git-bundle backup and restore test → Gate 0 decision → Step 12 (a private remote holding the full-history backup, a fresh-clone restore test, then the first hosted CI run and its verification) → Phase 1.
 - The roadmap and the Gate 0 criterion are defined in START_HERE.md (Phase 0, Gate 0).

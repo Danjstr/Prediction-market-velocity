@@ -51,7 +51,23 @@ The agents' goal is to make themselves operationally irrelevant by encoding thei
 | ~15 min | ~8 min in | ~7 min |
 | ~15 min | ~10 min in | ~5 min |
 
-The model should continuously update as market information arrives.
+The model should continuously update as market information arrives. The table illustrates the horizon-reduction principle. The strategy's primary operating window is narrower: the final few minutes of a contract (below).
+
+### Strategy objective: late-window, high-confidence (owner direction, 2026-10-16)
+
+This subsection is the canonical statement of what PMV is trying to build. Owner record: `docs/decisions/2026-10-16_phase1_batch4_acquisition_safety_decisions.md` ("Strategy objective").
+
+PMV is a **late-window, high-confidence** prediction-market strategy. It is intended to identify **relatively infrequent** opportunities where the model's **calibrated** probability materially exceeds the market's **executable, cost-adjusted break-even probability** during the **final few minutes** of a contract.
+
+- **Remaining horizon only.** The strategy generally forecasts only the remaining final few minutes of a contract. It does not attempt to predict the entire contract from inception. Time remaining is a first-class variable.
+- **Price sweet spot, not a trading band.** The preliminary hypothesis expects the greatest concentration of viable opportunities around executable prices of approximately **$0.93–$0.97**. A progressively thinner opportunity tail may extend down toward approximately **$0.85** when unusually large model-versus-market mispricing exists. Approximately $0.85 is a preliminary **candidate-generation floor**, not a trade signal. Prices below it are normally outside the intended strategy.
+- **Price alone never determines entry.** A trade requires the calibrated model probability to be materially above the executable break-even probability plus the required uncertainty and safety margin:
+  `calibrated P(win) > executable break-even probability + required margin`.
+  The break-even probability is computed from the actual entry price and the contract's actual payout structure, after fees, spread, slippage, and latency. The margin covers fill and execution uncertainty and model and calibration uncertainty. A $1 payout is never assumed where the actual economic payout differs.
+- **No imposed distribution.** The trade population is not forced into a normal distribution or any other predetermined price distribution. The observed distribution of trades must emerge from genuine opportunities in the development data.
+- **Stratified evaluation.** Results are evaluated by entry-price band (initially about 0.85–0.89, 0.90–0.92, 0.93–0.95, 0.96–0.97, and >0.97) and by remaining-time band (initially about ≤1, 1–2, 2–3, and 3–5 minutes). Details: `docs/phase2.md`, "Strategy evaluation strata".
+- **High-probability-tail calibration is a core success criterion.** AUC or ranking performance alone is not sufficient. A model that predicts 97% where the true conditional frequency is materially lower can destroy the strategy despite excellent overall discrimination. At a $0.95 entry on a contract paying $1, before costs, a win earns about $0.05 and a loss costs about $0.95, so an error of a few percentage points in tail calibration can reverse the sign of expected value.
+- **Development hypotheses, not facts.** Every price, time, confidence, and edge threshold above is a development hypothesis. Each is tested only on development data and formally frozen, in the audit-candidate manifest, before protected evaluation. The repository must not hard-code them as empirically proven truths.
 
 **Objective:** find a small but repeatable positive expected-value edge. Even small profits per trade may compound if:
 - the edge is real;
@@ -103,6 +119,15 @@ The system must evaluate whether the probability estimate creates positive expec
 
 The system should prefer conservative estimates.
 
+### Tax and after-tax economics (owner direction, 2026-10-16)
+
+Tax treatment is part of strategy viability, not an afterthought. Owner record: `docs/decisions/2026-10-16_b06_governance_continuity_sync.md`. Detailed requirements: START_HERE.md Phase 4.5.
+- No tax classification is assumed. Prediction-market products are not presumed to be gambling, capital gains, ordinary income, §1256 contracts, or any other fixed category. Classification may depend on the product, venue, jurisdiction, trader or entity status, and the law and regulation in force at the time.
+- Research and backtest reporting distinguishes pre-tax EV and performance, the tax assumptions or scenarios used, and after-tax or tax-adjusted EV wherever classification can reasonably be modelled.
+- An attractive pre-tax result is never presented as economically deployable without considering material tax consequences.
+- Tax assumptions used in a protected evaluation are frozen and preregistered like other material economic assumptions, or are explicitly reported as sensitivity scenarios.
+- Before any real-money scaling, current authoritative verification of the classification is required and, where appropriate, qualified tax or legal advice.
+
 ---
 
 ## 6. Data
@@ -116,7 +141,7 @@ Collect as much relevant historical and live data as practical from:
 
 Preserve raw market data whenever practical so events can be reconstructed and replayed.
 
-Historical data alone may not contain enough resolution for 5–15 minute forecasting, so **high-frequency live data collection should begin as early as possible.**
+Historical data alone may not contain enough resolution for the shortest horizons (the final few minutes of a contract, and 5–15 minute windows), so **high-frequency live data collection should begin as early as possible.**
 
 ### Verified existing historical data
 PMV prefers verified existing historical data to waiting to regenerate equivalent observations. When a historical source's provenance, timestamp semantics, contract semantics, licensing, and quality are adequate, it is used for development, while prospective PMV capture accumulates genuinely untouched data in parallel. This preference never weakens provenance, licensing, point-in-time correctness, holdout integrity, or source-quality requirements. Historical data exposed to development can never later become protected holdout data. Owner record: `docs/decisions/2026-10-16_phase1_batch3_historical_data_strategy.md`.
@@ -142,14 +167,16 @@ External work must be checked for:
 
 ## 7. Train / Test Design
 
-Use a **chronological** split. Never randomly shuffle the time series.
+Use **chronological** development and evaluation. Never randomly shuffle the time series.
 
-| Segment | Share (approx.) | Purpose |
-|---|---|---|
-| Oldest | 70% | Development / training |
-| Newest | 30% | Protected final out-of-sample holdout |
+| Segment | Purpose |
+|---|---|
+| Development pool: historical data, and PMV capture before the protected interval's start minus its margin | Development / training, in chronological train/development partitions |
+| Protected evaluation set: a **prospective** protected interval for the first cycle (preferred thereafter), starting at a declared future time `T0`, with `T0 − m` later than every registered prior exposure of the protected observable families and every recorded development-model training cutoff | Protected final out-of-sample holdout |
 
-### Within the development 70%
+For a prospective holdout, the approximate 70% development / 30% protected design target applies to the PMV-capture span, not to historical development data. The power requirement is a floor: where the ~30% target falls short of it, the protected span is lengthened (never by an earlier `T0`), and the deviation is recorded. "The development 70%" and "the final 30%" below and elsewhere mean the development pool and the protected evaluation set of the frozen split. Owner record: `docs/decisions/2026-10-16_phase1_batch4_acquisition_safety_decisions.md` (H-1).
+
+### Within the development pool
 Use rolling/walk-forward validation for:
 - feature selection;
 - model selection;
@@ -159,13 +186,13 @@ Use rolling/walk-forward validation for:
 - strategy thresholds.
 
 ### Holdout protection
-- The final 30% must remain untouched until the model and strategy are frozen.
-- The final 30% must not become a repeatedly queried validation set.
-- The split is frozen once as explicit immutable partition boundaries on an identified dataset snapshot. Approximately 70/30 is the design target; later-arriving data never moves the frozen boundaries.
+- The protected evaluation set must remain untouched until the model and strategy are frozen.
+- The protected evaluation set must not become a repeatedly queried validation set.
+- The split is frozen once as explicit immutable partition boundaries on an identified dataset snapshot or, for a prospective holdout, on the declared protected interval. Approximately 70/30 is the design target as defined above; later-arriving data never moves the frozen boundaries.
 - Opening the holdout requires explicit user approval for the specific frozen candidate, in addition to the technical release gates.
 - Once outcome-dependent information from the holdout has been revealed, it is consumed and can never again serve as untouched data for a changed candidate.
 - No observation may become protected evaluation data after its values, outcomes, or outcome-dependent derivatives have been exposed to development.
-- Historical data from any source, once exposed to development, stays development data permanently. When development relies on historical data, the formation of the protected set (a quarantined, unexamined snapshot, or a prospective protected period) is decided for each cycle before any outcome-dependent inspection.
+- Historical data from any source, once exposed to development, stays development data permanently, and no period or observation that has been exposed to development, historical or PMV-captured, may later be promoted into a protected holdout. When development relies on historical data, the formation of the protected set (a quarantined, unexamined snapshot, or a prospective protected period) is decided for each cycle before any outcome-dependent inspection. The prospective protected period is required for the first cycle and is the preferred formation thereafter (H-1).
 - Each holdout is evaluated once, against a preregistered evaluation plan with PASS, FAIL, and INCONCLUSIVE criteria. Any authorized evaluation that reveals outcomes consumes the holdout; only PASS permits the evaluated frozen candidate to continue.
 
 ### Leakage control
@@ -354,10 +381,18 @@ The project is not complete merely because a backtest is profitable.
 
 A successful system must:
 - demonstrate credible out-of-sample edge;
-- remain profitable after realistic costs;
+- remain profitable after realistic costs, with material tax consequences considered (§5);
 - preserve capital under adverse sequences;
 - execute reliably;
 - detect degradation;
 - halt safely;
 - recover safely;
 - operate independently of agents and LLMs.
+
+---
+
+## 16. Roadmap and Project Memory
+
+- The authoritative phase order (Phases 0–12, including 4.5 and 5.5) and every gate are in START_HERE.md ("Phase Roadmap" and the phase sections).
+- Git is the only durable project memory. A conversation, Claude or ChatGPT memory, scratchpad, recap, or agent-session state is never sufficient project governance. A material owner decision, strategy requirement, threshold hypothesis, phase change, safety rule, gate requirement, or unresolved mandatory decision binds future sessions only once it is recorded in this repository's canonical documents or decision records (START_HERE.md "Repository Continuity").
+- Current development happens on the current active ground-truth branch named in `docs/BRANCH_TIMELINE.md`. Each new development branch starts from the newest approved cumulative branch.

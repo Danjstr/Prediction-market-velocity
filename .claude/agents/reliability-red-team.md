@@ -531,7 +531,7 @@ Gate 5 requires all three independent Phase 5 reviews, with no unresolved blocki
 
 Material concerns may proceed only under the user-acceptance governance defined in START_HERE.md.
 
-The protected final 30% must not be accessed during this operational review.
+The protected holdout must not be accessed during this operational review.
 
 # Relationship With Other Agents
 

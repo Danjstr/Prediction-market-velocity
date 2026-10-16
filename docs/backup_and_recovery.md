@@ -13,13 +13,14 @@ Owner basis: Step 11 F-04 (`docs/decisions/2026-10-14_phase0_step11_owner_decisi
 | Private remote | `origin` = `git@github-pmv:Danjstr/Prediction-market-velocity.git` (private GitHub repository `Danjstr/Prediction-market-velocity`). In the isolated container, `origin` points at the same repository through `ssh.github.com:443`. |
 | SSH alias | `github-pmv` is a host alias in the owner's local `~/.ssh/config`. It, and the passphrase-protected key it names, exist only on the owner's machine and are never in the repository. |
 | Isolated-environment credential | A repository-scoped GitHub deploy key, provisioned by the owner into the isolated container only. It is never in the repository, is not the owner's personal key, and is never exposed to the owner's personal machine sessions. |
-| Integration branch | `main` is the authoritative integration branch unless a later approved policy changes it. |
+| Integration branch | `main` is the reviewed integration branch: it advances only through merged pull requests. |
+| Active development branch | The **current active ground-truth branch** named in `docs/BRANCH_TIMELINE.md` (branch-continuity rule, START_HERE.md "Repository Continuity", owner direction 2026-10-16). It is cumulative and may be ahead of `main`. |
 | Reference point | Gate 0 PASS was committed as `db09acd91c909f787ea3acc4ece421d8de59af2d` ("Record Gate 0 PASS"); its record pins project commit `1b743781ff0179ff9194062f339b8b656648f3fd`. Later checkpoints move `main` forward from there. |
 | Secondary local bundle | `~/pmv-backups/prediction-market-velocity-pre-gate0-1b743781.bundle`, SHA-256 `7b1440b9e7d859000ff68a3d03ce783369e7db320a69ac8bc21b44db92a21655`, outside the repository |
 
 The bundle stops at the pre-Gate-0 commit `1b743781`. It does **not** contain the Gate 0 record or anything later. It is on the same physical device as the repository, and it is not a source of truth. The private GitHub repository is newer and is the primary recovery source.
 
-The source of truth for the latest checkpoint is the verified `main` on GitHub, cross-checked against the commit SHA reported at the end of each checkpoint.
+The source of truth for the latest merged checkpoint is the verified `main` on GitHub, cross-checked against the commit SHA reported at the end of each checkpoint. The source of truth for current, not-yet-merged development is the pushed head of the current active ground-truth branch recorded in `docs/BRANCH_TIMELINE.md`.
 
 ## Execution environments and access boundary
 
@@ -159,7 +160,7 @@ If any prerequisite stops holding (for example, the ruleset is disabled, gains a
 
 **Workflow:**
 
-1. Create a task branch from the current verified `main`. Agents never commit to or push `main`.
+1. Create the task branch (`bNN/<short-purpose>`) from the current active ground-truth branch in `docs/BRANCH_TIMELINE.md`, after verifying with `git merge-base --is-ancestor` that it descends from that branch's recorded head. Never start from `main` or an older branch while a newer cumulative branch exists (START_HERE.md "Repository Continuity"). Record the new branch in `docs/BRANCH_TIMELINE.md`. Agents never commit to or push `main`.
 2. Implement within the approved batch scope.
 3. Run `./scripts/check.sh`. A failure, or an inability to run it, blocks the checkpoint exactly as in the local workflow: nothing is committed or pushed.
 4. Inspect the exact diff. Stage explicit paths only (never `git add -A`; see the rules above), confirm with `git diff --cached --name-only`, then commit with a meaningful message.

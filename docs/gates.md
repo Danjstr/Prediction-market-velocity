@@ -2,7 +2,7 @@
 
 Every gate decision is recorded as an immutable, generated file at `docs/decisions/gates/<gate_id>_<record_id>.md`, as START_HERE.md requires. Implementation: `src/pmv/gate_record.py` (schema, rendering, lineage rules) and `src/pmv/gates.py` (tooling). Schema document: `schemas/gate_record_v1.json`. The Python validators are authoritative.
 
-This step provides the tooling only. No gate decision has been recorded. Gate 0's record is created only after the full Phase 0 audit (Step 11) and its approved corrections.
+This step provides the tooling only. No gate decision had been recorded when this step was written. *Status (2026-10-16): Gate 0 PASS was recorded at `db09acd`; Gate 1 has not been decided (`docs/phase1.md`).* Gate 0's record is created only after the full Phase 0 audit (Step 11) and its approved corrections.
 
 **Gate 7 is the final protected-holdout result** (PASS, FAIL, or INCONCLUSIVE; START_HERE Phase 7), not preregistration sign-off. The v1 holdout-access tooling still uses a Gate 7 PASS record as pre-reveal plan approval. That is a recorded mismatch (Step 11 F-18), described in `docs/holdout_access.md`, and must be fixed before the Phase 7 reveal.
 

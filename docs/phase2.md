@@ -1,4 +1,6 @@
-# Phase 2: Data Cleaning, Dataset Engineering, and Target Construction — Design
+# Phase 2: Canonical Dataset Engineering and Statistical Design — Design
+
+*Covers data cleaning, dataset engineering, target construction, and statistical design. START_HERE.md "Phase Roadmap" gives the phase name.*
 
 Working design for Phase 2. The authoritative requirements are START_HERE.md (Phase 2, Gate 2, Project-Wide Controls), CLAUDE.md, and PROJECT_BRIEF.md; where this file summarizes them, they win. This is not a gate record and not an owner-decision record. Items marked **(owner decision)** are proposals until the owner approves them in `docs/decisions/`.
 
@@ -94,13 +96,13 @@ Every dataset is built through these layers. They stay separable (CLAUDE.md "Dat
   | `received_at` | PMV collector receipt time | **availability**, for PMV captures only |
   | `acquired_at` | PMV fetch time of a historical file | provenance only. Never availability: it is after the fact |
 
-- **Availability.** `available_at = received_at` for PMV captures, always. Archive rows have no PMV receipt time. Their availability follows the owner-approved rule H-5, a flagged synthetic `available_at = event_time + L` with `L` fixed before outcome inspection, or they are excluded. The `availability_class` (`RECEIPT` or `SYNTHETIC_ARCHIVE`) is carried on every row and every result.
+- **Availability.** `available_at = received_at` for PMV captures, always. Archive rows have no PMV receipt time. Their availability follows owner decision H-5 (explicit, fixed before the experiment, conservative against the hypothesis in each role, per S-8: later for predictor inputs, earlier for the prediction-market baseline; and evaluated over a preregistered latency ladder whose conservative primary rung is the headline result): a flagged synthetic `available_at = event_time + L` with `L` fixed before outcome inspection, or they are excluded. The `availability_class` (`RECEIPT` or `SYNTHETIC_ARCHIVE`) is carried on every row and every result.
 - **Synthetic latency is conservative against the hypothesis (S-8).** The core hypothesis is a lead-lag claim: prediction-market prices under-react to underlying velocity. Its measured strength depends on the *difference* in effective latency between sources, so:
   - underlying sources get a high latency quantile, and prediction-market price staleness a low one;
   - the asymmetry is stated explicitly;
   - latency spikes cluster in fast markets, so a high quantile is used, never a median;
-  - every archive-based result reports a preregistered `L` ladder (for example ×0.5, ×1, ×2, ×4), and an effect that does not survive the ladder is treated as a timing artifact. Only the primary `L` counts toward conclusions.
-- **Coarse timestamps and block time.** A timestamp of precision `p` denotes `[t, t + p)`, so availability uses `t + p + L`. On-chain fills use the information interval `[block_time − D_max, block_time + 1 s)`, and archive lead-lag results are reported at both ends (Red-Team RT-B3-07).
+  - every archive-based result reports a preregistered ladder over the **relative** latency: each rung lengthens predictor-input delays and shortens prediction-market staleness (including taking the early end of any PM information interval) by preregistered factors. The **primary rung** is preregistered at the conservative end of plausible latency (high quantile for predictor inputs, low for PM staleness). It is the headline result (owner decision H-5) and the only rung that counts toward conclusions. Rungs more favorable to the hypothesis than the primary are diagnostics, never cited as evidence. Rungs less favorable are stress tests. An effect is "surviving" only if a preregistered criterion holds at the stated stress rung (for example, the block-bootstrap lower bound of the primary estimand stays above zero at the ×2 stress rung). Otherwise it is treated as a timing artifact. The ladder is logged as research degrees of freedom.
+- **Coarse timestamps and block time.** A timestamp of precision `p` denotes `[t, t + p)`, so availability uses `t + p + L`. On-chain fills use the information interval `[block_time − D_max, block_time + 1 s)`, and archive lead-lag results are reported at both ends. The headline uses the end that is least favorable to the hypothesis in each role (the early end for the PM baseline or response), and an effect present only at the favorable end is a timing artifact (Red-Team RT-B3-07).
 - **Archive rows support predictive-information claims only, never executable-EV claims.** Archive prints are prices at which someone else traded, and there are no books. Any fill simulation on archive rows is labeled "indicative, not executable".
 
 ## 5. Clock-offset problems and impossible timestamps
@@ -186,12 +188,12 @@ Exact duplicates are removed only through a documented canonicalization that kee
 ## 11. Contract metadata versioning and point-in-time correctness
 
 - Contract metadata is **mutable** (batch 2: close time, strikes, tick grid, fees, status, current terms). Point-in-time contract metadata is required before any real label (Statistician M1).
-- Proposed architecture: `research/historical_data/point_in_time_metadata_architecture.md` **(owner decision H-3)**. In short:
+- Architecture: Option D in `research/historical_data/point_in_time_metadata_architecture.md`, **adopted by owner decision H-3** (`docs/decisions/2026-10-16_phase1_batch4_acquisition_safety_decisions.md`). In short:
   - an append-only metadata observation log keyed by PMV receipt time is the source of truth;
   - a bitemporal `ContractVersion` view is derived from it (`effective_from` from the venue, `known_at` from PMV), with a parity test;
   - periodic snapshots are used for reconciliation.
 - **Feature-time rule.** A decision at `t` uses the latest version with `known_at + min_latency <= t`. **Economics rule.** Realized costs use the version effective at fill time. Where the two differ, the difference is a measured execution risk.
-- **Archive metadata is post-hoc.** A historical market object is its end-of-life state. Rows built from it carry `metadata_pit_class = POST_HOC` and follow the admission policy **(owner decision H-4)**.
+- **Archive metadata is post-hoc.** A historical market object is its end-of-life state. Rows built from it carry `metadata_pit_class = POST_HOC` and follow the admission policy **(owner decision H-4, adopted)**: admissible for discovery, data cleaning, pilot modeling, and historical predictive research, but not by itself proof of executable historical EV unless decision-time availability of each field used can be justified.
 - **Universe selection.** The contract universe is enumerated from listings as received (lifecycle `created`), never from post-hoc listings. Archives that drop inactive or provisional markets bias the universe toward active markets. That bias is reported, never ignored.
 
 ## 12. Settlement and result revisions, and label cleaning
@@ -255,7 +257,7 @@ The tier is a judgment about a source, never a property inferred from its result
 
 ## Identity, duplicates, and statistical dependence
 
-**This section proposes terminology for owner approval (H-6).** It refines R1, R2, and E-5 (`docs/phase1.md`), after Statistician review.
+**This design was adopted by owner decision H-6** (`docs/decisions/2026-10-16_phase1_batch4_acquisition_safety_decisions.md`). It refines R1, R2, and E-5 (`docs/phase1.md`), after Statistician review. Contracts on different venues whose `ref_end` falls in the same `outcome_cell_id`, including those on different reference sources, remain separate venue observations (separate `venue_contract_id`s; never dropped as duplicates). They are one dependence unit for split, purge and embargo, uncertainty, power, effective sample size, and correlated-exposure aggregation (Phase 4.5). This does not limit dependence to same-cell pairs: overlapping information intervals, serial dependence within and across `time_block_id`s, and cross-asset dependence are handled by Policies 2, 4, and 5. The Gate 2 independent audit of this design is still required.
 
 ### Canonical identities
 
@@ -270,7 +272,7 @@ The tier is a judgment about a source, never a property inferred from its result
 | `contract_version_id` | The hash of one point-in-time version of a contract's economic and rule terms, with `effective_from` and `known_at` (H-3). For `POST_HOC` rows: an explicit `POST_HOC:<end-of-life version hash>` marker that can never pass a `known_at` check | The original strike, then the revised strike |
 | `outcome_reference_event_id` | The exact quantity that determines the outcome: underlying, reference source and methodology version, and the **fixing set** (one fixing for fixed-strike contracts; start and end fixings for up/down contracts) | "BTC, CF BRTI, 60 s average ending 14:15:00Z" (illustrative; actual rules unverified, UR-4) |
 | `outcome_cell_id` | **The scoring and aggregation unit.** `(underlying, floor_G(ref_end))` on a declared, fixed UTC grid `G` per underlying. It is assigned from each contract's own `ref_end`, never by transitive overlap. Venues, strikes, and reference sources whose `ref_end` falls in one grid cell share it | A Kalshi BRTI contract and a Polymarket Chainlink contract both ending 14:15:00Z share the cell `(BTC, 14:00–14:15)`. A 1-hour contract ending 15:00:00Z shares the cell `(BTC, 14:45–15:00)` |
-| `time_block_id` | **The resampling and HAC unit.** A contiguous calendar block of fixed, preregistered length `b` on one global UTC grid shared by all underlyings and venues, with `b ≥ max contract life + max feature lookback + label-availability lag`. Never delimited by realized market state. Regime labels are reporting strata computed from past-only information under fixed thresholds, and never define blocks | A UTC day (BTC), a declared session-day (gold) |
+| `time_block_id` | **The resampling and HAC unit.** A contiguous calendar block of fixed, preregistered length `b` on one global UTC grid shared by all underlyings and venues, with `b ≥ max contract life + max feature lookback + label-availability lag`. Never delimited by realized market state. Regime labels are reporting strata computed from past-only information under fixed thresholds, and never define blocks | A UTC day for all underlyings. Gold session structure is a reporting stratum, not a block boundary |
 | contract information interval `I(k)` | `[first_decision(k) − max_lookback, ref_end(k) + Δ_label]`, per contract. The unit for split and purge decisions | |
 | `decision_time` | The PMV-clock instant at which a decision row's information cutoff is applied. It is generated by a preregistered clock rule (below) | |
 | `decision_row_id` | `(venue_contract_id, contract_version_id known at t, decision_time, feature, label, and availability policy IDs)` | Many rows per contract |
@@ -286,7 +288,7 @@ Four points deserve emphasis:
 - An event-triggered decision rule may use only past-only triggers that the live system would compute identically.
 - Archive trade or candle times are never decision times by default. Trade arrival is information arrival, so rows created at trade times select on activity.
 
-### Policy (proposed, for H-6)
+### Policy (adopted, H-6)
 
 1. **Do not drop cross-venue near-duplicates.** Kalshi and Polymarket contracts on the same reference interval are distinct venue observations, with different prices, costs, liquidity, and rules. Both are kept. That pairing is also what any line-shopping or near-arbitrage analysis needs.
 2. **Split isolation, by contract information interval.**
@@ -294,7 +296,7 @@ Four points deserve emphasis:
      - a contract is **development-eligible** iff `ref_end + Δ_label < B − m`;
      - a contract is **protected-eligible** iff `first_decision ≥ B` and `ref_end + Δ_label ≤ E`;
      - every other contract is **purged**, counted in the exclusion ledger with reason `split_boundary_purge`.
-   - All contracts in one `outcome_cell_id` share `ref_end` up to the grid width. They therefore fall on the same side, or are purged together, without any transitive grouping.
+   - All contracts in one `outcome_cell_id` share `ref_end` up to the grid width. They therefore fall on the same side, or are purged together, without any transitive grouping. This requires `m + Δ_label ≥ G`, which is checked when the split is frozen.
 3. **Walk-forward folds.**
    - A fold with training cutoff `T` and validation start `V` trains only on contracts whose label is **available** by `T`:
      - for `RECEIPT` rows, that is the finalization receipt;
@@ -318,7 +320,7 @@ Four points deserve emphasis:
 6. **Power (F-07).**
    - **Primary confirmatory estimand:** the paired per-cell loss difference against the executable-price-implied probability, on eligible `RECEIPT` cells. It tests information not already in the price, and its SD is set by forecast disagreement, not by outcome variance.
    - **Secondary estimand:** after-cost EV per traded cell.
-   - For each estimand, the required effective N is `n = ((z_{1−α/2} + z_{1−β}) σ_s / Δ)²`. `σ_s` and the ESS ratio are estimated on development `RECEIPT` data only.
+   - For each estimand, the required effective N is `n = ((z_{1−α/2} + z_{1−β}) σ_s / Δ)²`. `σ_s` and the ESS ratio are estimated on development `RECEIPT` data available at cycle registration. Where none exist, as in the first cycle, the gate record states assumed values, their sources, and a sensitivity table, chosen conservatively (larger `σ_s`, smaller ESS ratio, smaller `Δ`). Historical-archive estimates may inform the assumption but are labeled as such.
    - The required protected span is `n / (cells per day × eligible fraction × traded fraction × ESS ratio)`. Rows, strikes, and venues add no independent samples.
    - An illustration with assumed values only (Statistician S-5): a 2-point net edge on 20% of cells traded, at ESS ratio 0.5, needs about 510 days of protected capture. If the secondary estimand cannot reach power within the planned span, that is recorded before `T0`. The holdout then tests incremental information and **bounds** EV rather than confirming it.
 7. **Pooling across venues and strikes in training.** This is allowed, with venue and strike as explicit features or hierarchy. Each contract's rows sum to `1/n_contracts_in_cell`, so a cell with many strikes or two venues does not dominate. Evaluation reports per venue and pooled, both with cell-based, block-resampled intervals.
@@ -338,25 +340,52 @@ Four points deserve emphasis:
   Plus a preregistered trend test of the per-block paired loss difference against calendar time. A decaying edge is extrapolated to `T0`, not averaged.
 - **Reference-source basis.** Features near the strike use the contract's settlement source, or a modeled basis to it, under its own availability. Cross-venue near-arbitrage P&L settles each leg on its **own** reference. Basis-disagreement rates are reported by distance to strike. A profit made mainly from reference disagreement is a basis bet, not an arbitrage.
 - **Research degrees of freedom.** Cleaning, exclusion, imputation, availability, and duplicate policies are frozen per data pool before that pool's first outcome-dependent inspection. A later change is a new policy version, every earlier result is re-run under it, and the change is counted as a degree of freedom. An optional **historical lockbox**, the newest historical slice before `T0 − m`, may be reserved as an outer-development check. It is opened once, it is development data, and it is never holdout. Development performance on historical periods is treated as optimistic by construction, because agents may know historical regimes.
+  - A revision of a synthetic availability policy (`L`, `D_max`, `L_vendor→PMV`, the ladder) may use only outcome-blind latency measurements (distributions of `received_at − event_time` or `received_at − source_send_time` from PMV capture, and overlap-window timing comparisons). It never uses an outcome-dependent result. Each revision is a new `policy_id`. Earlier results are re-run, and the revision is counted.
+  - Periods and families listed in `docs/exposure_register.md` Part A count as already outcome-inspected. Policies for them are disclosed as fixed after exposure, and a historical lockbox must either exclude them or be disclosed as partially exposed.
+  - Any regime-conditional design element (volatility, session, or liquidity filters or thresholds) is justified from development data alone. Its first version is dated in the experiment ledger, and one first proposed after `T0` is flagged for the auditor (S-10).
 - **Universe survivorship.**
   - Enumerate universes from creation events (the lifecycle `created` stream, or on-chain condition preparation), never from post-hoc listings.
   - Compare archive universes against PMV's own enumeration on the overlap window.
   - Report a provably complete subset as a sensitivity analysis.
   - A source with no possible bound stays discovery-only.
 
+## Strategy evaluation strata (owner direction, 2026-10-16)
+
+The strategy objective is in PROJECT_BRIEF.md §3: late-window, high-confidence entries in the final few minutes of a contract. Everything below is a **development hypothesis**. Band edges and thresholds are tested only on development data, and are frozen in the audit-candidate manifest before protected evaluation.
+
+**Strata.** Every strategy result is reported by both of these strata, separately and crossed:
+- **Entry-price band**, on the executable price of the side bought (the ask actually payable, never the midpoint), initially about: 0.85–0.89, 0.90–0.92, 0.93–0.95, 0.96–0.97, >0.97.
+- **Remaining-time band**, measured from the decision time to the contract's `ref_end` (identity table), initially about: ≤1 minute, 1–2 minutes, 2–3 minutes, 3–5 minutes. Decisions that fall inside a settlement averaging window are flagged and reported separately, because part of the settlement value is already observed at decision time.
+
+**Rules:**
+- **Bands are reporting strata, not entry rules.** No band admits or rejects a trade by itself. Entry requires calibrated probability materially above the executable, cost-adjusted break-even probability (payout structure, fees, spread, slippage, latency, execution uncertainty, and the preregistered safety and uncertainty margin).
+- **Candidate-generation floor.** Decision rows are generated for executable prices at or above a preregistered floor, initially about $0.85. The floor bounds the search; it is not a signal. Rows below it are outside the intended strategy, and any analysis of them is labelled exploratory.
+- **No imposed distribution.** The distribution of trades across bands must emerge from the decision rule on development data. Nothing forces it toward the expected $0.93–$0.97 concentration, a normal shape, or any other target.
+- **Per-stratum reporting.** For each band and crossed cell: the eligible decision count; the trade count; the effective sample size by `outcome_cell_id` and `time_block_id` (Policies 4 and 5); predicted versus realized frequency with block-bootstrap intervals; after-cost EV per trade with an interval; and the fill and latency assumptions in force. Sparse cells are reported as sparse, never pooled after looking.
+- **High-probability-tail calibration is a primary criterion.** Reliability is reported in fine bins over the candidate region (at least ≥0.85), with calibration error, interval estimates, and the Brier and log-loss decomposition restricted to that region. AUC or overall ranking metrics never substitute for it. The tail-calibration acceptance criterion is preregistered with the primary estimand.
+- **Selection discipline.** Choosing bands, floors, margins, or time windows after seeing stratified results is a research degree of freedom. It is logged in the experiment ledger and covered by the Development-Validation Discipline (START_HERE.md). Selection comparisons use `RECEIPT` + `PIT_CAPTURED` folds (see "The split"). A band is never chosen because it looked best.
+- **Freeze.** The final band edges, floor, remaining-time window, confidence and edge thresholds, and safety margin are frozen in the audit-candidate manifest before Gate 6. They are never tuned on the protected holdout.
+
 ## The split (unchanged requirements, applied to this design)
 
 - The frozen split follows START_HERE.md Phase 2 exactly: an identified snapshot, explicit UTC boundaries, purge and embargo at both ends, a hashed definition in `research/splits/<split_id>.yaml`, and HOLDOUT_ACCESS_LOG.md.
-- **Formation (H-1, owner decision).** Under P1 and P2, historical data shown to development cannot be the holdout.
-  - The recommended formation is a **prospective protected period** from a declared `T0`. All admissible data before `T0 − m` is then development data, historical and captured alike. The protected set is PMV's own capture after `T0`, embargoed together with every equivalent observable.
+- **Formation (H-1, adopted).** Under P1 and P2, historical data shown to development cannot be the holdout.
+  - The formation is a **prospective protected period** from a declared `T0`: required for the first cycle, preferred thereafter. All admissible data before `T0 − m` is then development data, historical and captured alike, subject to Policy 2 eligibility. The protected set is PMV's own capture after `T0`, embargoed together with every equivalent observable.
   - Prospective formation is necessary but not sufficient against agent-model knowledge (S-10). See the conditions in the decision record, H-1 and H-8.
-- **Sizing (S-11, owner interpretation, material).**
+- **Sizing (S-11, adopted by owner decision H-1).**
   - Under prospective formation, the "~70/30" target applies to the **PMV-capture span** `[C0, T_end]`, where `C0` is the start of release-eligible PMV capture. It does not apply to historical development data.
-  - The protected span must also meet the F-07 power requirement for the preregistered primary estimand. Where the two conflict, power governs and the deviation is recorded.
-  - `T0`, the margin, and either `T_end` or an outcome-blind stopping rule (an eligible-cell count from the trusted collector, with a calendar maximum) are fixed in the gate record before `T0`. They are never extended on protected information.
+  - The protected span must also meet the F-07 power requirement for the preregistered primary estimand. The power requirement is a floor. The protected span is at least the power-required span. It is lengthened (by a later `T_end` or a larger stopping count, never by an earlier `T0`) where the ~30% target falls short of power, and the deviation from 70/30 is recorded.
+  - `T0`, the margin, `C0`, and either `T_end` or an outcome-blind stopping rule (an eligible-cell count from the trusted collector, with a calendar maximum) are fixed in the gate record at cycle registration, before any release. They are never extended or shortened on protected information, and after `T0 − m` only under a preregistered technical contingency (H-1).
+  - **One preregistered re-sizing (owner ruling E-B4-8).** Before `T0 − m`, one preregistered re-estimate of the required sample size may use development receipt-time data only. It may only increase the required sample count or the calendar maximum. It never moves `T0` earlier or weakens the test, and it is logged in HOLDOUT_ACCESS_LOG.md.
 - **A cycle's development data may mix historical archive rows and PMV-captured rows (S-9).** Mixing is governed by these rules:
   - Every result reports `RECEIPT` and `SYNTHETIC_ARCHIVE` rows, and `PIT_CAPTURED` and `POST_HOC` rows, separately.
   - Any validation result used for selection (features, model family, hyperparameters, calibration, thresholds, policy) is computed on `RECEIPT` + `PIT_CAPTURED` rows only. Archive-validated folds are discovery only.
+  - Owner decision H-4 admits `POST_HOC` metadata for discovery, data cleaning, pilot modeling, and historical predictive research. Under this design:
+    - `POST_HOC` and `SYNTHETIC_ARCHIVE` rows may be used in training, in pilot models, and in historical predictive-information studies, with results labelled by class;
+    - such results may generate hypotheses (feature families, model families, regimes). Each hypothesis carried forward is logged in the experiment ledger as a research degree of freedom;
+    - the comparison that selects among candidate features, model families, hyperparameters, calibration, thresholds, or policy for the audit candidate is computed on `RECEIPT` + `PIT_CAPTURED` folds;
+    - field-level justification of decision-time availability (H-4) is necessary but not sufficient for an executable-EV claim, which also requires `RECEIPT` rows with live books (§4);
+    - if `RECEIPT` + `PIT_CAPTURED` data at selection time are too few for a powered comparison, that is raised to the owner. It is never a reason to select on archive folds.
   - `availability_class` and `metadata_pit_class` are never model inputs.
   - Archive rows stay in the candidate's training set only if a preregistered ablation shows improvement on receipt-validated folds beyond the block-bootstrap interval.
   - Archive artifacts are quantified on an **overlap calibration window**, captured live and later acquired from the same archive, before `T0 − m`.
@@ -375,6 +404,7 @@ Four points deserve emphasis:
 - The exclusion ledger.
 - Deterministic, rebuildable dataset manifests.
 - The observation unit, targets, settlement logic, remaining-time representation, eligibility, and horizons (START_HERE.md Phase 2).
+- The strategy evaluation strata (entry-price and remaining-time bands) and the high-probability-tail calibration reporting above.
 - The frozen split manifest, purge and embargo.
 - The Development-Validation Discipline design (START_HERE.md).
 - Statistician review, and an Independent Statistical Auditor review where Gate 2 independence requires it. The Statistician co-authored the dependence design here, so the independent audit applies to it.

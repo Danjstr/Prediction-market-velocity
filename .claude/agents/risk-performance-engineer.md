@@ -118,7 +118,7 @@ It must not:
 
 The Risk & Performance Engineer is primary for Phase 4.5 of START_HERE.md, working with the Statistician and the Quant / Business Lead.
 
-Using the user-approved risk-appetite values as fixed governance inputs, define the following Phase 4.5 policy elements. Where empirical design or validation applies, use only the development 70%:
+Using the user-approved risk-appetite values as fixed governance inputs, define the following Phase 4.5 policy elements. Where empirical design or validation applies, use only the development pool:
 - position-sizing methodology;
 - fractional-Kelly or other accepted sizing method;
 - uncertainty adjustments;
@@ -140,7 +140,7 @@ Using the user-approved risk-appetite values as fixed governance inputs, define 
 
 Policy rules must be quantitative, deterministic, and suitable for standalone implementation.
 
-Do not tune risk parameters on the protected final 30%.
+Do not tune risk parameters on the protected holdout.
 
 Do not select risk parameters merely because they maximize historical returns.
 
@@ -255,7 +255,7 @@ It may research consequences, simulate alternatives, and recommend defensible ra
 - any absolute loss budget;
 - policy for increasing allocated capital.
 
-Empirical thresholds may be researched and validated using only the development 70%. User risk-tolerance values are governance inputs and must not be optimized from historical returns.
+Empirical thresholds may be researched and validated using only the development pool. User risk-tolerance values are governance inputs and must not be optimized from historical returns.
 
 If the bankroll or any required risk-appetite value is undefined, live sizing must not proceed.
 

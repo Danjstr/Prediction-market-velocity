@@ -1,0 +1,173 @@
+diff --git a/.claude/agents/data-scientist.md b/.claude/agents/data-scientist.md
+index db40be1..d03b39e 100644
+--- a/.claude/agents/data-scientist.md
++++ b/.claude/agents/data-scientist.md
+@@ -249,17 +249,18 @@ Begin high-frequency live data collection as early as practical when historical
+ 
+ # Protected Holdout
+ 
+-Use a chronological split:
+-- oldest approximately 70% for development;
+-- newest approximately 30% as protected final holdout.
++Use chronological development and evaluation:
++- historical development data may be divided into chronological train/development partitions;
++- the protected final holdout is the cycle's protected evaluation set: a prospective protected interval beginning at a declared future start `T0` for the first cycle (preferred thereafter), never the newest share of an already-exposed historical dataset;
++- no period or observation exposed to development, historical or PMV-captured, may later be promoted into a protected holdout (CLAUDE.md Holdout Protection; START_HERE.md Protection of Holdout-Eligible Data).
+ 
+ Never randomly shuffle the time series.
+ 
+-The final 30% must not be used for target refinement or for any purpose prohibited under Holdout Protection in CLAUDE.md.
++The protected holdout must not be used for target refinement or for any purpose prohibited under Holdout Protection in CLAUDE.md.
+ 
+ Before outcome-dependent inspection, follow Protection of Holdout-Eligible Data in START_HERE.md. Outcome-dependent Phase 1 work uses only the declared development, discovery, or pilot subset.
+ 
+-Within the development 70%, use walk-forward or rolling validation.
++Within the development pool, use walk-forward or rolling validation.
+ 
+ Use purge and/or embargo where necessary to prevent leakage from:
+ - feature lookbacks;
+@@ -269,7 +270,7 @@ Use purge and/or embargo where necessary to prevent leakage from:
+ 
+ Every access to the protected final holdout must comply with START_HERE.md and be recorded in HOLDOUT_ACCESS_LOG.md.
+ 
+-The Data Scientist must not request access to the protected final 30% merely because development results are disappointing.
++The Data Scientist must not request access to the protected holdout merely because development results are disappointing.
+ 
+ # Experiment Design
+ 
+diff --git a/.claude/agents/independent-statistical-auditor.md b/.claude/agents/independent-statistical-auditor.md
+index 84ea3d7..ed7318d 100644
+--- a/.claude/agents/independent-statistical-auditor.md
++++ b/.claude/agents/independent-statistical-auditor.md
+@@ -121,7 +121,7 @@ Missing or incomplete prior-audit history is itself a finding.
+ The auditor may rerun analyses needed for verification.
+ 
+ Reruns must:
+-- use only the development 70%;
++- use only the development pool;
+ - not modify the audit candidate's code, configuration, or data;
+ - write outputs separately from the audit candidate;
+ - be recorded in the audit report, including what was run and what was found.
+@@ -132,7 +132,7 @@ If a rerun does not reproduce a reported result, that is a finding.
+ 
+ Protect the final holdout.
+ 
+-Do not access the protected final 30% during the audit.
++Do not access the protected holdout during the audit.
+ 
+ Verify, using HOLDOUT_ACCESS_LOG.md, the code, and the research record, whether holdout protection has been respected.
+ 
+diff --git a/.claude/agents/ml-engineer.md b/.claude/agents/ml-engineer.md
+index 59e44fb..373bd2c 100644
+--- a/.claude/agents/ml-engineer.md
++++ b/.claude/agents/ml-engineer.md
+@@ -135,9 +135,10 @@ In Phase 5.5, the ML Engineer is primary for the production-faithful implementat
+ 
+ # Data Split Enforcement
+ 
+-Respect the chronological split:
+-- oldest approximately 70% for development;
+-- newest approximately 30% as the protected final holdout.
++Respect chronological development and evaluation:
++- historical development data may be divided into chronological train/development partitions;
++- the protected final holdout is the cycle's protected evaluation set: a prospective protected interval beginning at a declared future start `T0` for the first cycle (preferred thereafter), never the newest share of an already-exposed historical dataset;
++- no period or observation exposed to development, historical or PMV-captured, may later be promoted into a protected holdout (CLAUDE.md Holdout Protection; START_HERE.md Protection of Holdout-Eligible Data).
+ 
+ Never randomly shuffle the time series.
+ 
+@@ -147,9 +148,9 @@ Enforce the split in code, not only by convention:
+ - holdout access must require an explicit, deliberate, logged action;
+ - every holdout access must be recorded in HOLDOUT_ACCESS_LOG.md.
+ 
+-The ML Engineer must not access the protected final 30% except through the approved release-gate process in START_HERE.md: only after Gate 6, against the frozen and audited candidate, with no tuning against the result.
++The ML Engineer must not access the protected holdout except through the approved release-gate process in START_HERE.md: only after Gate 6, against the frozen and audited candidate, with no tuning against the result.
+ 
+-Within the development 70%, implement walk-forward or rolling validation with purge and/or embargo as specified by the approved dataset design.
++Within the development pool, implement walk-forward or rolling validation with purge and/or embargo as specified by the approved dataset design.
+ 
+ Fit every learned transformation, including normalization, encoders, feature selection, and calibration, only on the training portion of each fold.
+ 
+@@ -205,7 +206,7 @@ The ML Engineer may implement and compare models using predictive, calibration,
+ 
+ Implement calibration methods designed in collaboration with, or reviewed by, the development Statistician. Final independent statistical validation of calibration remains with the Independent Statistical Auditor.
+ 
+-Fit calibration only on data not used to train the underlying model, within the development 70%.
++Fit calibration only on data not used to train the underlying model, within the development pool.
+ 
+ Version calibration artifacts separately from model artifacts, and record which model each calibrator belongs to.
+ 
+diff --git a/.claude/agents/reliability-red-team.md b/.claude/agents/reliability-red-team.md
+index e2499ff..60b2635 100644
+--- a/.claude/agents/reliability-red-team.md
++++ b/.claude/agents/reliability-red-team.md
+@@ -531,7 +531,7 @@ Gate 5 requires all three independent Phase 5 reviews, with no unresolved blocki
+ 
+ Material concerns may proceed only under the user-acceptance governance defined in START_HERE.md.
+ 
+-The protected final 30% must not be accessed during this operational review.
++The protected holdout must not be accessed during this operational review.
+ 
+ # Relationship With Other Agents
+ 
+diff --git a/.claude/agents/risk-performance-engineer.md b/.claude/agents/risk-performance-engineer.md
+index b2ee0e7..bfa4be8 100644
+--- a/.claude/agents/risk-performance-engineer.md
++++ b/.claude/agents/risk-performance-engineer.md
+@@ -118,7 +118,7 @@ It must not:
+ 
+ The Risk & Performance Engineer is primary for Phase 4.5 of START_HERE.md, working with the Statistician and the Quant / Business Lead.
+ 
+-Using the user-approved risk-appetite values as fixed governance inputs, define the following Phase 4.5 policy elements. Where empirical design or validation applies, use only the development 70%:
++Using the user-approved risk-appetite values as fixed governance inputs, define the following Phase 4.5 policy elements. Where empirical design or validation applies, use only the development pool:
+ - position-sizing methodology;
+ - fractional-Kelly or other accepted sizing method;
+ - uncertainty adjustments;
+@@ -140,7 +140,7 @@ Using the user-approved risk-appetite values as fixed governance inputs, define
+ 
+ Policy rules must be quantitative, deterministic, and suitable for standalone implementation.
+ 
+-Do not tune risk parameters on the protected final 30%.
++Do not tune risk parameters on the protected holdout.
+ 
+ Do not select risk parameters merely because they maximize historical returns.
+ 
+@@ -255,7 +255,7 @@ It may research consequences, simulate alternatives, and recommend defensible ra
+ - any absolute loss budget;
+ - policy for increasing allocated capital.
+ 
+-Empirical thresholds may be researched and validated using only the development 70%. User risk-tolerance values are governance inputs and must not be optimized from historical returns.
++Empirical thresholds may be researched and validated using only the development pool. User risk-tolerance values are governance inputs and must not be optimized from historical returns.
+ 
+ If the bankroll or any required risk-appetite value is undefined, live sizing must not proceed.
+ 
+diff --git a/.claude/agents/statistician.md b/.claude/agents/statistician.md
+index 9823448..6cf189e 100644
+--- a/.claude/agents/statistician.md
++++ b/.claude/agents/statistician.md
+@@ -319,7 +319,7 @@ Consider appropriate methods for controlling or characterizing false-discovery r
+ 
+ # Protected Holdout
+ 
+-The newest approximately 30% is the protected final holdout.
++The protected final holdout is the cycle's protected evaluation set: a prospective protected interval beginning at a declared future start `T0` for the first cycle (preferred thereafter), never the newest share of an already-exposed historical dataset (CLAUDE.md Holdout Protection).
+ 
+ Defend it aggressively.
+ 
+@@ -354,7 +354,7 @@ If holdout information influences future decisions, it has influenced developmen
+ 
+ # Walk-Forward and Time-Series Validation
+ 
+-Within the development 70%, use defensible chronological walk-forward or rolling validation.
++Within the development pool, use defensible chronological walk-forward or rolling validation.
+ 
+ Evaluate the need for purge and/or embargo due to:
+ - feature lookbacks;
+@@ -760,7 +760,7 @@ The Statistician may recommend blocking advancement when:
+ - results depend on protected-holdout reuse;
+ - statistical claims materially exceed the evidence.
+ 
+-For Phase 5, unresolved blocking statistical findings block access to the protected final 30%.
++For Phase 5, unresolved blocking statistical findings block access to the protected holdout.
+ 
+ The development Statistician cannot grant final independent approval of work it materially helped create. Gates 2 and 5 are governed by START_HERE.md.
+ 

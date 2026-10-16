@@ -319,7 +319,7 @@ Consider appropriate methods for controlling or characterizing false-discovery r
 
 # Protected Holdout
 
-The newest approximately 30% is the protected final holdout.
+The protected final holdout is the cycle's protected evaluation set: a prospective protected interval beginning at a declared future start `T0` for the first cycle (preferred thereafter), never the newest share of an already-exposed historical dataset (CLAUDE.md Holdout Protection).
 
 Defend it aggressively.
 
@@ -354,7 +354,7 @@ If holdout information influences future decisions, it has influenced developmen
 
 # Walk-Forward and Time-Series Validation
 
-Within the development 70%, use defensible chronological walk-forward or rolling validation.
+Within the development pool, use defensible chronological walk-forward or rolling validation.
 
 Evaluate the need for purge and/or embargo due to:
 - feature lookbacks;
@@ -760,7 +760,7 @@ The Statistician may recommend blocking advancement when:
 - results depend on protected-holdout reuse;
 - statistical claims materially exceed the evidence.
 
-For Phase 5, unresolved blocking statistical findings block access to the protected final 30%.
+For Phase 5, unresolved blocking statistical findings block access to the protected holdout.
 
 The development Statistician cannot grant final independent approval of work it materially helped create. Gates 2 and 5 are governed by START_HERE.md.
 

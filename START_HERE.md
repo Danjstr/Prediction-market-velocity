@@ -22,6 +22,75 @@ Agents succeed by encoding their work into standalone code, models, tests, confi
 
 ---
 
+# Strategy at a Glance
+
+The canonical statement is PROJECT_BRIEF.md §3 ("Strategy objective: late-window, high-confidence"). In short:
+- PMV looks for **relatively infrequent, late-window, high-confidence** opportunities. These are cases where the model's **calibrated** probability materially exceeds the market's **executable, cost-adjusted break-even probability** during the **final few minutes** of a Bitcoin or gold contract on Kalshi or Polymarket.
+- It forecasts only the **remaining final few minutes**, not the whole contract from inception.
+- The preliminary hypothesis puts most viable opportunities near executable prices of about **$0.93–$0.97**, with a thinning tail toward about **$0.85**, a candidate-generation floor and not a trade signal. **Price alone never triggers a trade.** Entry needs calibrated probability materially above break-even after payout, fees, spread, slippage, latency, execution uncertainty, and a safety margin.
+- The trade distribution is never imposed; it must emerge from development data.
+- Results are reported by entry-price band and remaining-time band (`docs/phase2.md`). **High-probability-tail calibration is a core success criterion**; AUC alone is not.
+- All of these thresholds are **development hypotheses**, tested only on development data and frozen before protected evaluation.
+- **Current scope order (Phase 1 charter, `docs/phase1.md`).** Kalshi comes first; Polymarket is deferred until separately approved and verified. Bitcoin and gold are the target underlyings, but whether in-scope gold contracts exist is still unverified (F-16, E-1).
+
+Current status and the next step are in `docs/phase1.md`. Open owner decisions are listed in the latest decision records under `docs/decisions/`. The current active branch is in `docs/BRANCH_TIMELINE.md`.
+
+---
+
+# Repository Continuity
+
+Owner record: `docs/decisions/2026-10-16_b06_governance_continuity_sync.md`.
+
+## Git is the durable project memory
+
+A conversation, Claude memory, ChatGPT memory, scratchpad, recap, or agent-session state is **not** durable project governance. A material owner decision, strategy requirement, threshold hypothesis, phase change, safety rule, gate requirement, or unresolved mandatory decision must be recorded in this repository's canonical documents or in a decision record under `docs/decisions/` before any later session relies on it as authoritative. If a session learns of such an item only from conversation, it records it (within governance-edit approval rules) or surfaces it to the owner; it never treats unrecorded context as binding.
+
+## Cold start
+
+A fresh session with no chat history recovers project state from Git in this order:
+1. `docs/BRANCH_TIMELINE.md`: confirm the current branch and HEAD are the **current active ground-truth branch**;
+2. PROJECT_BRIEF.md §3 and "Strategy at a Glance" above: what PMV is building and the current strategy hypothesis;
+3. "Phase Roadmap" below: the complete phase order and gates;
+4. the current phase's working record (now `docs/phase1.md`, "Current status and next step"): phase and gate status, blockers, and the next permitted action;
+5. `docs/decisions/` (latest records first): approved owner decisions and open ones, including the mandatory pre-T0 checklist under "Protection of Holdout-Eligible Data";
+6. CLAUDE.md, `docs/protected_information.md`, and `docs/external_access.md`: protected-information rules and acquisition and research restrictions.
+
+## Branch continuity
+
+`docs/BRANCH_TIMELINE.md` numbers every development branch (`B00`, `B01`, …) in verified ancestry order and names the **current active ground-truth branch**. "Newest approved development branch" means the branch the owner has designated, by batch charter or decision record, as the current active ground-truth branch in that file. Designation is not a merge: merging into `main` is integration review, and an active branch may be ahead of `main`.
+- A new development branch is created only from the immediately preceding, newest approved development branch, never from `main` or an older branch while a newer cumulative branch exists. New branches are named `bNN/<short-purpose>`.
+- The newest numbered active branch is the ground truth for current development. Older numbered branches are historical checkpoints, not competing sources of requirements. `main` is the reviewed integration branch: it advances only by merged pull request and may lag the active branch.
+- Sessions and subagents work on the owner-designated active branch or its working tree. They switch to an older branch only for explicit historical review.
+- Before substantive work, verify the branch name and its expected HEAD against `docs/BRANCH_TIMELINE.md`.
+- Before creating a branch, verify with `git merge-base --is-ancestor <predecessor-head> HEAD` that the expected predecessor is an ancestor. If it is not, stop and escalate; never create a forked project history.
+- Each new branch records itself, its parent, and its head in `docs/BRANCH_TIMELINE.md`.
+
+---
+
+# Phase Roadmap
+
+This is the authoritative phase order. Each phase's detailed section below governs its content and gate. Where the summary here is shorter than the detail, the stricter detailed requirement applies.
+
+| Phase | Name | Scope in brief |
+|---|---|---|
+| 0 | Foundation / Governance / Security | Repository controls, reproducibility, environment, tests, secret handling, governance. **Gate 0 passed.** |
+| 1 | Data Feasibility, Historical Acquisition, and Prospective Capture | Verify sources and rights; prefer useful verified historical data for development; begin prospective high-frequency capture in parallel as early as safely practical. Development-visible data can never later become protected holdout. **In progress.** |
+| 2 | Canonical Dataset Engineering and Statistical Design | Raw preservation; normalization; identity resolution; duplicate and dependence analysis; point-in-time metadata; timestamp and availability semantics; target and label construction; feature construction; overlap, purge, and embargo; development-validation design; cycle, split, and protection mechanics; strategy evaluation strata. |
+| 3 | Baselines | Strong simple and interpretable baselines first. |
+| 4 | Advanced Candidate Models | Sequence and deep-learning models only where development evidence justifies the complexity. |
+| 4.5 | Economics, Calibration, Sizing, Risk, and Tax Economics | Calibration; executable cost-adjusted edge; bankroll, sizing, fractional Kelly; exposure limits; drawdown and loss controls; circuit breakers; PAUSE/KILL; owner-approved risk appetite; tax-classification assumptions and pre-tax / after-tax economic analysis. |
+| 5 | Independent Statistical / Economic / Operational Audit | The auditor actively tries to disprove the edge: calibration, dependence-aware uncertainty, multiple testing, economic assumptions, and the Holdout Evaluation Plan. |
+| 5.5 | Pre-Holdout Implementation Readiness | Production-faithful deterministic implementation, replay, parity, and fault-injection evidence before the holdout is spent. No protected observation is accessed. |
+| 6 | Freeze and Preregistration | Freeze the candidate, implementation identity, dataset, cycle and split definitions, features, calibration, thresholds, strategy, economic (including tax) and risk rules, and evaluation criteria. Opening the holdout still requires explicit owner approval. |
+| 7 | Protected Evaluation | One-time preregistered PASS / FAIL / INCONCLUSIVE evaluation. No iterative tuning against the protected result. |
+| 8 | Risk and Monitoring Implementation / Hardening | Faithfully harden the frozen risk policy: drift, calibration, execution quality, drawdown, confidence-adjusted profitability, automatic and manual pause controls. |
+| 9 | Execution Implementation / Hardening | Venue integration, order lifecycle, fills, cancellation, reconciliation, latency, idempotency, restart and recovery, safeguards. |
+| 10 | Full Reliability / Red-Team Audit | Failure injection and full-system adversarial review. |
+| 11 | Shadow / Paper Operation | Production-faithful standalone runtime on live data with no LLM dependency, under a preregistered Shadow Qualification Plan. |
+| 12 | Limited Live-Capital Pilot | Explicit owner authorization only after all gates. Deliberately limited capital and evidence-based scaling. |
+
+---
+
 # Project-Wide Controls
 
 These controls apply to every phase. Later sections refer to them by name.
@@ -46,6 +115,8 @@ No observation may become the protected evaluation set for a cycle after its val
 
 Each cycle's split must include any purge or embargo interval needed at both ends of its protected evaluation interval, including where labels or lookbacks could overlap an earlier consumed interval or a later future interval.
 
+Where these documents, the agent files, or the hash-pinned Holdout Rules restatement in HOLDOUT_ACCESS_LOG.md state the split as an oldest/newest approximately 70%/30% division (for example "the development 70%", "the oldest approximately 70%", "the protected 30%", "the final 30%", "the newest approximately 30%"), they mean the cycle's development pool and protected evaluation set as fixed by its frozen split, whatever their actual shares. This never designates the newest share of a historical dataset as protected.
+
 A consumed protected set may not be reused to repair or validate the candidate or cycle that consumed it. In a later, explicitly new cycle with a genuinely untouched future protected set, previously consumed data may be used as historical development data, but it remains permanently tagged as previously exposed or consumed and can never regain untouched-evaluation status.
 
 ## Protection of Holdout-Eligible Data
@@ -55,6 +126,14 @@ Before outcome-dependent inspection begins, the protected evaluation set must be
 - a prospective future protected period, quarantined as it accumulates.
 
 The split-formation rule must be recorded before inspection and must not be selected after looking at candidate holdout outcomes.
+
+The prospective protected period is the required formation for the first cycle and the preferred formation thereafter (owner decision H-1, `docs/decisions/2026-10-16_phase1_batch4_acquisition_safety_decisions.md`). Its start `T0` and margin `m` are declared in advance so that `T0 − m` is later than every registered prior exposure of the protected observable families and every development model's training cutoff (`docs/exposure_register.md`). `T0`, `m`, `C0`, the embargo granularity, the power floor, and the end `T_end` or an outcome-blind stopping rule are recorded at cycle registration, before any release to agents, and are never changed on protected information; after `T0 − m` they change only mechanically under a preregistered technical contingency. Historical data may serve as development data in chronological train/development partitions; no period or observation exposed to development, historical or PMV-captured, may later be promoted into a protected holdout. Release of real observations to agents is owner-controlled, fails closed, and is cut per row and per equivalent observable (H-2).
+
+**Mandatory pre-T0 owner decision checklist.** A cycle cannot be registered, and `T0` cannot be declared, while any of these is unresolved. Each is resolved by an owner decision record in `docs/decisions/` that the cycle's gate record cites. Details: `docs/decisions/2026-10-16_phase1_batch4_acquisition_safety_decisions.md`.
+- **P-1** model-cutoff enforcement and model pinning (E-B4-2);
+- **P-2** cycle design: one long cycle or shorter or staged cycles, with power, model-cutoff burden, research-embargo burden, and governance cost (E-B4-5);
+- **P-3** the quantitative "near-deterministic" reconstruction / inference criterion for the protected-information boundary, at the protected label's native granularity, from development data only (E-B4-7);
+- **P-4** freezing the feature, model, and regime search space at `T0`, or allowing continued development during accumulation (E-B4-9(b)).
 
 Phase 1 may use only a declared development, discovery, or pilot subset for outcome-dependent work. Data inspected during Phase 1 is development-only for that cycle.
 
@@ -104,7 +183,7 @@ Before Phase 3, the Statistician defines nested chronological or walk-forward va
 
 ---
 
-# Phase 0 — Repository and Engineering Foundation
+# Phase 0 — Foundation / Governance / Security
 
 **Primary:**
 - ML Engineer
@@ -134,7 +213,7 @@ Do not build the trading model yet.
 
 ---
 
-# Phase 1 — Data Feasibility and Live Collection
+# Phase 1 — Data Feasibility, Historical Acquisition, and Prospective Capture
 
 **Primary:**
 - API / Execution Engineer
@@ -201,7 +280,7 @@ Gate 1 also requires the raw-data backup and retention policy to be in place, an
 
 ---
 
-# Phase 2 — Dataset and Target Construction
+# Phase 2 — Canonical Dataset Engineering and Statistical Design
 
 **Primary:**
 - Data Scientist
@@ -226,9 +305,9 @@ Define:
 
 Finalize the exact split manifest for the existing cycle, following the split-formation method recorded in Phase 1:
 - reference the existing cycle_id;
-- identify an immutable dataset snapshot or dataset version;
-- record the snapshot creation/freeze time;
-- allocate approximately 70% to development and approximately 30% to the protected holdout, from that snapshot or, under a prospective protected period, across the planned collection span;
+- identify an immutable dataset snapshot or dataset version, or, for a prospective protected period, the declared protected interval, `T0`, `m`, `C0`, and the end rule recorded at cycle registration;
+- record the snapshot creation/freeze time (for a prospective period, the cycle registration time);
+- allocate approximately 70% to development and approximately 30% to the protected holdout, from that snapshot or, under a prospective protected period, across the planned PMV-capture span `[C0, T_end]` (historical development data is outside this ratio; the power floor for the preregistered primary estimand is a minimum, met by lengthening the protected span, never by an earlier `T0`, and any deviation is recorded);
 - convert the allocation into explicit immutable partition boundaries, using UTC timestamp boundaries when appropriate to the data;
 - explicitly identify any purge/embargo interval at both ends of the protected interval;
 - hash or version the split definition;
@@ -277,7 +356,7 @@ Examples:
 - logistic/statistical models;
 - gradient-boosted trees.
 
-Use only the development 70%.
+Use only the development pool.
 
 Use walk-forward/rolling validation.
 
@@ -296,7 +375,7 @@ Evaluate:
 
 ---
 
-# Phase 4 — Advanced Velocity Models
+# Phase 4 — Advanced Candidate Models
 
 **Primary:**
 - Data Scientist
@@ -311,7 +390,7 @@ Evaluate justified architectures such as:
 
 Every advanced model must compete against simple baselines.
 
-Use only the development 70%.
+Use only the development pool.
 
 Model selection must consider:
 - predictive quality;
@@ -327,7 +406,7 @@ Model selection must consider:
 
 ---
 
-# Phase 4.5 — Risk and Economic Policy Definition
+# Phase 4.5 — Economics, Calibration, Sizing, Risk, and Tax Economics
 
 **Primary:**
 - Risk & Performance Engineer
@@ -338,7 +417,7 @@ Model selection must consider:
 
 **Purpose:** Define the quantitative risk and sizing policy that will be used in all subsequent simulations, statistical audits, and the protected final holdout.
 
-Using the user-approved risk-appetite values listed under Required User Governance Inputs as fixed governance inputs, define the following policy elements. Where empirical design or validation applies, use only the development 70%:
+Using the user-approved risk-appetite values listed under Required User Governance Inputs as fixed governance inputs, define the following policy elements. Where empirical design or validation applies, use only the development pool:
 - position-sizing methodology;
 - fractional-Kelly or other accepted sizing method;
 - uncertainty adjustments;
@@ -370,11 +449,21 @@ They must be used during development simulations so that reported P&L, drawdown,
 
 The Risk & Performance Engineer is defining policy here, not yet building the full production monitoring and execution implementation.
 
-**Gate 4.5:** The sizing and risk policy must be defined before the Phase 5 Independent Statistical Audit and before anything is frozen for final holdout evaluation. Every input listed as required by Gate 4.5 under Required User Governance Inputs must be approved by the user before Gate 4.5 passes, including the frozen/adjustable classification and envelope for each risk-appetite input. The policy evaluated on the holdout must be the policy intended for deployment, including its user-approved inputs and manual-control governance.
+**Calibration and executable edge.** The policy uses calibrated probabilities, with high-probability-tail calibration evidence over the candidate region (PROJECT_BRIEF.md §3, `docs/phase2.md` "Strategy evaluation strata"), and edge computed against the executable, cost-adjusted break-even probability from the actual entry price and payout structure, never the midpoint.
+
+**Tax and after-tax economics** (owner direction, 2026-10-16; PROJECT_BRIEF.md §5). Primary: Quant / Business Lead, with the Risk & Performance Engineer.
+- No tax classification is assumed. Prediction-market products are not presumed to be gambling, capital gains, ordinary income, §1256 contracts, or any other fixed category. Classification may depend on the product, venue, jurisdiction, trader or entity status, and the law and regulation in force at the time.
+- Record a tax-assumption set: each plausible classification scenario, its source and retrieval date, and its effect on per-trade and periodic economics (for example loss deductibility, netting, rate, and timing).
+- Report pre-tax EV and performance, the tax assumptions or scenarios used, and after-tax or tax-adjusted EV wherever classification can reasonably be modelled, side by side. A strategy whose deployability depends on one favorable classification is flagged as such.
+- An attractive pre-tax result is never presented as economically deployable without considering material tax consequences.
+- Tax assumptions used in a protected evaluation are frozen and preregistered like other material economic assumptions (Phase 6), or are explicitly designated as sensitivity scenarios in the Holdout Evaluation Plan.
+- Agents research and model; they do not give tax or legal advice. Before real-money scaling, current authoritative verification of the classification and, where appropriate, qualified tax or legal advice are required (Required User Governance Inputs).
+
+**Gate 4.5:** The sizing and risk policy must be defined before the Phase 5 Independent Statistical / Economic / Operational Audit and before anything is frozen for final holdout evaluation. Every input listed as required by Gate 4.5 under Required User Governance Inputs must be approved by the user before Gate 4.5 passes, including the frozen/adjustable classification and envelope for each risk-appetite input. The policy evaluated on the holdout must be the policy intended for deployment, including its user-approved inputs and manual-control governance.
 
 ---
 
-# Phase 5 — Independent Statistical Audit
+# Phase 5 — Independent Statistical / Economic / Operational Audit
 
 **Primary:**
 - Independent Statistical Auditor
@@ -546,7 +635,7 @@ Independently assess:
 - regime dependence;
 - confidence intervals and uncertainty;
 - calibration;
-- economic-edge credibility and significance;
+- economic-edge credibility and significance, including the pre-tax / after-tax distinction and the tax-assumption set;
 - sizing validity;
 - drawdown behavior;
 - risk of ruin;
@@ -558,7 +647,7 @@ The auditor should assume the apparent edge is fake and try to disprove it.
 
 Each Phase 5 reviewer assesses the completeness of the declared production-relevant scope for its domain. The Operational Assumptions Review explicitly challenges omissions.
 
-The protected final 30% must not be accessed during Phase 5. It may be opened only after Gate 6.
+The protected holdout must not be accessed during Phase 5. It may be opened only after Gate 6.
 
 ## No Redesign During Audit
 
@@ -697,7 +786,7 @@ Record the readiness review at `research/audits/<candidate_id>/IMPLEMENTATION_RE
 
 ---
 
-# Phase 6 — Freeze Before Holdout
+# Phase 6 — Freeze and Preregistration
 
 Freeze:
 - dataset definition;
@@ -711,6 +800,7 @@ Freeze:
 - entry rules;
 - cost assumptions;
 - execution assumptions;
+- tax assumptions, or their explicit designation as sensitivity scenarios;
 - position-sizing rules;
 - risk parameters;
 - user-approved risk-appetite inputs, with their frozen/adjustable classification and envelope;
@@ -744,6 +834,7 @@ Verify each component of the system being frozen against the audited manifest or
 - every repository difference outside the implementation snapshot is a non-production evidence or governance change and has been explicitly classified as such;
 - there are no unreviewed production-relevant differences;
 - Gate 5.5 has passed;
+- the preliminary production-use licence check of every input `licence_id` in the candidate's lineage has passed (owner ruling E-B4-3, `docs/external_access.md` §2);
 - the Holdout Evaluation Plan is unchanged and its SHA-256 matches the audit candidate;
 - the correlated-review meta-review is complete, or its unavailability has been explicitly dispositioned by the user;
 - every item of the Gate 6 opening checklist in HOLDOUT_ACCESS_LOG.md passes;
@@ -758,7 +849,7 @@ The technical checks are necessary but not sufficient. No agent, script, retrain
 
 ---
 
-# Phase 7 — Final Protected 30% Evaluation
+# Phase 7 — Protected Evaluation
 
 **Primary:**
 - the deterministic frozen evaluation runner identified in the Holdout Evaluation Plan
@@ -773,7 +864,7 @@ The technical checks are necessary but not sufficient. No agent, script, retrain
 
 The deterministic evaluation runner may be started only by the user or an operator explicitly authorized by the user, after Gate 6. No development agent controls the evaluation.
 
-Run the frozen system against the final 30% as the formal out-of-sample test, using exactly the deterministic evaluation runner and criteria in the Holdout Evaluation Plan.
+Run the frozen system against the protected evaluation set as the formal out-of-sample test, using exactly the deterministic evaluation runner and criteria in the Holdout Evaluation Plan.
 
 Do not tune against the result.
 
@@ -826,7 +917,7 @@ Do not repeatedly tune against the holdout. Descriptive subgroup results must no
 
 ---
 
-# Phase 8 — Risk and Monitoring System
+# Phase 8 — Risk and Monitoring Implementation / Hardening
 
 **Primary:**
 - Risk & Performance Engineer
@@ -877,7 +968,7 @@ No LLM or agent may be required in the live risk path.
 
 ---
 
-# Phase 9 — Execution Engine
+# Phase 9 — Execution Implementation / Hardening
 
 **Primary:**
 - API / Execution Engineer
@@ -904,7 +995,7 @@ Never assume that a failed or timed-out request means no order was accepted.
 
 ---
 
-# Phase 10 — Full-System Reliability / Red-Team Audit
+# Phase 10 — Full Reliability / Red-Team Audit
 
 **Primary:**
 - Reliability / Red-Team Engineer
@@ -971,7 +1062,7 @@ Post-holdout changes in Phases 8–10 follow Post-Holdout Implementation Deltas 
 
 ---
 
-# Phase 11 — Shadow / Paper Trading
+# Phase 11 — Shadow / Paper Operation
 
 Before Phase 11 begins, freeze a Shadow Qualification Plan at `research/qualification_plans/<cycle_id>_<candidate_id>_shadow.md`, recording the cycle ID, candidate ID, and frozen production implementation identity, identified by its SHA-256 and reviewed in a gate record. It is never overwritten or deleted; a revised plan is a new file with a new SHA-256 and its own gate record. It defines:
 - minimum time, opportunity, and sample evidence;
@@ -1007,7 +1098,7 @@ Advance only as the Shadow Qualification Plan specifies.
 
 ---
 
-# Phase 12 — Limited Live Pilot
+# Phase 12 — Limited Live-Capital Pilot
 
 Phase 12 is the earliest phase at which real-capital trading may begin. It requires explicit user approval; passing Gate 11 is not permission to deploy capital.
 
@@ -1016,6 +1107,7 @@ Start with deliberately limited capital and strict hard caps, using the user-app
 Before launch, verify:
 - venue eligibility, terms, and live-trading restrictions, re-verified from current official sources;
 - all Required User Governance Inputs are resolved and recorded;
+- tax classification has been verified from current authoritative sources and, where appropriate, by qualified tax or legal advice;
 - manual PAUSE;
 - manual KILL;
 - automatic circuit breakers;
@@ -1055,6 +1147,8 @@ Each risk-appetite value must include its semantic definition: bankroll basis; h
 | Backup scope and retention policy for raw captured market data | Before first live capture, and no later than Gate 1 |
 | Backup scope and retention policy for each other class of irreplaceable artifact | Before the first irreplaceable artifact of that class is created |
 | Restore-test cadence | Gate 11 |
+| Tax-assumption set (classification scenarios, sources, and which scenario is primary versus sensitivity) | Gate 4.5 |
+| Current authoritative tax-classification verification and, where appropriate, qualified tax or legal advice | Before the Phase 12 pilot, and again before any real-money scaling |
 | Incident-record ownership | Gate 11 |
 
 Gate 11 remains the overall live-readiness verification that every required durability policy and restore test is in place. Retention durations are user decisions and are not set by this document.
@@ -1155,9 +1249,16 @@ Use the strongest models where mistakes are expensive.
 
 Do not spend frontier-model inference on mechanical tasks unnecessarily.
 
+**Local resource discipline (owner instruction, 2026-10-16).** The owner's development machine is a Chromebook with limited RAM:
+- specialist and research agents may run in parallel;
+- heavy full-repository quality-gate runs (`./scripts/check.sh`) wait until specialist and background work has finished;
+- multiple heavy test processes are not run at the same time unless there is a stated reason; targeted tests during development are preferred.
+
 ---
 
 # First Real Development Task
+
+**Status note (2026-10-16):** this section records the original start-up order. Phase 0 is complete (Gate 0 passed), and Phase 1 is in progress. For the current batch status, blockers, and next step, read `docs/phase1.md`; for the current active branch, read `docs/BRANCH_TIMELINE.md` (see "Repository Continuity").
 
 After all project-control files and agent definitions are completed and committed:
 
