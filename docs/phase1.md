@@ -273,11 +273,11 @@ Full rulings and the pre-T0 checklist are in the decision record.
 - **G-4.** Fetcher semantics behind an injectable transport. No production transport exists.
 - **G-6.** The plan and evidence records, the explicit state machine, and the orchestrator into the protected raw store, with crash and restart recovery.
 - **RT-B6-26 and RT-B6-27.** Torn-tail recovery and the bound journal.
-- **RT-B6-28.** Re-reviewed.
+- **RT-B6-28.** Re-reviewed: correct in `release`; the gaps in `receive` and move-aside are fixed (RT-B7-07).
 
 Tests and review:
 - 376 new synthetic tests, including fault injection at every pipeline boundary and real `SIGKILL`s.
-- The independent Red-Team review is in `research/governance/b07_acquisition_pipeline_red_team_review.md`.
+- The independent Red-Team review is in `research/governance/b07_acquisition_pipeline_red_team_review.md`. It ran five rounds: round 1 found one BLOCKING finding (RT-B7-01, worker-to-parent channels under a denylist) and one MAJOR finding (RT-B7-02, injectable real-mode gate). Both were fixed. The final verdict at `4170b3c` is no BLOCKING and no MAJOR finding, with documented MINOR residuals. A-4 is still not satisfied.
 - No Statistician review was triggered: B07 does not touch release, holdout, `T0`, or equivalence semantics.
 
 ## Recommended next batches

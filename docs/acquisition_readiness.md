@@ -43,7 +43,7 @@ Decision record: `docs/decisions/2026-10-16_b07_acquisition_pipeline_hardening.m
 
 **What the parent sets up:**
 - **Resource limits, before exec:** address space, CPU seconds, file size 0 (no regular file can be written), descriptor count, and no core dumps.
-- **Launch:** the worker starts with `python -I`, an empty environment, `/` as its working directory, and a new session.
+- **Launch:** the worker starts with `python -I -S`, an empty environment, `/` as its working directory, and a new session. No `.pth`, `sitecustomize`, or `usercustomize` code runs. The package root is not on `sys.path`: a dedicated import finder loads only `pmv` and `pmv.*` from it, so nothing else in the checkout can run before confinement (RT-B7-13, RT-B7-14). The worker refuses to run unless it was started isolated with no site processing.
 - **Descriptors:** exactly three — the input, opened read-only by the parent; the output pipe; and `/dev/null`. The worker is never given a path.
 
 **What the worker does before reading any input:**
@@ -100,7 +100,7 @@ Each planned file moves only along these transitions:
 
 `approved_for_fetch` → `received` → `integrity_verified` → `parser_verified` → `backup_verified` → `stored`
 
-Also allowed: `fetch_failed` and retry, `rejected`, and `discarded` for unjournaled bytes set aside. Replay fails closed on a different authorizing bundle, an illegal transition such as a duplicate receipt, a file not in the plan, or anything after `completed`.
+Also allowed: `fetch_failed` and retry, `rejected`, `discarded` for unjournaled bytes set aside, and `stage_failed`, a non-terminal record of an environmental stop that leaves the state unchanged (RT-B7-04). Replay fails closed on a different authorizing bundle, an illegal transition such as a duplicate receipt, a file not in the plan, or anything after `completed`.
 
 ### The pipeline (G-6, A-7)
 
@@ -173,9 +173,9 @@ All of this is deterministic code in Git. The pipeline's only state is its journ
 |---|---|---|
 | Crash or kill during a pipeline run | The next run resumes from the last journaled state. A received file without its journal entry is moved to `orphans/<acquisition_id>/` and journaled as `discarded`, never deleted. Scratch plaintext is deleted. A store copy without its `stored` entry is accepted only if its bytes match the receipt. | Re-run the same acquisition. |
 | Fetch failure | Journaled as `fetch_failed` with a closed code. The next run retries, once per run and at most `max_attempts` in total. | Re-run, or fix the cause. |
-| Content refused (integrity, signature, parse, schema) | Journaled as `rejected`. The bytes move to `rejected/<acquisition_id>/`. The acquisition is terminal. | Inspect owner-side only. Start a new acquisition ID if appropriate. |
+| Content refused (integrity, signature, parse, schema, malformed worker output) | Journaled as `rejected`. The bytes move to `rejected/<acquisition_id>/`. The acquisition is terminal. | Inspect owner-side only. Start a new acquisition ID if appropriate. |
 | Store or record conflict (a different file already at the target) | The run stops (`store_conflict_never_replaced` or `record_conflict_never_replaced`). Nothing is replaced. | Investigate as a possible integrity incident. |
-| Backup or isolation environment failure, including a worker timeout, CPU limit, crash, or out-of-memory kill | The run stops. The state is kept, and nothing is rejected (RT-B7-04). | Fix the environment or raise the limits, and re-run. If a file keeps exhausting the worker, decide owner-side whether it is unacquirable. |
+| Backup or isolation environment failure, including a worker timeout, CPU limit, crash, out-of-memory kill, or internal error | The run stops and records `stage_failed` with a closed code. The state is kept, and nothing is rejected (RT-B7-04). | Fix the environment or raise the limits, and re-run. If a file keeps exhausting the worker, decide owner-side whether it is unacquirable. |
 | Torn journal tail (crash mid-append) | The journal refuses to open. | Run `pmv.acquisition.receipts.recover_torn_tail(path, "docs/decisions/<record>.md", committed=GitRepository(repo).committed_unchanged)` with a committed owner record attesting the crash. If the recovery itself is interrupted, run it again: it completes from the preserved evidence file. The torn bytes are preserved in a read-only evidence file, and a `tail_recovered` entry is appended. A torn tail cannot be told apart from tampering by the bytes alone; the attestation is the owner's. |
 | Journal reaches 64 MiB | Appends refuse (fail closed). Segmentation is not implemented. A synthetic single-file acquisition writes about 4.2 KB of journal (7 entries), so the cap is roughly 15,000 single-file acquisitions. | Start a new store root with an owner decision. Accepted residual. |
 | B06 `Quarantine` session interrupted | That class is still session-scoped. Its quarantine is discarded, and the source is re-acquired. The journal keeps the earlier receipt. The pipeline does not use it. | As before. |
@@ -183,5 +183,13 @@ All of this is deterministic code in Git. The pipeline's only state is its journ
 ## Review status
 
 - **B06 tooling.** Red-Team rounds 1 to 4b found no BLOCKING and no MAJOR finding in the B06 code. RT-B6-08 (G-2), RT-B6-26, RT-B6-27, and RT-B6-28 were carried into B07.
-- **B07.** See `research/governance/b07_acquisition_pipeline_red_team_review.md` for the verdict, findings, and dispositions. Any later change to `src/pmv/acquisition/` needs a fresh review.
+- **B07.** An independent Reliability / Red-Team review (`research/governance/b07_acquisition_pipeline_red_team_review.md`) ran five rounds:
+  - **Round 1** (`f160647`): **BLOCKING** RT-B7-01, in which the seccomp denylist let a confined worker signal, re-limit, or core-dump its parent; **MAJOR** RT-B7-02, in which the real-mode gate trusted caller-supplied collaborators; and nine MINOR findings.
+  - **Rounds 2 to 5:** the fixes were re-verified, and the reviewer's independent BPF interpreter found zero policy mismatches. Further MINOR findings (RT-B7-12, RT-B7-13, and RT-B7-14, which is the import shadowing before confinement that the `pmv`-only finder closed) were fixed.
+  - **RT-B6-28** (directory fsyncs) was re-reviewed: correct in `release`. The gaps in `receive` and `_move_aside` were fixed (RT-B7-07).
+  - **Final verdict at `4170b3c`:** no unresolved BLOCKING finding and no MAJOR finding. The open MINOR items are each documented, and each needs local write access to the tool checkout or journal directory, or fails closed:
+    - RT-B7-05 (accepted): gzip zero padding;
+    - the RT-B7-08 residual: torn-tail recovery relies on a caller-supplied commit check and the evidence file beside the journal;
+    - Python's import order inside the `pmv` tree: an `.so` takes precedence over a `.py`, and timestamp-checked `__pycache__` bytecode is used for parent and worker alike. Optional hardening: hash-checked bytecode.
+- Any later change to `src/pmv/acquisition/` needs a fresh review. A real run additionally requires an A-4 record citing the reviewed commit, with no acquisition-code change since then.
 - **This is not A-4 passing and not permission to acquire.**

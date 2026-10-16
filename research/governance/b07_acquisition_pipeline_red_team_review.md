@@ -266,3 +266,57 @@ No other regressions were found in this diff.
   - the G-7 owner inputs (real A-3 backup policy and restore test on the real medium, and the per-source A-1, A-2, A-5, and A-6 records);
   - a fresh A-4 record citing the final reviewed commit.
 - **Recommendation: proceed with conditions.** The code is acceptable for continued synthetic development. Close RT-B7-14 (restrict the worker's import resolution to `pmv` only) before any real acquisition. Any further change to `src/pmv/acquisition/` requires re-review. Acquisition remains unauthorized.
+
+## Re-verification (round 5, final)
+
+- **Date:** 2026-10-16
+- **Subject:** commit `4170b3c`. Scope is `git diff cd9ef17 4170b3c -- src tests`.
+- **Independence:** unchanged. The coordinator implemented the fix I suggested in round 4, so I reviewed it with extra skepticism.
+- **Method:**
+  - Ran targeted tests one at a time: `tests/failure_injection/test_acquisition_b07_regressions.py` (18 passed), then `tests/unit/test_acquisition_isolation.py` (18 passed).
+  - Re-ran `unresolved.py` against the real bootstrap.
+  - Re-ran the shadow-root probe with the exact `_BOOTSTRAP` under `env -i python -I -S -c`. I planted the following in the root:
+    - `csv.py`, `nt.py`, `_winapi.py`, `_wmi.py`, `sitecustomize.py`, and `encodings_extra.py`;
+    - **sourceless** `csv.pyc`, `nt.pyc`, `_winapi.pyc`, and `_wmi.pyc`.
+  - Reviewed `PmvOnly`, `pmv/__init__.py`, and `FileFinder` precedence by reading the code.
+  - Synthetic data only, no network. The plants were removed afterwards.
+
+### Evidence
+
+- **Plants:** none of the planted `.py` or `.pyc` files executed (no marker output), and the worker ran to completion (exit 0).
+- **Unresolved names:** the worker still *probes* `nt`, `_winapi`, and `_wmi`, and `pmv` is unresolved by the stdlib finders until `PmvOnly` answers. With the root off `sys.path`, those probes now resolve to nothing.
+
+### Finder analysis
+
+- **Top-level `pmv`.** `PmvOnly` answers only for `name == "pmv"`, searching `[root]`, and for names starting with `"pmv."`, searching the `path` the import system passes. That `path` is the parent package's `__path__`, which is `[<root>/pmv]` and so on down.
+- **Other names.** Any other name, including `pmvx`, stdlib names, and the `nt` family, gets `None`. Relative imports resolve to absolute `pmv.*` names before any finder is consulted.
+- **Missing `path`.** A `pmv.*` lookup with `path=None` would search `sys.path`, which does not contain the root. Only the trusted bootstrap and pmv code run before confinement, and neither passes an unusual `path`.
+- **`__path__` tricks.** `pmv/__init__.py` does not call `extend_path` or modify `__path__`, and no `pmv` module does.
+- **Origin check.** A planted `pmv/__init__.<ext>.so`, or a `pmv.py`, either changes `pmv`'s origin, so the bootstrap exits 71, or loses to the package directory.
+
+### Dispositions
+
+| ID | Disposition |
+|---|---|
+| RT-B7-14 | **FIXED, verified.** No name other than `pmv`/`pmv.*` can be loaded from the package root before (or after) confinement. Stdlib shadowing and the non-stdlib names the stdlib probes for (`nt`, `_winapi`, `_wmi`, `sitecustomize`) are both closed, for `.py` and for sourceless `.pyc`. |
+| Residual (MINOR, documented) | Inside the `pmv` tree, the standard `FileFinder` order still prefers an extension module (`*.so`) over `*.py` for a submodule, and timestamp-validated `__pycache__` bytecode is still trusted. Both are pre-existing and apply equally to the parent process. Worker identity hashes `.py` sources only. An untracked `*.so` is **not** gitignored, so the real-mode clean-tree check would refuse it. `*.pyc` is ignored, but with a matching `.py` source present only the `__pycache__` timestamp residual applies. Optional hardening: run with `--check-hash-based-pycs always` and `sys.dont_write_bytecode`, or verify `__spec__.origin` endswith `.py` for each loaded `pmv` module before installing the filter. |
+| RT-B7-04(a) | Fixed (round 4). |
+| RT-B7-08 | Residual still open, MINOR, documented. |
+| RT-B7-05 | Accepted, documented. |
+| RT-B7-01 to RT-B7-13 (others) | As dispositioned in rounds 2 to 4. No regressions found. |
+
+### Final verdict
+
+- **Reviewed code (`4170b3c`): no unresolved BLOCKING finding? YES.**
+- **MAJOR open? NO.** These remain, all MINOR and documented:
+  - the RT-B7-08 residual (a planted torn-tail evidence file combined with a caller-supplied `committed` predicate);
+  - RT-B7-05 (gzip zero padding, accepted);
+  - the `pmv`-tree bytecode and extension-precedence residual.
+
+  Each needs local write access to the tool checkout or the journal directory, or fails closed.
+- **A-4 satisfied? NO.** These remain:
+  - the Parquet and DBN readers and zstd (owner dependency approval);
+  - a reviewed production transport (G-4);
+  - the G-7 owner inputs (real A-3 backup policy and restore test on the real medium, and the per-source A-1, A-2, A-5, and A-6 records);
+  - a fresh A-4 record citing the final reviewed commit.
+- **Recommendation: proceed with conditions.** The B07 acquisition code at `4170b3c` is acceptable as reviewed tooling for synthetic development. Acquisition remains unauthorized until the A-4 items above and the owner approvals exist. Any further change to `src/pmv/acquisition/` requires re-review.
