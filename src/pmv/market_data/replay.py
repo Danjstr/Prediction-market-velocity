@@ -7,7 +7,9 @@ outcome, so nothing is dropped silently:
 - a payload the parser understood: ``Parsed`` (zero or more items);
 - a payload deliberately not normalized, such as a heartbeat: ``Skipped`` with a reason;
 - a payload the parser cannot accept, or one the collector flagged malformed: ``Rejected``
-  with a reason. The raw bytes stay preserved in the raw store;
+  with a reason. The raw bytes stay preserved in the raw store, and the driver adds a
+  ``frame_rejected`` stream event at the frame's position, so the book engine and
+  validation see the break (whatever the frame carried is unknown);
 - an event frame: a ``StreamEvent``.
 
 The driver, not the parser, owns time and provenance. A parser receives the frame's
@@ -56,8 +58,10 @@ __all__ = [
     "PayloadRejectedError",
     "Rejected",
     "Skipped",
+    "check_parsed_item",
     "merge_captures",
     "normalize_frames",
+    "rejection_event",
 ]
 
 STREAM_PARSER_ID = "pmv_stream_event"
@@ -186,6 +190,7 @@ def normalize_frames(
             records.append(
                 FrameRecord(frame.sequence, FrameDisposition.REJECTED, 0, RAW_MALFORMED_REASON)
             )
+            observations.append(rejection_event(capture_id, frame.sequence, context.received_at))
             continue
         try:
             outcome = normalizer.normalize(frame.payload, context)
@@ -193,6 +198,7 @@ def normalize_frames(
             records.append(
                 FrameRecord(frame.sequence, FrameDisposition.REJECTED, 0, rejection.reason)
             )
+            observations.append(rejection_event(capture_id, frame.sequence, context.received_at))
             continue
         if isinstance(outcome, Skipped):
             records.append(FrameRecord(frame.sequence, FrameDisposition.SKIPPED, 0, outcome.reason))
@@ -240,12 +246,31 @@ def _context(
     )
 
 
+def rejection_event(capture_id: str, frame_sequence: int, received_at: datetime) -> StreamEvent:
+    """The driver's record that a payload frame was rejected (B08 order-book continuity).
+
+    It is available when the frame was received, carries no payload information, and
+    breaks every book in the capture (``events.RESETS_BOOK_STATE``): the rejected frame may
+    have been a snapshot or delta for any of them.
+    """
+    return StreamEvent(
+        StreamEventKind.FRAME_REJECTED,
+        received_at,
+        Provenance(capture_id, frame_sequence, 0, STREAM_PARSER_ID, STREAM_PARSER_VERSION),
+    )
+
+
 def _stream_event(capture_id: str, frame: EventFrame) -> StreamEvent:
     return StreamEvent(
         StreamEventKind(frame.event_type.value),
         parse_timestamp(frame.written_at),
         Provenance(capture_id, frame.sequence, 0, STREAM_PARSER_ID, STREAM_PARSER_VERSION),
     )
+
+
+def check_parsed_item(item: object, index: int, context: NormalizeContext) -> None:
+    """Enforce the normalization contract on one parsed item (shared by every driver)."""
+    _check_item(item, index, context)
 
 
 def _check_item(item: object, index: int, context: NormalizeContext) -> None:

@@ -68,7 +68,13 @@ class TradingStatus(StrEnum):
 
 
 class StreamEventKind(StrEnum):
-    """PMV-originated stream events, mirroring raw ``EventType``."""
+    """PMV-originated stream events.
+
+    Most mirror raw event types (v1 ``raw_format.EventType``, v2 ``capture_format.EventType``).
+    ``frame_rejected`` is emitted by the normalization driver, never by a parser: a payload
+    frame was rejected (flagged malformed by the collector, or refused by the parser), so
+    whatever it carried is unknown.
+    """
 
     RECONNECT = "reconnect"
     RATE_LIMIT = "rate_limit"
@@ -77,16 +83,25 @@ class StreamEventKind(StrEnum):
     DISK_HARD_STOP = "disk_hard_stop"
     SOURCE_CLOCK_REGRESSION = "source_clock_regression"
     LOCAL_CLOCK_REGRESSION = "local_clock_regression"
+    CONNECTION_OPENED = "connection_opened"
+    CONNECTION_CLOSED = "connection_closed"
+    MONOTONIC_REGRESSION = "monotonic_regression"
+    FRAME_REJECTED = "frame_rejected"
 
 
-# After these, messages may have been lost without being recorded, so every book in the
-# capture must be re-established from a snapshot and sequence expectations restart.
+# After these, messages may have been lost or left uninterpretable without the loss being
+# visible in venue sequences, so every book in the capture must be re-established from a
+# snapshot and sequence expectations restart. A rejected frame may have been a snapshot or a
+# delta for any book, so it breaks them all (B08; Step 11 order-book continuity).
 RESETS_BOOK_STATE: Final = frozenset(
     {
         StreamEventKind.RECONNECT,
         StreamEventKind.GAP,
         StreamEventKind.RATE_LIMIT,
         StreamEventKind.DISK_HARD_STOP,
+        StreamEventKind.CONNECTION_OPENED,
+        StreamEventKind.CONNECTION_CLOSED,
+        StreamEventKind.FRAME_REJECTED,
     }
 )
 
@@ -123,7 +138,13 @@ class BookLevel:
 
 @dataclass(frozen=True, slots=True)
 class BookSnapshot:
-    """A full book for one outcome. Bids best-first (descending), asks best-first."""
+    """A full book for one outcome. Bids best-first (descending), asks best-first.
+
+    ``solicited`` marks a snapshot sent in reply to a PMV command (for example a venue's
+    "get snapshot" reply) rather than as the start of a subscription. Such a reply may not
+    be sequence-consistent with updates still in flight, so it never establishes or
+    recovers a usable book until a recorded test proves otherwise (Red-Team RT-B2-03).
+    """
 
     spec_key: str
     outcome: Outcome
@@ -133,9 +154,12 @@ class BookSnapshot:
     sequence_scope: str | None
     timing: Timing
     provenance: Provenance
+    solicited: bool = False
 
     def __post_init__(self) -> None:
         _check_common(self.spec_key, self.timing, self.provenance)
+        if not isinstance(self.solicited, bool):
+            raise TypeError("solicited must be a bool")
         if not isinstance(self.outcome, Outcome):
             raise TypeError("outcome must be an Outcome")
         for levels in (self.bids, self.asks):

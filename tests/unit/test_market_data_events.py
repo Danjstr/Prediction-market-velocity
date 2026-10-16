@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pytest
 
+from pmv.capture_format import EventType as V2EventType
 from pmv.market_data.events import (
     BookDelta,
     BookLevel,
@@ -118,7 +119,11 @@ def test_reference_prices_must_be_finite(price: Decimal) -> None:
 
 
 def test_stream_event_kinds_mirror_raw_event_types() -> None:
-    assert {kind.value for kind in StreamEventKind} == {kind.value for kind in EventType}
+    # v1 and v2 raw events, except session_closed (a storage boundary, not an observation),
+    # plus the driver's frame_rejected.
+    raw = {kind.value for kind in EventType} | {kind.value for kind in V2EventType}
+    expected = (raw - {V2EventType.SESSION_CLOSED.value}) | {"frame_rejected"}
+    assert {kind.value for kind in StreamEventKind} == expected
     event = StreamEvent(StreamEventKind.GAP, T0, PROV)
     assert event.available_at == T0
 

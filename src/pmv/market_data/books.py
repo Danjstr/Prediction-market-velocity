@@ -24,7 +24,11 @@ A book is **usable** only when both hold:
   - a snapshot with unsorted or repeated prices;
   - a delta at a price outside ``(0, price_units_per_payout)``, or one removing a level the
     book does not hold (a sign the book is out of step with the source);
-  - an unknown contract.
+  - an unknown contract;
+  - a rejected payload frame in the capture (``frame_rejected``) or a connection opened or
+    closed: whatever the frame carried is unknown, so every book in the capture breaks;
+  - a solicited snapshot (a reply to a PMV command): it is never accepted as recovery
+    until a recorded test proves such replies are sequence-consistent (RT-B2-03).
   A delta that arrives while a book has a continuity fault is not applied.
 - **consistency**: the current levels are well formed. Prices are strictly inside
   ``(0, price_units_per_payout)``, quantities are positive, and the best bid is below the
@@ -66,6 +70,7 @@ from pmv.market_data.events import (
     Outcome,
     Side,
     StreamEvent,
+    StreamEventKind,
 )
 from pmv.market_data.point_in_time import AsOfView, ObservationLog, effective_availability
 from pmv.market_data.timing import ensure_utc
@@ -90,6 +95,7 @@ class BookFault(StrEnum):
 
     # continuity: persists until the book's next snapshot
     STREAM_RESET = "stream_reset"
+    FRAME_REJECTED = "frame_rejected"
     SEQUENCE_GAP = "sequence_gap"
     SEQUENCE_REGRESSION = "sequence_regression"
     DUPLICATE_SEQUENCE = "duplicate_sequence"
@@ -98,6 +104,7 @@ class BookFault(StrEnum):
     DELTA_PRICE_OUT_OF_RANGE = "delta_price_out_of_range"
     ABSENT_LEVEL_REMOVED = "absent_level_removed"
     UNKNOWN_CONTRACT = "unknown_contract"
+    UNVERIFIED_SNAPSHOT = "unverified_snapshot"
     # consistency: follows the current levels
     PRICE_OUT_OF_RANGE = "price_out_of_range"
     INVALID_QUANTITY = "invalid_quantity"
@@ -295,7 +302,12 @@ class _Builder:
         self.last_seen[capture_id] = effective
         if isinstance(item, StreamEvent):
             if item.kind in RESETS_BOOK_STATE:
-                self.break_capture(capture_id, BookFault.STREAM_RESET, effective)
+                fault = (
+                    BookFault.FRAME_REJECTED
+                    if item.kind is StreamEventKind.FRAME_REJECTED
+                    else BookFault.STREAM_RESET
+                )
+                self.break_capture(capture_id, fault, effective)
                 self.sequences = {
                     key: value for key, value in self.sequences.items() if key[0] != capture_id
                 }
@@ -307,6 +319,12 @@ class _Builder:
         spec = self.specs.get(item.spec_key)
         if isinstance(item, BookSnapshot):
             continuity: set[BookFault] = set()
+            if item.solicited:
+                # Not a recovery: keep every fault the book already had, and add one.
+                previous = self.states.get(key)
+                if previous is not None:
+                    continuity |= previous.continuity
+                continuity.add(BookFault.UNVERIFIED_SNAPSHOT)
             if spec is None:
                 continuity.add(BookFault.UNKNOWN_CONTRACT)
             if item.venue_sequence is None:

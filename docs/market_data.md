@@ -8,8 +8,8 @@ Venue-neutral data contracts between raw captures and research. Implementation: 
 
 | Layer | Module | Holds |
 |---|---|---|
-| Raw | `pmv.raw_format`, `pmv.raw_storage` | Byte-exact payloads, receipt and source timestamps, operational events (`docs/raw_data.md`) |
-| Normalization boundary | `market_data.replay` | Venue `Normalizer` protocol; one recorded disposition per raw frame |
+| Raw | `pmv.raw_format`, `pmv.raw_storage` (v1, test only for new captures); `pmv.capture_format`, `pmv.capture_store` (v2, segmented) | Byte-exact payloads, receipt, monotonic, and source timestamps, direction, operational events (`docs/raw_data.md`) |
+| Normalization boundary | `market_data.replay` (v1 captures), `market_data.capture_replay` (v2 sessions and normalized artifacts) | Venue `Normalizer` protocol; one recorded disposition per raw frame |
 | Observations | `market_data.events` | Book snapshots and deltas, trades, trading status, reference ticks, stream events |
 | Contract identity | `market_data.contracts` | `ContractSpec` and its `spec_key` |
 | Decision-time views and features | `market_data.point_in_time` | `ObservationLog`, `AsOfView`, `FeatureRow` |
@@ -35,7 +35,7 @@ Stream events (reconnect, gap, rate limit, clock regression, disk pressure) are 
 - Raising availability this way only ever delays use.
 - The order of a log is `(effective availability, capture_id, frame_sequence, item_index)`. The cross-capture tie-break is deterministic, but it is not evidence of which simultaneous receipt came first.
 
-**Known limit.** `received_at` is a wall clock. Raw v1 records clock regressions as events but has no monotonic receive time. Frame v2 timing and direction are tracked as Step 11 F-12 and must be done before real collection. Validation flags receive-time regressions; it never reorders.
+**Clocks (B08).** `received_at` is a wall clock: for v2 sessions it is the payload frame's `observed_at`. Frame v2 (F-12) also records each frame's `CLOCK_MONOTONIC` time and its clock domain. The normalized artifact keeps it per frame, but observations and views still order by effective availability on the wall clock. Validation flags receive-time regressions and never reorders. No offset between PMV's clock and any venue's is measured yet (F-12 timing analysis, `LabelPolicy.max_clock_error`).
 
 ## Contract identity
 
@@ -76,7 +76,7 @@ Stream events (reconnect, gap, rate limit, clock regression, disk pressure) are 
 |---|---|
 | `parsed` | Zero or more items |
 | `skipped` | Deliberately not normalized, for example a heartbeat. Carries an identifier reason |
-| `rejected` | The parser raised `PayloadRejectedError(reason)`, or the collector flagged the frame malformed (`raw_flagged_malformed`) |
+| `rejected` | The parser raised `PayloadRejectedError(reason)`, or the collector flagged the frame malformed (`raw_flagged_malformed`). The driver adds a `frame_rejected` stream event at the frame's position (B08) |
 | `stream_event` | A raw event frame |
 
 Raw bytes are always preserved in the raw store. The driver owns time and provenance: an item whose receipt time, capture, frame, item index, or parser identity differs from the driver's fails the whole replay (`NormalizationContractError`). A parser may not emit stream events. Any parser exception other than `PayloadRejectedError` propagates and fails the replay.
@@ -84,6 +84,21 @@ Raw bytes are always preserved in the raw store. The driver owns time and proven
 Official resolutions (`labels.ResolutionRecord`) leave the boundary in a separate channel and never enter an `ObservationLog`.
 
 A normalized capture records its parser identity and version. A parser fix is a new version and a new result. It never mutates an earlier one.
+
+### v2 sessions and normalized artifacts (B08)
+
+`capture_replay.normalize_session(store, read, normalizer, use=...)` normalizes the readable chain of one v2 session.
+- **Identity.** The session is the capture: provenance is `(session_id, sequence, item_index)`.
+- **Dispositions.** Every frame gets one of `segment_header`, `parsed`, `skipped`, `rejected`, `outbound`, `stream_event`, or `session_end`, in sequence order.
+- **Outbound messages** are never parsed as observations.
+- **Book continuity.** Rolling over to a new segment does not break books. A connection opening or closing does.
+- **Loader refusals.** A demo-tagged session or artifact is refused for every use, and a synthetic one outside tests (RT-B2-09).
+
+`persist_artifact` writes a **content-addressed normalized artifact** into the capture store, under the same protected root as the raw bytes. Nothing is released (A-7, A-8).
+- **Files.** `observations.json` holds the frame dispositions with each frame's connection and monotonic time, and the observations. `labels.json` holds the resolutions, a separate channel.
+- **Key.** The SHA-256 of the derivation: driver version, session, every input segment's SHA-256 and size, session status, and parser identity and version.
+- **Determinism.** No creation time or commit is stored, so the same derivation always yields identical bytes. Writing it again is a no-op, and a different result under the same key is an integrity failure, never a replacement.
+- **Decoding** re-derives the key and the canonical bytes. It also checks that every frame accounts for exactly its own items, so a dropped, added, or moved observation is detected.
 
 ## Features and labels
 
@@ -128,7 +143,9 @@ A book is **usable** when its `faults` set is empty. Faults are enumerated (`Boo
 
 | Fault | Kind | Cleared by |
 |---|---|---|
-| `stream_reset` | Continuity: a reconnect, gap, rate limit, or hard stop (`events.RESETS_BOOK_STATE`) in the capture | The book's own next snapshot |
+| `stream_reset` | Continuity: a reconnect, connection opened or closed, gap, rate limit, or hard stop (`events.RESETS_BOOK_STATE`) in the capture | The book's own next snapshot |
+| `frame_rejected` | Continuity: a payload frame in the capture was rejected (malformed, schema refusal, undecodable). Whatever it carried (snapshot or delta, any book) is unknown (B08) | The book's own next snapshot |
+| `unverified_snapshot` | Continuity: the snapshot was a reply to a PMV command (`BookSnapshot.solicited`), which may not be sequence-consistent with updates in flight. It never recovers a book and keeps earlier faults (RT-B2-03) | The next unsolicited snapshot |
 | `sequence_gap`, `sequence_regression`, `duplicate_sequence` | Continuity: a break in any sequence scope of the capture invalidates every book in it, as in validation | The book's own next snapshot |
 | `unsequenced` | Continuity: a snapshot or delta for the book has no venue sequence, so a lost or rejected message could not be detected | A sequenced snapshot |
 | `malformed_snapshot` | Continuity: unsorted or repeated snapshot prices | The next well-formed snapshot |
@@ -152,7 +169,7 @@ A book is **usable** when its `faults` set is empty. Faults are enumerated (`Boo
 - No YES/NO complement mapping is assumed, so crossing is checked within one outcome's book only.
 - `BookDelta` is an absolute level replacement. Whether Kalshi deltas are absolute or relative is an AR-1 verification item (`kalshi.REQUIRED_VERIFICATIONS`). A relative feed must not be mapped onto `BookDelta` by an adapter that keeps its own book outside these continuity checks.
 
-**Known limit.** Frames the normalizer rejects or skips produce no observation. With sequenced streams, a lost update shows up as a sequence gap. Detecting rejected frames directly needs frame dispositions to reach the book engine, which is not implemented yet.
+**Rejected frames (B08).** A rejected frame reaches the book engine as a driver `frame_rejected` stream event, so it breaks every book in the capture even on an unsequenced stream or when the venue sequence would not show the loss. A skipped frame (for example a heartbeat) is a deliberate parser decision and does not break books; a parser must only skip messages that carry no book state. A solicited snapshot never recovers a book.
 
 These are conservative project rules, not venue facts. They are revisited once Kalshi semantics are verified (AR-1). A fresh-context Reliability / Red-Team review of this module (2026-10-15) found no blocking issue. Its major findings were fixed in this batch: filtered inputs, unsequenced books, liveness, the delta-semantics verification item, fault-time separation, and desync faults.
 
@@ -181,7 +198,8 @@ The policy fields `max_source_lead`, `max_receipt_delay`, and `max_feed_silence`
 | `invalid_quantity` | blocking | Non-positive level or trade quantity, or negative delta quantity |
 | `trade_outside_trading_window` | warning | Trade time (source time if present, else receipt) outside `[open, close)` |
 | `non_positive_reference_price` | blocking | Reference price ≤ 0 |
-| `stream_*` | per kind | Raw operational events: reconnect (info), gap (blocking), hard stop (blocking), rate limit, clock regression, storage pressure (warning). Reconnect, gap, rate limit, and hard stop reset sequence expectations and invalidate every book in the capture |
+| `stream_*` | per kind | Raw operational events: reconnect and connection opened or closed (`stream_connection`) (info), gap (blocking), hard stop (blocking), rate limit, clock and monotonic regression, storage pressure (warning), and a driver-recorded rejected frame (`stream_frame_rejected`, blocking). Every event in `events.RESETS_BOOK_STATE` resets sequence expectations and invalidates every book in the capture |
+| `unverified_snapshot` | blocking | A solicited snapshot (a reply to a PMV command). It does not establish a book: a delta after it is `delta_without_snapshot` |
 
 Severities and the open-interval price rule are conservative project defaults. They are not venue facts. If verified venue semantics differ (for example, quoting at the payout bound), changing them is a reviewed change.
 
@@ -251,5 +269,5 @@ The owner's process change P1 (`docs/decisions/2026-10-16_phase1_batch3_historic
 ## Not yet done (see `docs/phase1.md`)
 
 - The Kalshi parser, contract-spec builder, and resolution parser, pending official documentation (ACCESS REQUEST AR-1).
-- Persistence of normalized captures as content-addressed artifacts.
+- Persistence of normalized v1 captures as artifacts (v2 sessions have content-addressed artifacts since B08; v1 is test-only for new captures).
 - Wiring a real-data loader through the protected-information controls (F-08).

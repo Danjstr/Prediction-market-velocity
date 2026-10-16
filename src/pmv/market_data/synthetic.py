@@ -4,7 +4,8 @@ The format is defined here, by PMV, for tests and replay fixtures. It is not, an
 imitate, any venue's wire format. Every message is one JSON object with a ``type``:
 
 - ``book_snapshot``: ``spec_key``, ``outcome``, ``bids``/``asks`` (lists of
-  ``[price, quantity]`` integers), optional ``seq`` with ``scope``, optional ``ts``;
+  ``[price, quantity]`` integers), optional ``seq`` with ``scope``, optional ``ts``,
+  optional ``solicited`` (a boolean: a reply to a PMV command, RT-B2-03; version 2);
 - ``book_delta``: ``spec_key``, ``outcome``, ``side``, ``price``, ``quantity``, optional
   ``seq`` with ``scope``, optional ``ts``;
 - ``trade``: ``spec_key``, ``outcome``, ``price``, ``quantity``, optional ``taker_side``,
@@ -45,13 +46,13 @@ from pmv.protected_scope import Family, Provider
 __all__ = ["PARSER_ID", "PARSER_VERSION", "SyntheticNormalizer"]
 
 PARSER_ID: Final = "pmv_synthetic_v1"
-PARSER_VERSION: Final = 1
+PARSER_VERSION: Final = 2
 
 _KEYS: Final[Mapping[str, tuple[frozenset[str], frozenset[str]]]] = {
     # type: (required keys, optional keys)
     "book_snapshot": (
         frozenset({"type", "spec_key", "outcome", "bids", "asks"}),
-        frozenset({"seq", "scope", "ts"}),
+        frozenset({"seq", "scope", "ts", "solicited"}),
     ),
     "book_delta": (
         frozenset({"type", "spec_key", "outcome", "side", "price", "quantity"}),
@@ -157,6 +158,9 @@ def _observation(
                 timing,
                 provenance,
             )
+        solicited = message.get("solicited", False)
+        if not isinstance(solicited, bool):
+            raise PayloadRejectedError("bad_field_type")
         return BookSnapshot(
             spec_key,
             outcome,
@@ -166,6 +170,7 @@ def _observation(
             scope,
             timing,
             provenance,
+            solicited,
         )
     except (TypeError, ValueError) as error:
         raise PayloadRejectedError("invalid_observation") from error

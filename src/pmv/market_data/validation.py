@@ -85,6 +85,9 @@ class AnomalyKind(StrEnum):
     STREAM_CLOCK_REGRESSION = "stream_clock_regression"
     STREAM_STORAGE_PRESSURE = "stream_storage_pressure"
     STREAM_HARD_STOP = "stream_hard_stop"
+    STREAM_CONNECTION = "stream_connection"
+    STREAM_FRAME_REJECTED = "stream_frame_rejected"
+    UNVERIFIED_SNAPSHOT = "unverified_snapshot"
 
 
 SEVERITY: Final[Mapping[AnomalyKind, Severity]] = {
@@ -111,6 +114,9 @@ SEVERITY: Final[Mapping[AnomalyKind, Severity]] = {
     AnomalyKind.STREAM_CLOCK_REGRESSION: Severity.WARNING,
     AnomalyKind.STREAM_STORAGE_PRESSURE: Severity.WARNING,
     AnomalyKind.STREAM_HARD_STOP: Severity.BLOCKING,
+    AnomalyKind.STREAM_CONNECTION: Severity.INFO,
+    AnomalyKind.STREAM_FRAME_REJECTED: Severity.BLOCKING,
+    AnomalyKind.UNVERIFIED_SNAPSHOT: Severity.BLOCKING,
 }
 
 _STREAM_KINDS: Final[Mapping[StreamEventKind, AnomalyKind]] = {
@@ -121,6 +127,10 @@ _STREAM_KINDS: Final[Mapping[StreamEventKind, AnomalyKind]] = {
     StreamEventKind.LOCAL_CLOCK_REGRESSION: AnomalyKind.STREAM_CLOCK_REGRESSION,
     StreamEventKind.DISK_WARNING: AnomalyKind.STREAM_STORAGE_PRESSURE,
     StreamEventKind.DISK_HARD_STOP: AnomalyKind.STREAM_HARD_STOP,
+    StreamEventKind.CONNECTION_OPENED: AnomalyKind.STREAM_CONNECTION,
+    StreamEventKind.CONNECTION_CLOSED: AnomalyKind.STREAM_CONNECTION,
+    StreamEventKind.MONOTONIC_REGRESSION: AnomalyKind.STREAM_CLOCK_REGRESSION,
+    StreamEventKind.FRAME_REJECTED: AnomalyKind.STREAM_FRAME_REJECTED,
 }
 
 
@@ -322,7 +332,13 @@ class _Checker:
             self.flag(AnomalyKind.INVALID_QUANTITY, index, item)
         if item.bids and item.asks and item.bids[0].price >= item.asks[0].price:
             self.flag(AnomalyKind.CROSSED_BOOK, index, item)
-        self.books.add((item.provenance.capture_id, item.spec_key, item.outcome.value))
+        key = (item.provenance.capture_id, item.spec_key, item.outcome.value)
+        if item.solicited:
+            # A reply to a PMV command is not a recovery point (RT-B2-03).
+            self.flag(AnomalyKind.UNVERIFIED_SNAPSHOT, index, item)
+            self.books.discard(key)
+            return
+        self.books.add(key)
 
     def check_delta(self, index: int, item: BookDelta, spec: ContractSpec) -> None:
         self.check_sequence(index, item)

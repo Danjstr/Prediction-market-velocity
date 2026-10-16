@@ -62,6 +62,120 @@ Historical files acquired by the acquisition pipeline (`src/pmv/acquisition/pipe
 
 Storing is not releasing (A-8): nothing here is agent-visible. No real acquisition has run.
 
+## Segmented prospective capture, frame format v2 (B08)
+
+Real collection uses the segmented v2 store (`src/pmv/capture_store.py`, format `src/pmv/capture_format.py`), not the v1 store. **Raw format v1 no longer starts a capture outside the `test` environment** (`LegacyFormatRefusedError`): v1 lacks monotonic receipt time and message direction (Step 11 F-12). Reading and verifying v1 captures is unchanged. Decision record: `docs/decisions/2026-10-16_b08_prospective_capture_hardening.md`.
+
+Nothing here authorizes live capture. Every demo or production session needs an owner-approved endpoint in `pmv.capture_environment.APPROVED_CAPTURE_ENDPOINTS`, **which is empty**, so every real session refuses.
+
+### Sessions and segments (F-11)
+
+A **session** is one collector run against one source endpoint. It is written as a hash-chained sequence of bounded, immutable **segments**. A segment rolls over when it reaches the session's explicit `SegmentPolicy`:
+- a byte bound, at most `MAX_SEGMENT_BYTES` (128 MiB);
+- a frame-count bound;
+- a monotonic-duration bound.
+
+There are no defaults. A crash can damage only the open segment.
+
+```
+<root>/capture/v2/
+  sessions/<session_id>                             permanent session reservation (closed schema)
+  open/<segment_id>/segment.pmvraw.partial          the open segment, flock-locked while live
+  quarantine/<segment_id>/                          interrupted or stopped segments + quarantine.json
+  salvage/<segment_id>/{salvaged.pmvraw,salvage.json}   salvaged valid prefixes (0400, dir 0500)
+  segments/<source>/<feed>/YYYY/MM/DD/<session_id>/<index>/{segment.pmvraw,manifest.json}
+                                                    finalized segments (0400, dir 0500)
+  normalized/<session_id>/<key>/{observations.json,labels.json}   normalized artifacts
+```
+
+`session_id` has the capture-ID form. `segment_id` is `<session_id>.<index>`, with a six-digit index.
+
+**Segment finalization order.** Each step is synced before the next:
+1. sync the object;
+2. re-read and fully verify it against the running size, hash, and frame count;
+3. rename the partial object (no-replace);
+4. write the manifest (`pmv.capture.segment_manifest` v1, closed schema), then rename it (no-replace);
+5. make both files 0400;
+6. create the destination path;
+7. confirm the open directory's identity;
+8. move it into `segments/` with `RENAME_NOREPLACE`;
+9. make it 0500.
+
+A segment is accepted exactly when its directory is in `segments/`.
+
+**Recovery** never resumes a segment:
+- `recover()` moves every unlocked directory in `open/` to `quarantine/`, with a closed-schema record, whatever it contains.
+- A live (locked) segment is never touched.
+- A session whose open segment was quarantined has ended. The collector starts a new session.
+- Interrupted salvage or artifact writes leave `.staging-*` directories. These are reported (`stale_staging`), never read, renamed, or deleted by the tool.
+- `reconcile()` verifies every finalized segment and tightens any left 0700 by a crash.
+
+**Salvage** (`salvage(segment_id)`) is an explicit, deterministic step under rule `longest_valid_frame_prefix_v1`:
+- It copies the longest prefix of a quarantined object made only of complete, fully valid frames: lengths, canonical closed headers, sequence continuity, and payload SHA-256.
+- It records the original object's name, size, and SHA-256, the prefix, the tail size, and its disposition (`none`, `incomplete_frame`, or `invalid_frame`).
+- It never changes the quarantined bytes. It never repairs anything, and it never uses anything after the first bad frame.
+- An object with no valid header is refused (`SalvageRefusedError`).
+- Repeating salvage verifies and returns the existing result. A changed input is an integrity failure.
+- A salvaged segment always **ends** its session's readable chain.
+
+**Reading.** `read_session` follows the chain from segment 0. Each segment must name its predecessor's SHA-256 and last sequence, and match the session's reservation: source, environments, clock domain, and start. The read stops at the first segment that is not finalized, and reports why:
+
+| Status | Meaning |
+|---|---|
+| `complete` | The last segment ends with `session_closed` |
+| `open` | The next segment is still open |
+| `ends_with_salvage` | The chain ends at a salvaged prefix |
+| `truncated` | The chain ends at a missing, quarantined but unsalvaged, or never-opened segment |
+
+A gap is never bridged: later segments are reported as `unreachable_indices`. `iter_frames` re-verifies every byte, and enforces session-wide sequence continuity and connection discipline.
+
+### Frame format v2 (F-12, F-27)
+
+Magic `PMVRAW2\n`; v1 framing (4-byte header length, 8-byte payload length, canonical JSON header, payload). A v1 object is never read as v2, or the reverse.
+
+| Kind | Fields |
+|---|---|
+| `segment` (first frame only) | `session_id`, `segment_index`, `previous_segment_sha256` and `previous_last_sequence` (null for segment 0), `source_id`, `feed_id`, `endpoint_id`, `transport`, `deployment_environment`, `venue_environment` (`synthetic`, `demo`, `production`), `clock_domain`, `session_started_at`, `written_at`, `monotonic_ns` |
+| `payload` | `direction` (`inbound` or `outbound`), `connection`, `observed_at`, `monotonic_ns`, `source_timestamp` (inbound only, caller-supplied), `payload_sha256`, `malformed` (inbound only), `written_at` |
+| `event` | `event_type`, `connection` (required for connection events), `written_at`, `monotonic_ns` |
+
+Event types:
+- `connection_opened` and `connection_closed`;
+- `gap` and `rate_limit`;
+- `disk_warning` and `disk_hard_stop`;
+- `source_clock_regression`, `local_clock_regression`, and `monotonic_regression`;
+- `session_closed`, which must be the object's last frame.
+
+Rules:
+- **Ordering.** One `sequence` counter covers a whole session, across segments. Sequence, not any clock, is the ordering authority. Regressions of any clock are recorded as events, never repaired or reordered.
+- **Monotonic time.** `monotonic_ns` is `CLOCK_MONOTONIC`. It is comparable only within one `clock_domain` (the boot identity, `/proc/sys/kernel/random/boot_id`). It measures intervals and order within a session, and it is never a timestamp.
+- **Environment identity** is carried by each segment's hash-chained header, which every frame of that segment sits behind (interpretation B8-2).
+- **Venue sequence numbers** stay inside payloads. The raw layer never parses payloads (B8-3).
+- **Outbound frames** hold application-level messages PMV sent (for example subscriptions). Handshake and authentication material never passes through the store (F-03).
+
+### Environment boundaries (F-37, RT-4)
+
+`pmv.capture_environment.authorize_capture` is the only producer of the `CaptureAuthorization` a session needs:
+
+| Deployment | May capture | Store root |
+|---|---|---|
+| `test` | `synthetic` only, on RFC 2606 reserved hosts (`.example`, `.test`, `.invalid`) | Never inside the protected raw location, lexically or after symlinks |
+| `development` | `demo` or `production`, from an approved endpoint | Inside the protected raw location |
+| `shadow`, `production` | `production`, from an approved endpoint | Inside the protected raw location |
+
+- Demo data is protected like real data and is never loaded as data, for any use (`require_data_use`; RT-B2-09).
+- Synthetic data is loaded only for tests. Production data is loaded only for research, and that still happens only through the H-2 release path.
+- The CLIs that create project records (`python -m pmv.gates create` and `python -m pmv.holdout_log record`) refuse `--environment test` (RT-4).
+
+### Limits
+
+- **Process crashes only.** Fault-injection tests kill a real process at every named boundary (`capture_store.FAULT_POINTS`). They do not model power loss.
+- **Durability.** A frame is durable after `sync()` or segment finalization. Frames written before a process crash are kept by the kernel and are salvageable.
+- **Memory.** Salvage and the normalized-artifact reader hold one object in memory, bounded by `MAX_SEGMENT_BYTES` plus one frame, and by 1 GiB respectively. Normalization holds one session's observations in memory.
+- **No index.** The directory tree is authoritative. Listing sessions walks `segments/`.
+- **F-26 is still open:** storage-event claims and their restore dependency.
+- **Not proven by tests.** Session records and segment manifests do not prove where bytes came from beyond PMV's own records; the collector must be trusted for that (live capture is not authorized).
+
 ## Raw object format `pmv.raw.frames` v1
 
 File magic `PMVRAW1\n`, then frames. Each frame: 4-byte big-endian header length, 8-byte big-endian payload length, canonical JSON header (sorted keys, no spaces, ASCII, no floats), payload bytes.
