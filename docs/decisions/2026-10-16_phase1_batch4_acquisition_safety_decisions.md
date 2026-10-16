@@ -1,5 +1,11 @@
 # Phase 1 batch 4: owner decisions on acquisition safety and holdout formation (2026-10-16)
 
+> **Status note (B07, 2026-10-16).** This record is historical. Two pending items it describes have since been resolved:
+> - the B06 pull request was merged (PR #5, `2314326`);
+> - the owner actions below (agent split wording, F-09 denies) were applied in `8517fc2`.
+>
+> Current status is in `docs/phase1.md` and `docs/BRANCH_TIMELINE.md`.
+
 **Approver:** the project owner, in the batch 4 charter given on 2026-10-16 (branch `phase1/acquisition-safety-decisions`). The charter states the decisions below as approved and instructs the governance edits listed under "Documents changed". The development session wrote this record. The owner reviewed it and issued follow-up rulings on 2026-10-16, recorded under "Owner rulings on the batch 4 reviews" below. The owner restated the same rulings in the B06 recovery charter (`docs/decisions/2026-10-16_b06_governance_continuity_sync.md`, C-6), and the session checked them against this record. Until the B06 pull request is merged, the rulings table below, as verified in B06 C-6, governs development on the active branch. The owner confirms the record's final wording by merging.
 
 **Limitation:** this record is procedural. The system does not cryptographically prove who approved it (F-42 in `docs/decisions/2026-10-14_phase0_step11_owner_decisions.md`).

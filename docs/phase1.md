@@ -268,7 +268,11 @@ Full rulings and the pre-T0 checklist are in the decision record.
 **Charter (owner, 2026-10-16).** Recorded in `docs/decisions/2026-10-16_b07_acquisition_pipeline_hardening.md`. Synthetic data only: no real data, network host, credential, approval, licence determination, gate decision, `T0`, holdout access, or modeling.
 
 **Done:**
-- **G-1.** An isolated parse worker: rlimits applied by the parent, a seccomp denylist installed before input, and a framed protocol enforced by the parent.
+- **G-1.** An isolated parse worker:
+  - resource limits applied by the parent before exec;
+  - launch with `python -I -S` and an empty environment, with a finder that loads only `pmv` from the package root;
+  - `no_new_privs` and a seccomp **allowlist** (argument-filtered `fcntl` and `ioctl`) installed before any input is read;
+  - a framed protocol enforced by a parent that has made itself non-dumpable.
 - **G-2, G-3, G-5.** Stdlib readers with pinned identities and required schemas, and bounded gzip, bzip2, and xz decoding. Parquet, DBN, and zstd are deferred for owner dependency approval.
 - **G-4.** Fetcher semantics behind an injectable transport. No production transport exists.
 - **G-6.** The plan and evidence records, the explicit state machine, and the orchestrator into the protected raw store, with crash and restart recovery.

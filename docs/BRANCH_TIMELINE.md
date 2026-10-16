@@ -59,7 +59,14 @@ Listed oldest first, and appended at each timeline update.
 | Commit | Content |
 |---|---|
 | `f160647` | G-1 to G-6 acquisition pipeline hardening (synthetic data only) |
-| (the commit adding this row) | Documentation, B07 decision record, and timeline. Later commits are listed here at the next timeline update, and the tip is verified with `git ls-remote` |
+| `b146099` | Red-Team round 1 remediation (RT-B7-01 to RT-B7-11) |
+| `ae693e2` | Round 2 follow-ups (RT-B7-12, RT-B7-13, RT-B7-04 residual) and B07 documentation |
+| `cd9ef17` | Round 3 follow-ups (RT-B7-14, `stage_failed`) |
+| `4170b3c` | RT-B7-14 closed (`pmv`-only finder). **Final reviewed acquisition code:** Red-Team round 5 verdict, no BLOCKING and no MAJOR finding |
+| `597aeba` | Final Red-Team verdict recorded in the docs (`check.sh` passed: 2123 passed, 8 skipped) |
+| (the commit adding this row) | Cold-start review and its fixes (docs), plus a collision-proof content-leak assertion in one integration test. Its hash is the branch tip; see `git ls-remote` |
+
+After `4170b3c`, no production code changed: `git diff 4170b3c <tip> -- src` is empty, so the final Red-Team verdict covers the code at the tip. The only later test change makes the sentinel values in `test_report_journal_and_record_carry_no_file_content` impossible to collide with a timestamp or hash.
 
 ## Ancestry verification for B07 (2026-10-16)
 

@@ -71,6 +71,37 @@ Until the owner approves, any plan containing these formats or codecs is refused
 - No real market observation was accessed, no network host was contacted for data, and no credential was used.
 - `.claude/settings.json`, the agent files, PROJECT_BRIEF.md, START_HERE.md, CLAUDE.md, and the hash-pinned HOLDOUT_ACCESS_LOG.md body were not modified.
 
+## Outcome (2026-10-16)
+
+- **Reviews.** The independent Reliability / Red-Team review (`research/governance/b07_acquisition_pipeline_red_team_review.md`) ran five rounds.
+  - Round 1 found:
+    - **BLOCKING** RT-B7-01: the original seccomp denylist let a confined worker signal, re-limit, or core-dump its parent;
+    - **MAJOR** RT-B7-02: the real-mode gate trusted collaborators supplied by the caller;
+    - nine MINOR findings.
+  - All were fixed and re-verified. The fixes are:
+    - the allowlist;
+    - a non-dumpable parent;
+    - a code-level transport registry compared by identity;
+    - Git facts from the tool's own checkout;
+    - the `python -I -S` launch with a finder that loads only `pmv` (RT-B7-13, RT-B7-14);
+    - a non-terminal `stage_failed` event.
+  - **Final verdict at `4170b3c`:** no BLOCKING and no MAJOR finding, with documented MINOR residuals (`docs/acquisition_readiness.md`, "Review status").
+  - No Statistician review was triggered.
+  - Cold-start review: `research/governance/b07_cold_start_review.md`.
+- **A-4 is not satisfied, Gate 1 is undecided, and acquisition is not authorized.**
+- **Models used.** Development and review in this batch used Claude Opus 5.5 (`claude-opus-5-5`). Nothing in B07 trains or selects a predictive model, and no cycle exists, so this is not a model-cutoff record under P-1.
+
+## Open owner inputs after B07
+
+- Merge the single B07 pull request, with a normal merge commit.
+- Reader dependencies (B7-6): approve, defer, or reject `pyarrow`, `databento-dbn`, and `zstandard` (or a Python 3.14 move).
+- A-3: the real backup policy and a restore test on the real backup medium. Also confirm or replace the "size class" interpretation (B7-7), on which the pipeline's restore-coverage check currently relies.
+- Per-source A-1, A-2, A-5, and A-6 records, starting with the licence terms for the first candidate source (AR-3).
+- G-4: commission the production network transport and its review (B7-4).
+- E-U1: the catalog decision, the first step before the H-2 release tool.
+- The pre-T0 decisions P-1 to P-4 (START_HERE.md), then cycle registration.
+- Optional: B6S-14.
+
 ## Optional owner decision carried forward
 
 **B6S-14** (independent statistical audit of the H-2 release rules before the first real release; `docs/release_tool_design.md`) remains **optional and unadopted**. It is neither discarded nor turned into a requirement. B07 does not touch release semantics.

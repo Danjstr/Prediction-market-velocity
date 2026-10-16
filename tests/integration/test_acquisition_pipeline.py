@@ -34,7 +34,6 @@ from pmv.acquisition.receipts import ReceiptEvent, ReceiptJournal
 REPO = Path(__file__).resolve().parents[2]
 SCHEMA = syn.csv_schema(("row", "integer"), ("value", "decimal"))
 CSV = b"row,value\n0,1.5\n1,-2.25\n"
-SECRET_VALUE = b"-2.25"
 SETTINGS_EXTRA: dict[str, Any] = {
     "worker_limits": WorkerLimits(wall_clock_seconds=60.0),
     "fetch_policy": FetchPolicy(free_space_margin_bytes=0),
@@ -117,16 +116,19 @@ def test_csv_acquisition_completes_into_the_protected_store(env: Env) -> None:
 
 
 def test_report_journal_and_record_carry_no_file_content(env: Env) -> None:
-    inputs, transport = _csv_inputs()
+    # Sentinel values with a decimal point cannot occur in a hex hash or a timestamp.
+    sentinel = b"row,value\n0,424242.4242\n1,-313131.3131\n"
+    inputs, transport = _csv_inputs(sentinel)
     report = env.pipeline(transport).run(inputs)
     stored = _stored(env, "a.csv")
+    assert stored.read_bytes() == sentinel
     for blob in (
         json.dumps(report.document()).encode(),
         (env.base / "journal.jsonl").read_bytes(),
         (stored.parent / "acquisition.json").read_bytes(),
     ):
-        assert SECRET_VALUE not in blob
-        assert b"1.5" not in blob
+        assert b"424242.4242" not in blob
+        assert b"313131.3131" not in blob
 
 
 def test_rerun_is_idempotent_and_contacts_nothing(env: Env) -> None:

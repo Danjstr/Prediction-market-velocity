@@ -108,7 +108,7 @@ Also allowed: `fetch_failed` and retry, `rejected`, `discarded` for unjournaled 
 - A-1 to A-6 consistency;
 - an allowlisted URL for every planned file;
 - an adopted reader for every planned format;
-- restore-test coverage under the backup policy;
+- restore-test coverage under the backup policy, using the proposed "size class" reading (decision record B7-7), which awaits owner confirmation;
 - an A-4 review record with no BLOCKING or MAJOR finding;
 - no credential;
 - the mode rules (decision record B7-8);
