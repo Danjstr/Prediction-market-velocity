@@ -141,7 +141,7 @@ Collect as much relevant historical and live data as practical from:
 
 Preserve raw market data whenever practical so events can be reconstructed and replayed.
 
-Historical data alone may not contain enough resolution for 5–15 minute forecasting, so **high-frequency live data collection should begin as early as possible.**
+Historical data alone may not contain enough resolution for the shortest horizons (the final few minutes of a contract, and 5–15 minute windows), so **high-frequency live data collection should begin as early as possible.**
 
 ### Verified existing historical data
 PMV prefers verified existing historical data to waiting to regenerate equivalent observations. When a historical source's provenance, timestamp semantics, contract semantics, licensing, and quality are adequate, it is used for development, while prospective PMV capture accumulates genuinely untouched data in parallel. This preference never weakens provenance, licensing, point-in-time correctness, holdout integrity, or source-quality requirements. Historical data exposed to development can never later become protected holdout data. Owner record: `docs/decisions/2026-10-16_phase1_batch3_historical_data_strategy.md`.

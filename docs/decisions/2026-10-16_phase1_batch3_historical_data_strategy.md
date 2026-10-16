@@ -81,7 +81,7 @@
   - the single access authority allows the request. Today that is the guard. Under F-08 it would be the trusted release tool, applying the same catalog and scope.
 
   P1 changes what PMV acquires and plans to use. It does not open early access.
-- **Split rule.** The chronological ~70/30 rule, the frozen-boundary rule, purge and embargo, and the Gate 6 and owner-approval requirements for opening the holdout are unchanged.
+- **Split rule.** *(Later refined by batch 4 H-1: prospective holdout, with ~70/30 applied to the PMV-capture span; see CLAUDE.md Holdout Protection.)* The chronological ~70/30 rule, the frozen-boundary rule, purge and embargo, and the Gate 6 and owner-approval requirements for opening the holdout are unchanged.
 - **Credentials, real money, and raw data.** Credential isolation (F-03), the real-capital rules, and the raw-data backup prerequisite for irreplaceable capture are unchanged.
 
 ## Owner decisions raised by this batch (not taken)

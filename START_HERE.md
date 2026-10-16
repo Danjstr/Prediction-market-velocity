@@ -31,6 +31,7 @@ The canonical statement is PROJECT_BRIEF.md §3 ("Strategy objective: late-windo
 - The trade distribution is never imposed; it must emerge from development data.
 - Results are reported by entry-price band and remaining-time band (`docs/phase2.md`). **High-probability-tail calibration is a core success criterion**; AUC alone is not.
 - All of these thresholds are **development hypotheses**, tested only on development data and frozen before protected evaluation.
+- **Current scope order (Phase 1 charter, `docs/phase1.md`).** Kalshi comes first; Polymarket is deferred until separately approved and verified. Bitcoin and gold are the target underlyings, but whether in-scope gold contracts exist is still unverified (F-16, E-1).
 
 Current status and the next step are in `docs/phase1.md`. Open owner decisions are listed in the latest decision records under `docs/decisions/`. The current active branch is in `docs/BRANCH_TIMELINE.md`.
 
@@ -56,7 +57,7 @@ A fresh session with no chat history recovers project state from Git in this ord
 
 ## Branch continuity
 
-`docs/BRANCH_TIMELINE.md` numbers every development branch (`B00`, `B01`, …) in verified ancestry order and names the **current active ground-truth branch**.
+`docs/BRANCH_TIMELINE.md` numbers every development branch (`B00`, `B01`, …) in verified ancestry order and names the **current active ground-truth branch**. "Newest approved development branch" means the branch the owner has designated, by batch charter or decision record, as the current active ground-truth branch in that file. Designation is not a merge: merging into `main` is integration review, and an active branch may be ahead of `main`.
 - A new development branch is created only from the immediately preceding, newest approved development branch, never from `main` or an older branch while a newer cumulative branch exists. New branches are named `bNN/<short-purpose>`.
 - The newest numbered active branch is the ground truth for current development. Older numbered branches are historical checkpoints, not competing sources of requirements. `main` is the reviewed integration branch: it advances only by merged pull request and may lag the active branch.
 - Sessions and subagents work on the owner-designated active branch or its working tree. They switch to an older branch only for explicit historical review.

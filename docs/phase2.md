@@ -1,4 +1,6 @@
-# Phase 2: Data Cleaning, Dataset Engineering, and Target Construction — Design
+# Phase 2: Canonical Dataset Engineering and Statistical Design — Design
+
+*Covers data cleaning, dataset engineering, target construction, and statistical design. START_HERE.md "Phase Roadmap" gives the phase name.*
 
 Working design for Phase 2. The authoritative requirements are START_HERE.md (Phase 2, Gate 2, Project-Wide Controls), CLAUDE.md, and PROJECT_BRIEF.md; where this file summarizes them, they win. This is not a gate record and not an owner-decision record. Items marked **(owner decision)** are proposals until the owner approves them in `docs/decisions/`.
 

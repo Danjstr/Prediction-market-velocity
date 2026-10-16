@@ -1,5 +1,7 @@
 # Protected Information (Phase 0 Step 9)
 
+*Established in Phase 0 Step 9 and in force in every later phase. Later owner decisions are noted inline. For current status, see `docs/phase1.md`.*
+
 The final holdout is protected **information**, not just a file. Protected observations, outcomes, and any equivalent information that could reconstruct them stay unavailable to development agents until authorized final evaluation, whatever the source or representation. This is the primary control. Filesystem isolation is defense in depth only. Governing text: START_HERE.md (Project-Wide Controls) and the Protected Information Rule in CLAUDE.md.
 
 Implementation:
@@ -54,7 +56,7 @@ The project owner directed this design. It replaced an earlier plan for a separa
   - it is never copied into repository files, logs, configuration artifacts, or agent context.
 - **Least privilege:** use the least privilege the venue supports, and prefer a genuinely data-only or read-only credential. If a venue requires broader permissions, stop for explicit owner approval before creating or using it.
 
-## Phase 0 status: what is safe now
+## What is safe now (Phase 0, and Phase 1 until the release path exists)
 
 **Phase 0 is safe for:** synthetic fixtures, methodology research, API documentation, open-source research, and deterministic infrastructure development.
 
@@ -74,7 +76,7 @@ The project owner directed this design. It replaced an earlier plan for a separa
 8. **Identifier kinds are caller-asserted** (M-2). A caller-supplied kind cannot prove the identifier was labelled honestly. A Polymarket question ID or negative-risk ID labelled as a condition ID, an event slug labelled as a slug, or a Kalshi multivariate ticker labelled as a market ticker is checked as the asserted kind. The trusted endpoint/catalog (item 1) must supply kinds before real data. **MUST RESOLVE BEFORE PHASE 1 AGENT-FACING REAL MARKET DATA.**
 9. **Recorded contracts only** (M-3). Rule 1 below protects contracts recorded in a scope. A whole-venue scope without contract records cannot refuse post-interval history of unlisted protected-period contracts. That needs the lifecycle catalog (item 2). **MUST RESOLVE BEFORE PHASE 1 AGENT-FACING REAL MARKET DATA.**
 
-**Step 11 dispositions (recorded, not yet decided).** Items 1, 2, 3, 7, 8, and 9 assume agents request market data through the guard. Step 11 (F-08) recommends a simpler architecture instead:
+**Step 11 dispositions (F-08 since decided as H-2; see "Batch 4" below).** Items 1, 2, 3, 7, 8, and 9 assume agents request market data through the guard. Step 11 (F-08) recommends a simpler architecture instead:
 - a trusted collector writes to the protected raw store;
 - an owner-run tool releases to agents only records received before a fixed development boundary;
 - the first release is the durable first-exposure record (S-4).
@@ -85,7 +87,7 @@ If the owner adopts F-08, items 1, 3, 7, 8, and 9 become unnecessary for access 
 
 **Until these are resolved, Step 9 is safe for** synthetic fixtures, methodology research, documentation, open-source and code research, and infrastructure development. **Step 9 is not authorization for agents to inspect real market observations.**
 
-**Approved collection rule (S-6).** Before the split and protected scope are frozen, deterministic project tooling may **collect** raw real market data, into the protected raw store only (Step 11 F-01), by a collector running outside Claude Code. Agents may work on schemas, API documentation, synthetic fixtures, capture, parsing, and integration code, and on metadata that exposes no protected observation. Agents do **not inspect** collected real observations until the chronological split and protected scope are established under the approved process. After that, only the approved development portion becomes agent-readable; the protected portion stays embargoed.
+**Approved collection rule (S-6).** This rule permits collection in principle. No real capture has begun, and none may begin until the Phase 1 prerequisites in `docs/phase1.md` are met (including the raw backup policy and restore test, and F-09). Before the split and protected scope are frozen, deterministic project tooling may **collect** raw real market data, into the protected raw store only (Step 11 F-01), by a collector running outside Claude Code. Agents may work on schemas, API documentation, synthetic fixtures, capture, parsing, and integration code, and on metadata that exposes no protected observation. Agents do **not inspect** collected real observations until the chronological split and protected scope are established under the approved process. After that, only the approved development portion becomes agent-readable; the protected portion stays embargoed.
 
 ## The protected scope
 

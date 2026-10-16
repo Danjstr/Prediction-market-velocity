@@ -433,7 +433,7 @@ The phase order (0–12, including 4.5 and 5.5) is fixed in START_HERE.md "Phase
 
 Branch continuity (START_HERE.md "Repository Continuity"; `docs/BRANCH_TIMELINE.md`):
 - work only on the **current active ground-truth branch** named in `docs/BRANCH_TIMELINE.md`; verify the branch name and expected HEAD before substantive work;
-- create each new development branch (`bNN/<short-purpose>`) only from the newest approved cumulative branch, never from `main` or an older branch while a newer one exists;
+- create each new development branch (`bNN/<short-purpose>`) only from the newest approved cumulative branch (the one the owner designated as active in `docs/BRANCH_TIMELINE.md`, whether or not it is merged), never from `main` or an older branch while a newer one exists;
 - older branches are historical checkpoints, never competing requirement sources; switch to them only for explicit historical review;
 - if the expected predecessor is not an ancestor of the branch point, stop and escalate; never fork project history.
 

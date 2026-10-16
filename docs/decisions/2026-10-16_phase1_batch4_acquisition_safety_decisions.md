@@ -1,6 +1,6 @@
 # Phase 1 batch 4: owner decisions on acquisition safety and holdout formation (2026-10-16)
 
-**Approver:** the project owner, in the batch 4 charter given on 2026-10-16 (branch `phase1/acquisition-safety-decisions`). The charter states the decisions below as approved and instructs the governance edits listed under "Documents changed". The development session wrote this record. The owner reviewed it and issued follow-up rulings on 2026-10-16, recorded under "Owner rulings on the batch 4 reviews" below. The owner restated the same rulings in the B06 recovery charter (`docs/decisions/2026-10-16_b06_governance_continuity_sync.md`, C-6), and the session checked them against this record. The owner confirms the final wording by merging the B06 pull request.
+**Approver:** the project owner, in the batch 4 charter given on 2026-10-16 (branch `phase1/acquisition-safety-decisions`). The charter states the decisions below as approved and instructs the governance edits listed under "Documents changed". The development session wrote this record. The owner reviewed it and issued follow-up rulings on 2026-10-16, recorded under "Owner rulings on the batch 4 reviews" below. The owner restated the same rulings in the B06 recovery charter (`docs/decisions/2026-10-16_b06_governance_continuity_sync.md`, C-6), and the session checked them against this record. Until the B06 pull request is merged, the rulings as restated in the B06 charter govern development on the active branch. The owner confirms the record's final wording by merging.
 
 **Limitation:** this record is procedural. The system does not cryptographically prove who approved it (F-42 in `docs/decisions/2026-10-14_phase0_step11_owner_decisions.md`).
 
@@ -124,7 +124,7 @@ These were raised as O-7 and RT-B3-12 in batch 3. The owner approved resolving t
 2. **"Oldest ~70% / newest ~30%".** CLAUDE.md, PROJECT_BRIEF.md §7, and START_HERE.md now say:
    - development and validation stay chronological, with walk-forward validation, purge, and embargo;
    - historical development data may use chronological train and development partitions;
-   - the final protected evaluation is preferably prospective, beginning only after a declared start;
+   - the final protected evaluation is prospective, beginning only after a declared start: required for the first cycle and preferred thereafter (H-1);
    - no exposed historical period may later be promoted into the protected holdout.
 
    Phrases such as "the development 70%", "the oldest approximately 70%", "the protected 30%", and "the newest approximately 30%" elsewhere, including the agent files and the HOLDOUT_ACCESS_LOG.md Holdout Rules restatement, are defined in CLAUDE.md and START_HERE.md to mean the development pool and the protected evaluation set of the frozen split, never the newest share of a historical dataset.
