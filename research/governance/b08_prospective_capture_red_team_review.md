@@ -147,3 +147,38 @@
   - RT-B8-06 and RT-B8-14 may be fixed now or carried forward, recorded in the failure register or the B08 decision record.
   - Callers that rely on an artifact should record `artifact_digest` and pass `expected_digest` when they load it.
   - Nothing here authorizes live capture or changes any gate status.
+
+## Re-verification (round 3)
+
+- **Subject:** commit `6dc2b51`, reviewed against `7190f7f`, source and tests only.
+- **Data and scope:** synthetic only, with no network access. `src/pmv/acquisition/` is still untouched: the diff from `9a6b212` to `6dc2b51` is empty.
+- **Tests:** the targeted capture tests all passed (169: format, environment, store, replay, and crash points). I did not run `check.sh` or the full suite.
+- **Reproductions:**
+  - I re-ran `r6_base.py`.
+  - I did not re-run `r5_race.py`, because it holds the reader's lock indefinitely by design, so it would still fail. I replaced it with `$TMPDIR/rt8/r7_round3.py`, which holds the lock for a bounded time and also covers the quarantine crash windows.
+
+| ID | Disposition | Evidence |
+|---|---|---|
+| RT-B8-12 | **Resolved** | With a reader's shared probe held for 0.05 s across the writer's rollover, the writer now succeeds after about 0.06 s and opens segment 1. A probe held for 3 s still ends the session after about 1.1 s (fails closed). That is acceptable: a real `_is_live` probe holds the lock for microseconds. If `recover()` takes the lock and quarantines the directory meanwhile, the writer's identity check (`same_entry`) still detects it after it gets the lock. Residual: a collector stalls for up to about 1 s under heavy contention. |
+| RT-B8-13 | **Resolved** | `r6_base.py`, with a hypothetical registry entry and a caller-chosen base, is now refused: "real and demo captures are written only inside the protected raw location". The non-test branch reads the module-level `PROTECTED_RAW_BASE` at call time. The tests construct their own base with `monkeypatch` and do not depend on the real home directory. |
+| RT-B8-14 | **Resolved** | Simulated crash at `quarantine.moved`: the directory is 0700 and the files are already 0400. `recover()` reports `tightened`, sets the directory to 0500, and is idempotent (a second run returns nothing). Salvage still works. Simulated crash at `quarantine.record_written`: `recover()` quarantines the segment, keeps the single existing `requested` record (it validates it rather than rewriting it), and ends with 0500/0400. Correction to my round-2 note: `capture_store._open_file` already wraps `_fs_errors`, so that part was not a defect. A non-owned or unexpected quarantine entry makes `recover()` raise, which fails closed. |
+
+**No regressions found.**
+- The writer's retry path keeps the identity check.
+- The quarantine record is created exclusively or validated, never replaced.
+- Making the files read-only before the move does not block the move.
+- Salvage still reads the read-only quarantined objects.
+
+**Decision record "Outcome" section** (`docs/decisions/2026-10-16_b08_prospective_capture_hardening.md`): it states my findings accurately. Severities, round-by-round dispositions, the latent nature of RT-B8-13, and the carried-forward residuals (RT-B8-05 and RT-B8-06, the artifact-digest condition, and RT-B8-13 re-review on any registry change) all match this review. Two small omissions, neither requiring a correction before merge:
+- the bounded-wait residual of RT-B8-12 (a probe held longer than about 1 s still ends a capture);
+- that the RT-B8-01 residual, a consistent rewrite of all three files, is caught only with `expected_digest` or `verify_artifact`. The "Artifact digest" row covers this implicitly.
+
+### Round-3 verdict
+
+- **No unresolved BLOCKING? YES.**
+- **MAJOR open? NO.**
+- **Open MINOR findings (carried forward):**
+  - RT-B8-05: timestamp plausibility, before live capture is authorized;
+  - RT-B8-06: memory bounds, before long real sessions are normalized;
+  - the RT-B8-12 bounded-wait residual, which is informational.
+- **Recommendation: proceed.** B08 meets the charter's Red-Team bar, subject to the conditions carried forward in the decision record. Nothing here authorizes live capture or changes any gate status.

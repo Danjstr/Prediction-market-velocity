@@ -67,7 +67,7 @@ Git records F-11, F-12, F-27, F-26, F-33, F-37, and RT-4 by title only (`docs/ga
     - **MAJOR** RT-B8-02: `dataclasses.replace` could re-issue a test `CaptureAuthorization` as production.
     - MINOR RT-B8-03 to RT-B8-11.
   - **Round 2** (`7190f7f`): RT-B8-01 and RT-B8-02 were fixed and verified, with no unresolved BLOCKING and no MAJOR finding. It raised MINOR RT-B8-12 (a reader's lock probe could end a live capture), RT-B8-13 (the real-capture protected-location check used a caller-supplied base; latent while the registry is empty), and RT-B8-14 (a crash window in quarantine).
-  - **Round 3:** RT-B8-12 to RT-B8-14 were fixed and verified. See the review file.
+  - **Round 3** (`6dc2b51`): RT-B8-12 to RT-B8-14 were fixed and verified, with no regressions. Verdict: proceed, with no unresolved BLOCKING and no MAJOR finding.
 - **Statistician** (`research/governance/b08_statistician_review.md`; development self-review): **PASS WITH CONDITIONS.**
   - No look-ahead. Availability is still the wall-clock receipt time, and every new continuity rule is conservative.
   - No effect on protected data, `T0`, the split, or the holdout.
@@ -87,6 +87,8 @@ Git records F-11, F-12, F-27, F-26, F-33, F-37, and RT-4 by title only (`docs/ga
 | B8S-06 | Parser tests for the skip list and for identifying command replies (`solicited`) | A real venue parser (after AR-1 verification) |
 | Artifact digest | Code that relies on an artifact records `artifact_digest` and loads with `expected_digest` | Experiments on v2 artifacts |
 | RT-B8-13 | Fixed: real captures always use the account's protected location. Re-review it with any registry change | Any `APPROVED_CAPTURE_ENDPOINTS` entry |
+| RT-B8-12 (residual) | Under heavy lock contention a collector may wait up to about 1 s before it gives up on a new segment and ends the session. That failure is closed. Monitoring readers should not hold segment locks | Live capture is authorized |
+| RT-B8-01 (residual) | A local writer who rewrites all three artifact files consistently is detected only through a recorded `artifact_digest` (`expected_digest`) or `verify_artifact` | Experiments on v2 artifacts |
 
 ## Open owner inputs carried forward
 
