@@ -2,12 +2,15 @@
 
 Working record for Phase 1. The authoritative requirements are START_HERE.md (Phase 1, Gate 1, Project-Wide Controls), CLAUDE.md, and PROJECT_BRIEF.md; where this file summarizes them, they win. This is not a gate record and not an owner-decision record.
 
-## Current status and next step (as of 2026-10-16, B07)
+## Current status and next step (as of 2026-10-16, B08)
 
 - **Phase:** Phase 1. No cycle, `T0`, split, or protected scope exists. No real market observation has been acquired, captured, or released to agents. The guard refuses every real request.
-- **Strategy:** late-window, high-confidence (PROJECT_BRIEF.md §3; START_HERE.md "Strategy at a Glance"). B07 did not change it.
-- **Gate status:** Gate 0 passed. Gate 1 has not been decided. **Acquisition is not authorized.**
-- **Active branch:** `b07/phase1-acquisition-pipeline-hardening` (B07; `docs/BRANCH_TIMELINE.md`). It was branched from final B06 (`c0d2a2b`) and contains everything through B06. It integrates into `main` through one pull request; merging is the owner's decision. B06 is a preserved historical checkpoint.
+- **Strategy:** late-window, high-confidence (PROJECT_BRIEF.md §3; START_HERE.md "Strategy at a Glance"). B07 and B08 did not change it.
+- **Gate status:** Gate 0 passed. Gate 1 has not been decided. **Historical acquisition is not authorized. Live capture is not authorized.**
+- **Active branch:** `b08/prospective-capture-hardening` (B08; `docs/BRANCH_TIMELINE.md`; charter `docs/decisions/2026-10-16_b08_prospective_capture_hardening.md`).
+  - B08 was branched from final B07 (`9a6b212`) and contains everything through B07.
+  - B07 was merged into `main` by PR #6 (merge commit `2a46ffd`) and is a preserved historical checkpoint.
+  - B08 integrates through one pull request, and merging is the owner's decision.
 - **Blockers before the first historical acquisition** (`docs/external_access.md` §2):
   - a per-source owner approval naming its hosts (A-1);
   - an owner licence determination from verbatim terms (A-2);
@@ -34,17 +37,17 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
   The release tool's code is deliberately **not yet written**: RT-B3-05 requires the owner's E-U1 catalog decision and a reviewed shared catalog first (`docs/release_tool_design.md`). B07 storage never releases anything (A-8).
 - **Recommended next steps:**
   - **Owner:**
-    1. open (the sandbox cannot), review, and merge the single B07 pull request with a normal merge commit;
+    1. select the first historical source, and supply its terms (AR-3), so that A-1 and A-2 can be prepared (the post-B07 audit found no further source-neutral acquisition engineering worth doing before this);
     2. decide whether to approve the reader dependencies listed in decision record B7-6 (Parquet, DBN, zstd), or to defer those formats;
     3. approve a raw-data backup policy (A-3) and confirm or replace the "size class" reading (B7-7);
     4. pursue the licence terms for the first candidate source (Kalshi official historical data; AR-3);
     5. decide E-U1 (equivalence-catalog expansion), the first step before the H-2 release tool;
     6. prepare the pre-T0 checklist decisions P-1 to P-4 (START_HERE.md);
     7. optionally decide B6S-14 (independent statistical audit of the release rules before the first release; not adopted).
-  - **Agents** (no network, synthetic data only, from the active branch, in a later batch chartered by the owner):
-    - the production transport design and its review (B7-4);
-    - after owner approval, the Parquet, DBN, and zstd readers inside the G-1 worker;
-    - raw-format v2 and collector hardening (F-11, F-12, F-33, F-37).
+  - **Agents** (no network, synthetic data only, from the active branch, in a batch chartered by the owner):
+    - B08, in progress: raw-format v2 and collector hardening (F-11, F-12/F-27, F-33, F-37/RT-4), order-book continuity after rejected frames, and normalized capture artifacts;
+    - after source selection: the production transport design and its review (B7-4), and any source-specific acquisition support;
+    - after owner approval: the Parquet, DBN, and zstd readers inside the G-1 worker.
 
 ## Owner direction for Phase 1 (batch charter, 2026-10-15)
 
