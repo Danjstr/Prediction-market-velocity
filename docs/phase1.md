@@ -8,16 +8,14 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
 - **Strategy:** late-window, high-confidence (PROJECT_BRIEF.md §3; START_HERE.md "Strategy at a Glance").
 - **Gate status:** Gate 0 passed. Gate 1 has not been decided.
 - **Active branch:** `b06/governance-continuity-sync` (B06; `docs/BRANCH_TIMELINE.md`). It contains batch 4 (B05, `a1752b4`), the B06 governance continuity sync (`docs/decisions/2026-10-16_b06_governance_continuity_sync.md`), and the B06 acquisition-readiness tooling (`docs/acquisition_readiness.md`). It integrates into `main` through one pull request; merging is the owner's decision.
-- **Owner actions pending outside agent sessions** (`docs/owner_actions/README.md`):
-  1. apply the F-09 host-class settings patch. This is a priority blocker for any historical acquisition;
-  2. apply the agent-file split-wording patch.
+- **Owner patches applied** (`docs/owner_actions/README.md`): the F-09 host-class settings patch and the agent-file split-wording patch were applied and committed on B06 in `8517fc2`, and the F-09 behavioral check passed on 2026-10-16. This does not change any gate status or authorize acquisition.
 - **Blockers before the first historical acquisition** (`docs/external_access.md` §2):
   - a per-source owner approval naming its hosts (A-1);
   - an owner licence determination from verbatim terms (A-2);
   - the raw backup policy and a restore test on the real backup medium (A-3);
   - a reviewed safe-parsing acquisition tool with passing fault-injection fixtures (A-4);
   - provenance and source-quality entries (A-5, A-6);
-  - committed F-09 denies.
+  - committed F-09 denies (done: `8517fc2`, behavioral check passed 2026-10-16).
 - **A-4 status (B06):** the source-neutral building blocks and every named fault-injection fixture exist, tested on synthetic data only. The Reliability / Red-Team review and its re-verification are in `research/governance/b06_acquisition_tooling_red_team_review.md`. **A-4 is not satisfied.** Still missing:
   - parser process isolation with resource limits;
   - pinned, reviewed Parquet and DBN readers;
@@ -27,13 +25,13 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
 - **Recommended next steps:**
   - **Owner:**
     1. open (the sandbox cannot), review, and merge the single B06 pull request;
-    2. apply the F-09 settings patch and the agent-file patch on the active branch;
-    3. approve a raw-data backup policy (A-3);
-    4. pursue the licence terms for the first candidate source (Kalshi official historical data; AR-3);
-    5. decide E-U1 (equivalence-catalog expansion), the first step before the H-2 release tool (`docs/release_tool_design.md`);
-    6. prepare the pre-T0 checklist decisions P-1 to P-4 (START_HERE.md).
+    2. approve a raw-data backup policy (A-3);
+    3. pursue the licence terms for the first candidate source (Kalshi official historical data; AR-3);
+    4. decide E-U1 (equivalence-catalog expansion), the first step before the H-2 release tool (`docs/release_tool_design.md`);
+    5. prepare the pre-T0 checklist decisions P-1 to P-4 (START_HERE.md).
+    (Done: the F-09 settings patch and the agent-file patch, `8517fc2`.)
   - **Agents (no network, synthetic data only, from the active branch):** close the remaining A-4 gaps (parser process isolation, pinned readers, fetcher design with redirect re-checks, the pipeline into the protected raw store), then request a fresh Red-Team review. The release tool waits for the owner's E-U1 decision (`docs/release_tool_design.md`).
-  - F-09 is required before any acquisition, collection, or post-`T0 − m` web research. It does not gate no-network tooling work.
+  - F-09 is required before any acquisition, collection, or post-`T0 − m` web research. It is now committed and behaviorally validated, but it is only one of the acquisition prerequisites above; acquisition is still not authorized. It does not gate no-network tooling work.
 
 ## Owner direction for Phase 1 (batch charter, 2026-10-15)
 

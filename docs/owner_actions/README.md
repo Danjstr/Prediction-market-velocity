@@ -11,6 +11,8 @@ Agent sessions cannot write `.claude/agents/` or `.claude/settings.json`. Both a
 
 Both patches were generated against commit `a1752b4`. On 2026-10-16 both were re-checked on B06 (`b06/governance-continuity-sync`): each passes `git apply --check`; the agents patch leaves no stale split term; and the settings patch yields valid JSON. If either target file changes later, `git apply --check` fails, and the patch must be regenerated, not forced.
 
+**Status (2026-10-16): both patches applied.** The owner applied and committed both on B06 in `8517fc2`; `git apply --reverse --check` passes for each. Validation in a new session started at `8517fc2`: no stale split term in `.claude/agents/`; `.claude/settings.json` is valid JSON; `check-config` reports "protected-information settings verified"; `./scripts/check.sh` passes; and the §2 behavioral check passed (all four synthetic `example.com` hosts were refused by a WebFetch deny rule, not by a DNS or connection error, and the `code.claude.com` positive control loaded). The refusal message names the denied domain, not the matched pattern. The procedures below are kept as the record of how the patches were applied and validated. Applying them satisfies only the F-09 part of G-7: A-4 is still not satisfied, and acquisition is still not authorized (`docs/acquisition_readiness.md`).
+
 **Where to apply.** Apply on the current active ground-truth branch (`docs/BRANCH_TIMELINE.md`), not on `main` or an older branch, so the change joins that branch's pull request.
 
 ## 1. Agent-file split wording

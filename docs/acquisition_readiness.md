@@ -59,7 +59,7 @@ From the Red-Team review (G-1 to G-7):
 2. **Pinned readers (G-2, G-3, G-5).** Parquet and DBN content is only signature-checked today. Reading it needs pinned, patched, hash-locked, individually reviewed reader dependencies that never resolve remote paths. Compressed single files (`.csv.gz`, `.dbn.zst`) have no supported path yet.
 3. **Fetcher (G-4).** No network fetcher exists. It needs per-redirect re-checks against the allowlist, no cross-host redirects, a download size cap, and a free-disk check at intake.
 4. **End-to-end pipeline (G-6).** Fetch, quarantine, verify, and write to the protected raw store (A-7), by a tool running outside agent sessions. Receipts are now persisted (`receipts.py`); the orchestrator and the cross-check of cited decision files in Git are still missing.
-5. **Owner inputs (G-7).** These are the backup policy and a restore test on the real backup medium (A-3), committed F-09 denies, and the per-source records (A-1, A-2, A-5, A-6).
+5. **Owner inputs (G-7).** These are the backup policy and a restore test on the real backup medium (A-3), committed F-09 denies, and the per-source records (A-1, A-2, A-5, A-6). Status 2026-10-16: the F-09 denies are committed (`8517fc2`) and passed the behavioral check (`docs/owner_actions/README.md`). The A-3 and per-source items are still open, so G-7 is not complete.
 6. **Provider checksums.** Where a provider publishes checksums, the manifest hash must come from them. Otherwise the receipt hash only proves that the bytes did not change after intake.
 
 ## Agent release (H-2) is separate
