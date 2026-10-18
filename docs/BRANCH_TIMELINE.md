@@ -10,9 +10,9 @@ Old branches keep their original names. Their B-numbers are assigned here only; 
 
 - **Designation:** the owner's B09 batch charter of 2026-10-16 (`docs/decisions/2026-10-16_b09_kalshi_source_qualification.md`, "Designation").
 - **Parent:** B08 `b08/prospective-capture-hardening`, at its final commit `5806d8c83afc6c1788db438394c7a0b978b16350`. B09 was branched directly from that commit, not from `main`, even though `main` already contained B08 through merge commit `a6b5411` (PR #7).
-- **Purpose:** Kalshi official historical data source qualification and the owner-decision packet for A-1 to A-6. Documentation and design only:
+- **Purpose:** Kalshi official historical data source qualification and the owner-decision packet for A-1 to A-6; then, under the owner's 2026-10-18 direction, the master data-source inventory and the cloud-native architecture review (`docs/decisions/2026-10-18_b09_cloud_native_data_strategy.md`). Documentation and design only:
   - no market data;
-  - no Kalshi host contacted;
+  - no Kalshi data or API host contacted (one HEAD reachability probe of `docs.kalshi.com` on 2026-10-18, headers only; decision record §5.3);
   - no credential;
   - no code change.
 - **Head:** the pushed tip of `origin/b09/kalshi-source-qualification`. A commit cannot contain its own hash, so the "Last recorded" head below is the newest commit recorded at the last timeline update. Verify the tip with `git ls-remote origin refs/heads/b09/kalshi-source-qualification`.
@@ -96,7 +96,8 @@ Listed oldest first, and appended at each timeline update.
 | Commit | Content |
 |---|---|
 | `703fd7f` | B09 charter record, source-qualification analysis, owner-decision packet, and status updates (the Red-Team review subject) |
-| (the commit adding this row) | Red-Team review recorded (no BLOCKING; MAJOR RT-B9-01 and RT-B9-02), its fixes in the documents, D-B09-9 added. Its hash is the branch tip; see `git ls-remote` |
+| `f78d7e2` | Red-Team review recorded (no BLOCKING; MAJOR RT-B9-01 and RT-B9-02), its fixes in the documents, D-B09-9 added |
+| (the commit adding this row) | Owner cloud-native direction (2026-10-18): master data-source inventory, canonical cloud architecture review and cost model, advisory reviews with dispositions, exposure rows X-4 to X-6, decision record with D-B09-10 to D-B09-22. Documentation only. Its hash is the branch tip; see `git ls-remote` |
 
 ## Ancestry verification for B09 (2026-10-16)
 

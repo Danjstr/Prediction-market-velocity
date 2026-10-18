@@ -744,3 +744,74 @@ Status: research record, not an approved requirement. Entries are in research/so
 - Used for: F-5 macro release-time calendar
 - Source type: official documentation
 - Verification status: page reachable
+
+## B09 cloud and source-inventory review (2026-10-18)
+
+Research for `research/data_sources/master_source_inventory.md` and `research/cloud/`. Owner authorization: `docs/decisions/2026-10-18_b09_cloud_native_data_strategy.md` §2. Pages listed as "fetched" were read through WebFetch or curl. Their facts were summarized by the fetch tool, with no verbatim quote or raw-byte hash recorded, so they are SECONDARY under O-8 until re-captured. All other facts in the B09 documents come from web-search summaries (SECONDARY) and are not listed one by one; each document marks them.
+
+### Databento blog: understanding exchange fees
+- URL: https://databento.com/blog/understanding-exchange-fees
+- Retrieved: 2026-10-18
+- Used for: historical-data licence statement (G-1 to G-3, B-9)
+- Source type: official vendor documentation
+- Verification status: fetched (tool summary)
+
+### Databento blog: updates to subscription pricing; introducing new CME pricing plans
+- URL: https://databento.com/blog/updates-to-subscription-pricing ; https://databento.com/blog/introducing-new-cme-pricing-plans
+- Retrieved: 2026-10-18
+- Used for: plan prices (G-1 to G-3, B-9)
+- Source type: official vendor documentation
+- Verification status: fetched (tool summary)
+
+### Databento terms, legal, and docs pages
+- URL: https://databento.com/terms (404); https://databento.com/legal (JavaScript shell); https://databento.com/docs/venues-and-datasets/glbx-mdp3 (JavaScript shell); https://databento.com/robots.txt (disallows /portal only)
+- Retrieved: 2026-10-18
+- Used for: terms-first check (terms event TE-G1)
+- Source type: official vendor pages
+- Verification status: terms not readable; `legal.databento.com` refused by the proxy
+
+### Kraken developer guide: historical data
+- URL: https://docs.kraken.com/exchange/guides/general/historical-data
+- Retrieved: 2026-10-18
+- Used for: B-1, B-2 (incl. the "no bulk historical data dump" statement that conflicts with the support articles)
+- Source type: official documentation
+- Verification status: fetched (tool summary)
+
+### Coinbase Exchange API documentation
+- URL: https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-trades ; https://docs.cdp.coinbase.com/exchange/introduction/welcome ; https://docs.cdp.coinbase.com/exchange/introduction/rate-limits-overview.md
+- Retrieved: 2026-10-18
+- Used for: B-5, B-7 (incl. the statement that Market Data API use binds the user to the Market Data Terms of Use)
+- Source type: official documentation
+- Verification status: fetched (tool summary)
+
+### CME Group DataMine Python client repository
+- URL: https://github.com/CMEGroupPublic/datamine_python
+- Retrieved: 2026-10-18
+- Used for: DataMine dataset tags (B-10, G-5)
+- Source type: official repository page
+- Verification status: fetched (tool summary)
+
+### blockchain-etl polygon-etl and public-datasets repositories
+- URL: https://github.com/blockchain-etl/polygon-etl ; https://github.com/blockchain-etl/public-datasets
+- Retrieved: 2026-10-18
+- Used for: PM-15 (legacy BigQuery Polygon dataset frozen since 2024-09-01; conflicting README)
+- Source type: official project repository pages
+- Verification status: fetched (tool summary)
+
+### google-github-actions/auth repository README
+- URL: https://github.com/google-github-actions/auth
+- Retrieved: 2026-10-18
+- Used for: Workload Identity Federation attribute-condition guidance (architecture review §14)
+- Source type: official project repository page
+- Verification status: fetched (tool summary)
+
+### robots.txt and terms checks (no content used)
+- URL: docs.databento.com, docs.kraken.com, docs.cdp.coinbase.com, docs.gemini.com, www.bitstamp.net robots.txt; https://www.bitstamp.net/terms-of-use/ (JavaScript, empty)
+- Retrieved: 2026-10-18
+- Used for: terms-first checks
+- Source type: official pages
+- Verification status: Bitstamp robots.txt disallows `/api/` subpaths, which were therefore not fetched
+
+### Secondary-only sources of record (search summaries, not fetched)
+- Kalshi Data Terms of Use PDF, locator `kalshi-public-docs.s3.amazonaws.com/kalshi-data-terms-of-service.pdf` (cloud-bucket host; not fetched). Owner copy requested (INV-1).
+- Coinbase Market Data Terms (`coinbase.com/legal/market_data`, refused host); Kraken API commercial-use notice; CME DS-45 (June 2026); Tardis.dev Licence Agreement cl. 9.4 and 9.5; Polymarket institutional data-licensing statement; Polymarket US rulebook (2026-08-05); Pyth Pro plans and the 2026-08-26 API-key requirement; Google Cloud, AWS, and Azure pricing and product limits (cost model §1).

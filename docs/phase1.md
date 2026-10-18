@@ -2,7 +2,15 @@
 
 Working record for Phase 1. The authoritative requirements are START_HERE.md (Phase 1, Gate 1, Project-Wide Controls), CLAUDE.md, and PROJECT_BRIEF.md; where this file summarizes them, they win. This is not a gate record and not an owner-decision record.
 
-## Current status and next step (as of 2026-10-16, B09)
+## Current status and next step (as of 2026-10-18, B09)
+
+**B09 continued, 2026-10-18 (cloud-native direction).** The owner made PMV explicitly cloud-native: the Chromebook is a control and development terminal only, never the primary or intermediate store for bulk data and never a bulk-data relay. Within B09 the owner ordered a master data-source inventory and a review of the proposed GCP architecture before any acquisition. Record: `docs/decisions/2026-10-18_b09_cloud_native_data_strategy.md`. Results:
+- inventory: `research/data_sources/master_source_inventory.md`. Licensing is the dominant blocker. No market-data source is AVAILABLE_NOW. Every Kalshi surface PMV would use is NEEDS_LICENCE_CLARIFICATION;
+- architecture (advisory): GCP ARCHITECTURE APPROVED WITH CHANGES; KEEP GCP (`research/cloud/pmv_cloud_architecture_review.md`). Staged security, Stage A for historical development and Stage B before `T0 − m`. GCP Batch as the training backend. B07/B08 stores on cloud disks with a sealed-object uploader (direction approved, implementation not);
+- costs: `research/cloud/pmv_cloud_cost_model.md`;
+- owner decisions D-B09-10 to D-B09-22 are pending, alongside D-B09-1 to D-B09-9;
+- the approved local raw-store rule (Step 11 F-01, `~/pmv-protected/raw`) remains in force until D-B09-10 and the matching governance edits. Nothing is provisioned, acquired, or authorized.
+
 
 - **Phase:** Phase 1. No cycle, `T0`, split, or protected scope exists. No real market observation has been acquired, captured, or released to agents. The guard refuses every real request.
 - **Strategy:** late-window, high-confidence (PROJECT_BRIEF.md §3; START_HERE.md "Strategy at a Glance"). B07 and B08 did not change it.
@@ -39,7 +47,7 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
   The release tool's code is deliberately **not yet written**: RT-B3-05 requires the owner's E-U1 catalog decision and a reviewed shared catalog first (`docs/release_tool_design.md`). B07 storage never releases anything (A-8).
 - **Recommended next steps:**
   - **Owner:**
-    0. B09: decide D-B09-1 to D-B09-9 (`docs/decisions/2026-10-16_b09_kalshi_source_qualification.md`, "Owner-decision packet"), including supplying the AR-3 documents listed there. B08 is merged (PR #7, `a6b5411`);
+    0. B09: decide D-B09-1 to D-B09-9 (`docs/decisions/2026-10-16_b09_kalshi_source_qualification.md`, "Owner-decision packet"), including supplying the AR-3 documents listed there, and D-B09-10 to D-B09-22 (`docs/decisions/2026-10-18_b09_cloud_native_data_strategy.md` §7: cloud successor to F-01, credential rule, Stage A/B isolation, cloud backup policy, architecture adoption, first cloud batch, kill and spend gates, licence letters). B08 is merged (PR #7, `a6b5411`);
     1. select the first historical source, and supply its terms (AR-3), so that A-1 and A-2 can be prepared (the post-B07 audit found no further source-neutral acquisition engineering worth doing before this);
     2. decide whether to approve the reader dependencies listed in decision record B7-6 (Parquet, DBN, zstd), or to defer those formats;
     3. approve a raw-data backup policy (A-3) and confirm or replace the "size class" reading (B7-7);
@@ -49,7 +57,7 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
     7. optionally decide B6S-14 (independent statistical audit of the release rules before the first release; not adopted).
   - **Agents** (no network, synthetic data only, from the active branch, in a batch chartered by the owner):
     - B08 (done; merged by PR #7): raw frame format v3 and collector hardening (F-11, F-12/F-27, F-33, F-37/RT-4), order-book continuity after rejected frames, and normalized capture artifacts;
-    - B09 (in progress; stopped at the owner-decision boundary): Kalshi source qualification, documentation only;
+    - B09 (in progress; stopped at the owner-decision boundary): Kalshi source qualification, the master data-source inventory, and the cloud architecture review, documentation only;
     - before live capture is authorized: timestamp plausibility and clock-sync state (RT-B8-05, B8S-03);
     - before real segmented-capture data is used for research: the exclusion ledger (B8S-01), trading status after a reset (B8S-02), and an end marker for sessions that are not `complete` (B8S-04);
     - before long real sessions are normalized: memory bounds (RT-B8-06);
