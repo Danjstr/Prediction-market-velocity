@@ -2,15 +2,26 @@
 
 Working record for Phase 1. The authoritative requirements are START_HERE.md (Phase 1, Gate 1, Project-Wide Controls), CLAUDE.md, and PROJECT_BRIEF.md; where this file summarizes them, they win. This is not a gate record and not an owner-decision record.
 
-## Current status and next step (as of 2026-10-16, B08)
+## Current status and next step (as of 2026-10-18, B09)
+
+**B09 continued, 2026-10-18 (cloud-native direction).** The owner made PMV explicitly cloud-native: the Chromebook is a control and development terminal only, never the primary or intermediate store for bulk data and never a bulk-data relay. Within B09 the owner ordered a master data-source inventory and a review of the proposed GCP architecture before any acquisition. Record: `docs/decisions/2026-10-18_b09_cloud_native_data_strategy.md`. Results:
+- inventory: `research/data_sources/master_source_inventory.md`. Licensing is the dominant blocker. No market-data source is AVAILABLE_NOW. Every Kalshi surface PMV would use is NEEDS_LICENCE_CLARIFICATION;
+- architecture (advisory): GCP ARCHITECTURE APPROVED WITH CHANGES; KEEP GCP (`research/cloud/pmv_cloud_architecture_review.md`). Staged security, Stage A for historical development and Stage B before `T0 − m`. GCP Batch as the training backend. B07/B08 stores on cloud disks with a sealed-object uploader (direction approved, implementation not);
+- costs: `research/cloud/pmv_cloud_cost_model.md`;
+- owner decisions D-B09-10 to D-B09-22 are pending, alongside D-B09-1 to D-B09-9;
+- the approved local raw-store rule (Step 11 F-01, `~/pmv-protected/raw`) remains in force until D-B09-10 and the matching governance edits. Nothing is provisioned, acquired, or authorized.
+- procurement: `research/data_sources/owner_source_action_sheet.md`, synchronized with owner-verified facts on 2026-10-18. Next: owner outreach M1 (Kalshi), M2 (Kraken), M3 (Databento), M4 (CF Benchmarks quote), M5 (Polymarket, if needed). The minimum viable dataset (Kalshi history, Kraken archive, Databento GC/MGC) targets about $0–$160 in market data, subject to permissions and the Databento estimator. No purchase, acquisition, `T0`, or holdout exists.
+
 
 - **Phase:** Phase 1. No cycle, `T0`, split, or protected scope exists. No real market observation has been acquired, captured, or released to agents. The guard refuses every real request.
 - **Strategy:** late-window, high-confidence (PROJECT_BRIEF.md §3; START_HERE.md "Strategy at a Glance"). B07 and B08 did not change it.
 - **Gate status:** Gate 0 passed. Gate 1 has not been decided. **Historical acquisition is not authorized. Live capture is not authorized.**
-- **Active branch:** `b08/prospective-capture-hardening` (B08; `docs/BRANCH_TIMELINE.md`; charter `docs/decisions/2026-10-16_b08_prospective_capture_hardening.md`).
-  - B08 was branched from final B07 (`9a6b212`) and contains everything through B07.
-  - B07 was merged into `main` by PR #6 (merge commit `2a46ffd`) and is a preserved historical checkpoint.
-  - B08 integrates through one pull request, and merging is the owner's decision.
+- **Active branch:** `b09/kalshi-source-qualification` (B09; `docs/BRANCH_TIMELINE.md`; record `docs/decisions/2026-10-16_b09_kalshi_source_qualification.md`).
+  - B09 was branched directly from final B08 (`5806d8c`), not from `main`, and contains everything through B08.
+  - B08 was merged into `main` by PR #7 (merge commit `a6b5411`) and is a preserved historical checkpoint. B07 was merged by PR #6 (`2a46ffd`).
+  - **B09 is source qualification only:** Kalshi official historical data as a candidate first source, and the owner-decision packet for A-1 to A-6. It acquires no data, contacts no Kalshi host, and changes no code. Its provisional verdict is NOT CURRENTLY QUALIFIABLE — EVIDENCE MISSING (the AR-3 terms, AR-B9-1 re-verification, gold existence, and retention depth).
+  - A-1 to A-6 remain owner-controlled and unresolved. The owner's decisions D-B09-1 to D-B09-9 are pending.
+  - B09 integrates through one pull request, opened after the owner's decisions are recorded. Merging is the owner's decision.
 - **Blockers before the first historical acquisition** (`docs/external_access.md` §2):
   - a per-source owner approval naming its hosts (A-1);
   - an owner licence determination from verbatim terms (A-2);
@@ -37,7 +48,7 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
   The release tool's code is deliberately **not yet written**: RT-B3-05 requires the owner's E-U1 catalog decision and a reviewed shared catalog first (`docs/release_tool_design.md`). B07 storage never releases anything (A-8).
 - **Recommended next steps:**
   - **Owner:**
-    0. B08: the interpretations B8-1 to B8-7 were decided on 2026-10-16 (decision record, "Owner decisions"). What remains is the single B08 → `main` pull request: the owner opens it (the sandbox cannot; the session supplies its title and body) and merges it with a normal merge commit, if approved;
+    0. B09: decide D-B09-1 to D-B09-9 (`docs/decisions/2026-10-16_b09_kalshi_source_qualification.md`, "Owner-decision packet"), including supplying the AR-3 documents listed there, and D-B09-10 to D-B09-22 (`docs/decisions/2026-10-18_b09_cloud_native_data_strategy.md` §7: cloud successor to F-01, credential rule, Stage A/B isolation, cloud backup policy, architecture adoption, first cloud batch, kill and spend gates, licence letters). B08 is merged (PR #7, `a6b5411`);
     1. select the first historical source, and supply its terms (AR-3), so that A-1 and A-2 can be prepared (the post-B07 audit found no further source-neutral acquisition engineering worth doing before this);
     2. decide whether to approve the reader dependencies listed in decision record B7-6 (Parquet, DBN, zstd), or to defer those formats;
     3. approve a raw-data backup policy (A-3) and confirm or replace the "size class" reading (B7-7);
@@ -46,11 +57,12 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
     6. prepare the pre-T0 checklist decisions P-1 to P-4 (START_HERE.md);
     7. optionally decide B6S-14 (independent statistical audit of the release rules before the first release; not adopted).
   - **Agents** (no network, synthetic data only, from the active branch, in a batch chartered by the owner):
-    - B08 (done; owner decisions on B8-1 to B8-7 recorded; pull request pending): raw frame format v3 and collector hardening (F-11, F-12/F-27, F-33, F-37/RT-4), order-book continuity after rejected frames, and normalized capture artifacts;
+    - B08 (done; merged by PR #7): raw frame format v3 and collector hardening (F-11, F-12/F-27, F-33, F-37/RT-4), order-book continuity after rejected frames, and normalized capture artifacts;
+    - B09 (in progress; stopped at the owner-decision boundary): Kalshi source qualification, the master data-source inventory, and the cloud architecture review, documentation only;
     - before live capture is authorized: timestamp plausibility and clock-sync state (RT-B8-05, B8S-03);
     - before real segmented-capture data is used for research: the exclusion ledger (B8S-01), trading status after a reset (B8S-02), and an end marker for sessions that are not `complete` (B8S-04);
     - before long real sessions are normalized: memory bounds (RT-B8-06);
-    - after source selection: the production transport design and its review (B7-4), and any source-specific acquisition support;
+    - after source selection: the production transport design and its review (B7-4), and any source-specific acquisition support (for Kalshi, the paginated REST design S1–S21 in `research/kalshi/b09_source_qualification.md` §4, if the owner approves D-B09-7);
     - after owner approval: the Parquet, DBN, and zstd readers inside the G-1 worker.
 
 ## Owner direction for Phase 1 (batch charter, 2026-10-15)
@@ -235,6 +247,16 @@ This was documentation research and design only. No credential was used, no mark
   2. Allowlist `help.kalshi.com` (read-only, documentation only). This is a new domain and needs owner approval.
   3. Contract-terms documents may be hosted on a domain named only in a `GET /series/{ticker}` response (`contract_terms_url`). Learning that URL requires a market-data API call, which is not authorized. Under option 1 the owner can follow the links from the kalshi.com market rules page instead.
 - **Excluded.** API hosts, market pages showing live prices, account login, and any attempt to bypass the challenge.
+
+**Status after B09 (2026-10-16):** still open. B09 lists the exact documents the owner is asked to supply (`docs/decisions/2026-10-16_b09_kalshi_source_qualification.md`, "AR-3: documents the owner must supply"). No web copy was substituted for them.
+
+### AR-B9-1: one-time re-verification of Kalshi API documentation (B09; owner decision D-B09-8)
+
+- **Host and paths:** `docs.kalshi.com`, an exact list of 18 paths covering the historical-tier, pagination, rate-limit, series, and events pages, `llms.txt`, and the two spec files (`research/kalshi/b09_source_qualification.md` §1.2).
+- **Class:** `docs`.
+- **Purpose:** re-verify the 2026-10-15 snapshot facts that A-1 and the paginated REST design rely on.
+- **Why it is not covered today:** AR-1 was approved as temporary, for the batch 2 work, and its expiry was never recorded (E-7). §1.1 rule 3 of `docs/external_access.md` also requires the licensor's terms first, and they are not yet owner-supplied (AR-3).
+- **Status:** not approved; no request made.
 
 ### AR-4 to AR-16: batch 3 documentation access requests
 

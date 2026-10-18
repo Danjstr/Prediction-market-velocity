@@ -24,8 +24,13 @@ Opening a page whose subject is data or statistics of a protected observable fam
 | X-1 | 2026-10-16 | Two batch 3 research agents (prediction-market and open-data inventories) | HF dataset card `DegenHedge/kalshi-btc-15m` README (`research/sources.md`, batch 3) | BTC: KXBTC15M outcomes, and through them the BTC path | 2026-01-10 to 2026-10-04 | Aggregate: win rate against entry price, strike and price ranges, window anomalies |
 | X-2 | 2026-10-16 | Batch 3 research agents | Web search summaries and paper abstracts | BTC and BTC prediction markets; gold price levels | Up to 2026-10-16 | Aggregate claims and coarse recent levels |
 | X-3 | 2026-10-16 | Underlying-data research agent | `www.cfbenchmarks.com` BRTI page | BTC reference index | 2026-10-16 (one live value) | Point |
+| X-4 | 2026-10-18 | B09 prediction-market research agent | Web-search summaries for a KXGOLD15M settlement query (third-party news snippets) | Gold: Kalshi gold contracts, and through one example window the gold reference (Pyth GOLD) | Aggregate: September 2026. Point: one window around August 2026 (date not stated) | Monthly aggregate volume and fees; one window reference value |
+| X-5 | 2026-10-18 | B09 prediction-market research agent | Web-search summaries (vendor and news snippets on Polymarket datasets) | BTC prediction markets (Polymarket, including BTC up/down) | Undated; treated as up to 2026-10-18 | Aggregate row counts and volume totals |
+| X-6 | 2026-10-18 | B09 gold research agent | Web-search summary of a Pyth gold-index methodology query, citing the Pyth Terminal | Gold reference (`Metal.Index.GOLD/USD`, `Metal.Index.1OZGOLD/USD`) | One undated snapshot, after 2026-06; treated as 2026-10-18 | Point |
 
 The latest end per family is derived from the rows when a cycle is registered, and is stated in its `cycle_registered` event; it is not maintained by editing. As of row X-3: BTC 2026-10-16; gold 2026-10-16. Later summaries are appended as new lines that name the last row they cover.
+
+As of row X-6: BTC 2026-10-18; gold 2026-10-18. No value from rows X-4 to X-6 was recorded in any PMV file; the research agents reported the events without values (`docs/decisions/2026-10-18_b09_cloud_native_data_strategy.md` §5.2).
 
 ## Part B: development-model training cutoffs (H-8)
 
