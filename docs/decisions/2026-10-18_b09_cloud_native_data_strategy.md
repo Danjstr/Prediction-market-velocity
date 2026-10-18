@@ -276,3 +276,35 @@ New findings recorded there:
 - **Recommendation:** drop Coinbase and CME DataMine for now.
 
 Research agents ran as `claude-opus-5-5`. They made no new exposures, and every refused host was left untried.
+
+## 11. Documentation sync and current B09 state (2026-10-18)
+
+The owner directed a documentation-only synchronization of the procurement conclusions, incorporating facts the owner verified on official pages. The changes are in `research/data_sources/owner_source_action_sheet.md`, `master_source_inventory.md`, and `research/sources.md` ("B09 documentation sync"):
+- Kalshi Developer Agreement and website Data Terms kept distinct;
+- Kraken archive facts;
+- Databento pricing, with the credit coverage unconfirmed until the estimator is run;
+- CF Benchmarks quote route;
+- Pyth budgeting assumption;
+- Tardis variable pricing;
+- Coinbase ML prohibition and DROP;
+- CME DataMine "do not buy";
+- final procurement tiers;
+- outreach queue M1 to M5.
+
+**Owner has approved:** documentation synchronization only.
+
+**Owner has not yet approved:**
+- vendor purchases;
+- licence acceptance;
+- data acquisition;
+- live capture;
+- cloud provisioning;
+- any of the pending decisions D-B09-1 to D-B09-22.
+
+**Current state:**
+- cloud architecture research is complete;
+- source procurement research is complete, and the procurement packet exists;
+- no bulk market data has been acquired, no vendor purchase made, and no cloud resource provisioned;
+- no `T0` exists, and no protected holdout has been opened.
+
+**Next external dependencies:** vendor permission and licensing (M1 Kalshi, M2 Kraken, M3 Databento, M4 CF Benchmarks quote, M5 Polymarket if needed), plus the owner's cloud decisions.

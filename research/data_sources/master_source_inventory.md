@@ -4,6 +4,17 @@
 
 Every status below is a research classification. No source may be acquired, captured, or ingested until the A-1 to A-8 acquisition gate passes for that source (`docs/external_access.md` §2). Nothing acquired becomes agent-visible before H-2 release (`docs/release_tool_design.md`).
 
+**Owner-verified updates (documentation sync, 2026-10-18).** The owner checked official pages and reported these facts. They are recorded as the owner's statements (OWNER-VERIFIED); A-2 still needs verbatim quotes and hashes:
+- **Kalshi Developer Agreement** (<https://kalshi-public-docs.s3.amazonaws.com/Kalshi-Developer-Agreement.pdf>) limits API use, and storage of API data, to facilitating the member's own trading. It does not by itself prohibit ML or backtesting. Kalshi surfaces stay NEEDS_LICENCE_CLARIFICATION, owner-facing NEEDS_WRITTEN_PERMISSION.
+- **Kalshi website Data Terms** (<https://kalshi-public-docs.s3.amazonaws.com/kalshi-data-terms-of-service.pdf>) remain legally distinct from API data.
+- **Kraken:** complete downloadable trade archive with quarterly updates, OHLCVT archive, live public REST/WebSocket; technically $0.
+- **Databento:** $125 credit, historical from about $0.50/GB, Standard about $199/month, CME/CBOT/NYMEX/COMEX supported. Coverage of PMV's exact pull by the credit is unconfirmed until the owner runs the estimator.
+- **CF Benchmarks BRTI:** quote required (contact <https://www.cfbenchmarks.com/about/contact>).
+- **Pyth:** budget about $2,500/month (<https://app.pyth.com/plans>); the $99 package is unverified.
+- **Tardis:** price varies by exchange, dataset, history, and billing period.
+- **Coinbase:** ordinary Market Data Terms prohibit ML training and validation without written consent; DROP for now.
+- **CME DataMine:** do not buy; Databento preferred.
+
 **Owner-facing procurement packet:** `research/data_sources/owner_source_action_sheet.md` (2026-10-18). It holds the core matrix, prices, contacts, procurement tiers, and ready-to-send permission requests. Where it and this inventory differ on a price or contact, the action sheet is newer.
 
 **Detailed records** (every field the owner required):

@@ -837,3 +837,63 @@ For `research/data_sources/owner_source_action_sheet.md`. Pages were fetched thr
 ### Secondary-only sources of record (procurement pass)
 - Kalshi Developer Agreement v1.1 §3/§3.1 (`https://kalshi.com/developer-agreement`; PDF on a cloud-bucket host, not fetched).
 - CME DataMine, fee list, licensing FAQ, and DS-45 (cmegroup.com refused); Tardis pricing and billing FAQ; Pyth pricing and the $99 Polymarket package; CF Benchmarks contacts; Coinbase Market Data Terms §3 and Data Marketplace; Polymarket institutional and Institute statements; Polymarket US rulebook and terms; CoinAPI, Marketlens, Chainlink, Bitquery, Goldsky, Oddpool, OANDA pricing.
+
+## B09 documentation sync: owner-verified sources (2026-10-18)
+
+The owner checked these official pages and reported their content. They are recorded as owner statements. No verbatim quote or hash is in Git, so A-2 determinations still need captured text.
+
+### Kalshi Developer Agreement (PDF)
+- URL: https://kalshi-public-docs.s3.amazonaws.com/Kalshi-Developer-Agreement.pdf
+- Retrieved: 2026-10-18 (owner)
+- Used for: API use and storage limited to facilitating the member's own trading
+- Source type: official legal document
+- Verification status: owner-verified (no hash in Git)
+
+### Kalshi website Data Terms (PDF)
+- URL: https://kalshi-public-docs.s3.amazonaws.com/kalshi-data-terms-of-service.pdf
+- Retrieved: 2026-10-18 (owner)
+- Used for: website data kept distinct from API data
+- Source type: official legal document
+- Verification status: owner-verified (no hash in Git)
+
+### Kraken downloadable historical market data
+- URL: https://support.kraken.com/articles/360047543791-downloadable-historical-market-data-time-and-sales-
+- Retrieved: 2026-10-18 (owner)
+- Used for: full trade archive, quarterly updates, OHLCVT availability
+- Source type: official support documentation
+- Verification status: owner-verified
+
+### Databento pricing
+- URL: https://databento.com/pricing
+- Retrieved: 2026-10-18 (owner; also agent-fetched)
+- Used for: $125 credit, about $0.50/GB historical, Standard about $199/month, CME venues and schemas
+- Source type: official pricing page
+- Verification status: owner-verified
+
+### CF Benchmarks BRTI and contact
+- URL: https://www.cfbenchmarks.com/data/indices/BRTI ; https://www.cfbenchmarks.com/about/contact
+- Retrieved: 2026-10-18 (owner)
+- Used for: BRTI relevance to event contracts; licence requires a quote
+- Source type: official pages
+- Verification status: owner-verified
+
+### Pyth products and plans
+- URL: https://app.pyth.com/products ; https://app.pyth.com/plans
+- Retrieved: 2026-10-18 (owner)
+- Used for: Pyth Pro budgeting assumption (about $2,500/month for metals, full-resolution history, non-display use)
+- Source type: official product pages
+- Verification status: owner-verified (the $99 package remains unverified)
+
+### Tardis.dev
+- URL: https://tardis.dev/ ; https://docs.tardis.dev/historical-data-details
+- Retrieved: 2026-10-18 (owner)
+- Used for: trades, L2/L3, raw messages; pricing varies, recheck in the order tool
+- Source type: official vendor pages
+- Verification status: owner-verified
+
+### Coinbase Market Data Terms
+- URL: https://www.coinbase.com/legal/market_data
+- Retrieved: 2026-10-18 (owner)
+- Used for: prohibition on ML training, validation, and benchmarking without prior written consent
+- Source type: official legal page
+- Verification status: owner-verified (no hash in Git)

@@ -10,6 +10,7 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
 - costs: `research/cloud/pmv_cloud_cost_model.md`;
 - owner decisions D-B09-10 to D-B09-22 are pending, alongside D-B09-1 to D-B09-9;
 - the approved local raw-store rule (Step 11 F-01, `~/pmv-protected/raw`) remains in force until D-B09-10 and the matching governance edits. Nothing is provisioned, acquired, or authorized.
+- procurement: `research/data_sources/owner_source_action_sheet.md`, synchronized with owner-verified facts on 2026-10-18. Next: owner outreach M1 (Kalshi), M2 (Kraken), M3 (Databento), M4 (CF Benchmarks quote), M5 (Polymarket, if needed). The minimum viable dataset (Kalshi history, Kraken archive, Databento GC/MGC) targets about $0–$160 in market data, subject to permissions and the Databento estimator. No purchase, acquisition, `T0`, or holdout exists.
 
 
 - **Phase:** Phase 1. No cycle, `T0`, split, or protected scope exists. No real market observation has been acquired, captured, or released to agents. The guard refuses every real request.
