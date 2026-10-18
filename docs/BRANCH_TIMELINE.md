@@ -99,7 +99,8 @@ Listed oldest first, and appended at each timeline update.
 | `f78d7e2` | Red-Team review recorded (no BLOCKING; MAJOR RT-B9-01 and RT-B9-02), its fixes in the documents, D-B09-9 added |
 | `5b0106e` | Owner cloud-native direction (2026-10-18): master data-source inventory, cloud architecture review and cost model, advisory reviews with dispositions, exposure rows X-4 to X-6, decision record with D-B09-10 to D-B09-22. Documentation only |
 | `2373174` | Owner consolidation direction: architecture consolidation, inventory completed (one row per source), Stage A/B wording, round 3 focused re-reviews (no BLOCKING) and their fixes. Documentation only |
-| (the commit adding this row) | Canonical architecture rebuilt from scratch and replaced atomically; inventory checked complete; round 4 Red-Team re-review (RESOLVED) and its fixes. Documentation only. Its hash is the branch tip; see `git ls-remote` |
+| `b5b3bfb` | Canonical architecture rebuilt from scratch and replaced atomically; inventory checked complete; round 4 Red-Team re-review (RESOLVED) and its fixes. Documentation only |
+| (the commit adding this row) | Owner procurement packet: `research/data_sources/owner_source_action_sheet.md` (core matrix, prices, contacts, tiers, datasets, messages M1 to M6). Documentation only; nothing bought or downloaded. Its hash is the branch tip; see `git ls-remote` |
 
 ## Ancestry verification for B09 (2026-10-16)
 

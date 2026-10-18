@@ -815,3 +815,25 @@ Research for `research/data_sources/master_source_inventory.md` and `research/cl
 ### Secondary-only sources of record (search summaries, not fetched)
 - Kalshi Data Terms of Use PDF, locator `kalshi-public-docs.s3.amazonaws.com/kalshi-data-terms-of-service.pdf` (cloud-bucket host; not fetched). Owner copy requested (INV-1).
 - Coinbase Market Data Terms (`coinbase.com/legal/market_data`, refused host); Kraken API commercial-use notice; CME DS-45 (June 2026); Tardis.dev Licence Agreement cl. 9.4 and 9.5; Polymarket institutional data-licensing statement; Polymarket US rulebook (2026-08-05); Pyth Pro plans and the 2026-08-26 API-key requirement; Google Cloud, AWS, and Azure pricing and product limits (cost model §1).
+
+## B09 procurement pass (2026-10-18)
+
+For `research/data_sources/owner_source_action_sheet.md`. Pages were fetched through WebFetch and summarized by the tool (FETCHED-SUMMARY; SECONDARY under O-8).
+
+### Databento pricing, catalog, and licensing pages
+- URL: https://databento.com/pricing ; https://databento.com/catalog/cme/GLBX.MDP3 ; https://databento.com/datasets/GLBX.MDP3 ; https://databento.com/blog/updates-to-subscription-pricing ; https://databento.com/blog/pricing-plans-updates ; https://databento.com/blog/introduction-market-data-licensing ; https://databento.com/blog/subscriber-status
+- Retrieved: 2026-10-18
+- Used for: $125 credit, usage-based rates, Standard/Plus/Unlimited plans, the usage-based "personal use" marking (to confirm), licensing approach
+- Source type: official vendor pages
+- Verification status: fetched (tool summary; the summarizer was inconsistent between passes)
+
+### Kraken current API introduction
+- URL: https://docs.kraken.com/api/docs/guides/global-intro/
+- Retrieved: 2026-10-18
+- Used for: the permission notice is absent from the current docs (it appears only on the legacy page, which was refused)
+- Source type: official documentation
+- Verification status: fetched (tool summary)
+
+### Secondary-only sources of record (procurement pass)
+- Kalshi Developer Agreement v1.1 §3/§3.1 (`https://kalshi.com/developer-agreement`; PDF on a cloud-bucket host, not fetched).
+- CME DataMine, fee list, licensing FAQ, and DS-45 (cmegroup.com refused); Tardis pricing and billing FAQ; Pyth pricing and the $99 Polymarket package; CF Benchmarks contacts; Coinbase Market Data Terms §3 and Data Marketplace; Polymarket institutional and Institute statements; Polymarket US rulebook and terms; CoinAPI, Marketlens, Chainlink, Bitquery, Goldsky, Oddpool, OANDA pricing.

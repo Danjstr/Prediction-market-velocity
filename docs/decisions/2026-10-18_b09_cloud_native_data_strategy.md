@@ -256,3 +256,23 @@ None of these is taken here. D-B09-1 to D-B09-9 (the 2026-10-16 record) remain p
 - The only remaining MAJOR finding, S-B9C2-08, is assigned to cycle registration (`research/governance/b09_cloud_architecture_reviews.md`).
 - Nothing is provisioned, acquired, or authorized.
 - B09 stays open: no pull request and no B10 until the owner directs.
+
+## 10. Procurement packet (owner task, 2026-10-18)
+
+At the owner's direction, after the architecture review, B09 produced `research/data_sources/owner_source_action_sheet.md`. It is documentation only:
+- an owner core matrix with owner-facing statuses;
+- re-verified prices and contacts (official pages where reachable; otherwise OWNER_VERIFY);
+- procurement tiers;
+- minimum, better, and ideal datasets;
+- ready-to-send permission and licence messages M1 to M6.
+
+No account, purchase, licence acceptance, or data download was made.
+
+New findings recorded there:
+- **Kalshi Developer Agreement.** It reportedly limits API use and storage to facilitating the member's own trading on Kalshi (S). This sharpens D-B09-22, M1.
+- **Databento usage-based billing.** It may be marked "personal use" only, with commercial use on the Standard plan (FS, needs confirmation). See M3.
+- **The $20,000–$35,000 CME figure** corresponds to CME's historical redistribution licence, which PMV does not need.
+- **Pyth $99/month package.** A package offered through Polymarket's docs may cover XAU (S).
+- **Recommendation:** drop Coinbase and CME DataMine for now.
+
+Research agents ran as `claude-opus-5-5`. They made no new exposures, and every refused host was left untried.
