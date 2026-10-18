@@ -15,7 +15,7 @@ Every status below is a research classification. No source may be acquired, capt
 - **Coinbase:** ordinary Market Data Terms prohibit ML training and validation without written consent; DROP for now.
 - **CME DataMine:** do not buy; Databento preferred.
 
-**Owner-facing procurement packet:** `research/data_sources/owner_source_action_sheet.md` (2026-10-18). It holds the core matrix, prices, contacts, procurement tiers, and ready-to-send permission requests. Where it and this inventory differ on a price or contact, the action sheet is newer.
+**Owner-facing procurement packet (canonical):** `research/data_sources/owner_source_action_sheet.md` (2026-10-18). It holds the core matrix, procurement tiers, minimum viable dataset, costs, contacts, and outreach messages M1 (Kalshi), M2 (Kraken), M3 (Databento), M4 (CF Benchmarks), and M5 (Polymarket, if needed). Where it and this inventory differ on a price, contact, or recommendation, the action sheet is newer.
 
 **Detailed records** (every field the owner required):
 - `research/data_sources/inventory_pm_gold_detail.md`: PM-00 to PM-31, G-1 to G-26;

@@ -264,7 +264,7 @@ At the owner's direction, after the architecture review, B09 produced `research/
 - re-verified prices and contacts (official pages where reachable; otherwise OWNER_VERIFY);
 - procurement tiers;
 - minimum, better, and ideal datasets;
-- ready-to-send permission and licence messages M1 to M6.
+- ready-to-send permission and licence messages (outreach numbering later canonicalized in §11 as M1 Kalshi, M2 Kraken, M3 Databento, M4 CF Benchmarks, M5 Polymarket; Coinbase optional).
 
 No account, purchase, licence acceptance, or data download was made.
 
@@ -290,6 +290,10 @@ The owner directed a documentation-only synchronization of the procurement concl
 - CME DataMine "do not buy";
 - final procurement tiers;
 - outreach queue M1 to M5.
+
+The action sheet was then rebuilt from scratch as a clean canonical file at the owner's direction (section list in the owner instruction of 2026-10-18; one row per source). It is the canonical owner-facing procurement document. The 100-row inventory remains the detailed research source.
+
+**Outreach numbering (canonical):** M1 Kalshi; M2 Kraken; M3 Databento; M4 CF Benchmarks; M5 Polymarket (only if needed); Coinbase optional, not queued.
 
 **Owner has approved:** documentation synchronization only.
 

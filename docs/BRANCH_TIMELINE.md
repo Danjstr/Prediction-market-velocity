@@ -101,7 +101,8 @@ Listed oldest first, and appended at each timeline update.
 | `2373174` | Owner consolidation direction: architecture consolidation, inventory completed (one row per source), Stage A/B wording, round 3 focused re-reviews (no BLOCKING) and their fixes. Documentation only |
 | `b5b3bfb` | Canonical architecture rebuilt from scratch and replaced atomically; inventory checked complete; round 4 Red-Team re-review (RESOLVED) and its fixes. Documentation only |
 | `a9a24a5` | Owner procurement packet: `research/data_sources/owner_source_action_sheet.md` (core matrix, prices, contacts, tiers, datasets, messages). Documentation only; nothing bought or downloaded |
-| (the commit adding this row) | Documentation sync of procurement conclusions with owner-verified facts; final tiers; outreach queue M1 to M5. Documentation only. Its hash is the branch tip; see `git ls-remote` |
+| `9e6e34b` | Documentation sync of procurement conclusions with owner-verified facts; final tiers; outreach queue M1 to M5. Documentation only |
+| (the commit adding this row) | Owner action sheet rebuilt from scratch as one canonical file (one row per source; canonical outreach numbering); pointers synced. Documentation only. Its hash is the branch tip; see `git ls-remote` |
 
 ## Ancestry verification for B09 (2026-10-16)
 
