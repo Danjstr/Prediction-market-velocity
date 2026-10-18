@@ -25,7 +25,7 @@ Every status below is a research classification. No source may be acquired, capt
 
 Every licence statement in this inventory is S or G. A-2 needs verbatim terms with a raw-byte hash.
 
-**CLOUD DIRECT values** (CLOUD_DIRECT_INGESTION) are documented capabilities. They were **not tested from GCP**. Datacenter-IP blocking or geo policy may apply, and a chartered connectivity check precedes A-1 (architecture §7). No region is ever chosen to get around a venue restriction.
+**CLOUD DIRECT values** (CLOUD_DIRECT_INGESTION) are documented capabilities. They were **not tested from GCP**. Datacenter-IP blocking or geo policy may apply, and a chartered connectivity check precedes A-1 (architecture §6.3). No region is ever chosen to get around a venue restriction.
 
 ## 1. Headline findings
 
@@ -299,7 +299,7 @@ Each step needs its own A-1 to A-6 approval. **The order is conditional:** which
 | Step | Source | Why | Specific preconditions |
 |---|---|---|---|
 | 0 (owner, now) | Licence letters and terms copies: Kalshi (§2), Kraken, Databento/CME DS-45 scope; optional Coinbase, Polymarket | Every market-data source is licence-gated | Owner sends; agents draft |
-| Prospective, as early as licences allow | **PMV capture (PM-31):** Kalshi WS + `cfbenchmarks_value`; Kraken WS (B-3) under the Kraken permission; G-26 if gold receipt-time parity is wanted | Receipt-time truth, future protected evaluation, execution realism, power. Every uncaptured day is lost | Licence; cloud F-03 successor; venue connector; capture charter; Stage-appropriate controls (architecture §3.3 B6–B8) |
+| Prospective, as early as licences allow | **PMV capture (PM-31):** Kalshi WS + `cfbenchmarks_value`; Kraken WS (B-3) under the Kraken permission; G-26 if gold receipt-time parity is wanted | Receipt-time truth, future protected evaluation, execution realism, power. Every uncaptured day is lost | Licence; cloud F-03 successor; venue connector; capture charter; Stage-appropriate controls (architecture §2.3 B6–B8) |
 | 1 | **Kalshi historical + metadata** (PM-01, PM-02, B-15) | Official labels, prices, fee history; the near-free go/no-go test (proposed K2) | Kalshi clarification; D-B09-2/-7/-9; paginated REST tooling; cutoff handling |
 | 2 | **Kraken full trade archive** (B-2) | Free, complete constituent tape for velocity baselines and the BRTI-proxy test | Kraken permission; archive host resolved |
 | 3 (pipeline-proving fallback) | **Databento GC/MGC/1OZ L1 + metadata** (G-2, G-3), inside the $125 credit | Clearest historical licence statement among vendors (FS), subject to DS-45; proves the cloud pipeline if Kalshi's answer is slow | Databento terms; DS-45 answer; DBN reader (B7-6) |
@@ -307,7 +307,7 @@ Each step needs its own A-1 to A-6 approval. **The order is conditional:** which
 | 5 | **Tardis smallest slice** (B-8) | Only after the trigger in §4.4 | Licence read |
 | 6 | Polymarket sources (PM-14, PM-21, B-16) | Only if Polymarket is in scope after F-16 and licensing; first replicate or rebut OpenMarket (PM-26) | F-16; licensing |
 
-**Historical data drives development** (architecture §11). Historical rows released as development-only are used for exploration, training, pilot models, and hypothesis generation. Whether they may also decide the final audit-candidate comparison is owner decision D-B09-20 (`docs/phase2.md` S-9, a working-design rule; under it, archive results screen and narrow candidates as logged hypotheses). Once released, they can never become holdout.
+**Historical data drives development** (architecture §5.3). Historical rows released as development-only are used for exploration, training, pilot models, and hypothesis generation. Whether they may also decide the final audit-candidate comparison is owner decision D-B09-20 (`docs/phase2.md` S-9, a working-design rule; under it, archive results screen and narrow candidates as logged hypotheses). Once released, they can never become holdout.
 
 ### 7a. Prospective equivalents for historical feature sources (S-B9C-04)
 
