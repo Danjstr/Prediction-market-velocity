@@ -2,7 +2,19 @@
 
 Working record for Phase 1. The authoritative requirements are START_HERE.md (Phase 1, Gate 1, Project-Wide Controls), CLAUDE.md, and PROJECT_BRIEF.md; where this file summarizes them, they win. This is not a gate record and not an owner-decision record.
 
-## Current status and next step (as of 2026-10-18, B09)
+## Current status and next step (as of 2026-10-19, B10)
+
+**B10, 2026-10-19 (data source reconnaissance).** Under the owner's B10 charter, B10 (`b10/source-reconnaissance`, branched from final B09 `8b4e026`; B09 merged by PR #8, `bbcdd6b`) ran a bounded read-only reconnaissance: connectivity pass, 19 schema profiles, tiny samples inspected and deleted (Kraken REST trades for 2023-03-01; a 200-message Kraken WS capture; official non-gold Databento fixtures), the source × information value matrix, source verdicts, and a minimum viable source set. Record: `docs/decisions/2026-10-19_b10_source_reconnaissance.md`; results: `research/data_sources/source_redundancy_decisions.md`, `source_feature_value_matrix.md`, `schema_profiles/`.
+- Stage 1, the BTC hypothesis test: Kalshi metadata, trades, and 1-minute candles, plus the Kraken trade archive. Free once Kalshi clears (M1, A-2) and the published Kraken terms are snapshotted and classified for private own-account use (B10-D11 as replaced; correspondence only if a material ambiguity remains).
+- Stage 2, gold: Databento GC/MGC `trades`, `definition`, and `statistics`.
+- Everything else is CONDITIONAL with a stated promotion experiment, REDUNDANT, or DROP.
+- **Owner rulings (2026-10-19):** D1, D3, D6, D7, and D10 approved; D2 approved with clarification; D5 conditional; D8 in principle (thresholds frozen at cycle registration); D9 deferred; D4 not approved as written (default: licensed rows stay outside agent context unless the terms clearly permit it); D11 replaced (Kraken bulk acquisition waits for a published-terms snapshot and classification, not for vendor correspondence).
+- **Owner correction (2026-10-19, runtime-secret hardening):**
+  - D6 is resolved by control hardening. The exposed credential was not a PMV Squid credential (most likely a sandbox/runtime credential; issuer and lifetime not proven); there is no PMV Squid password to rotate.
+  - D10 removal of `api.kraken.com`, `ws.kraken.com`, and `api.exchange.coinbase.com` from both egress layers is not required to close B10. It is required before any `T0 − m` (`docs/owner_actions/README.md` §3).
+  - `tests/integration/test_live_host_egress_refusal.py` (with `PMV_EGRESS_PROBE=1`) still fails 4 of its 10 checks by design until then, and must pass before any `T0 − m`.
+  - A permanent diagnostic rule is in `docs/conventions.md`.
+- Nothing was acquired, licensed, provisioned, or captured. **B10 is now the active branch**; the B09 bullet below is historical.
 
 **B09 continued, 2026-10-18 (cloud-native direction).** The owner made PMV explicitly cloud-native: the Chromebook is a control and development terminal only, never the primary or intermediate store for bulk data and never a bulk-data relay. Within B09 the owner ordered a master data-source inventory and a review of the proposed GCP architecture before any acquisition. Record: `docs/decisions/2026-10-18_b09_cloud_native_data_strategy.md`. Results:
 - inventory: `research/data_sources/master_source_inventory.md`. Licensing is the dominant blocker. No market-data source is AVAILABLE_NOW. Every Kalshi surface PMV would use is NEEDS_LICENCE_CLARIFICATION;
@@ -16,7 +28,7 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
 - **Phase:** Phase 1. No cycle, `T0`, split, or protected scope exists. No real market observation has been acquired, captured, or released to agents. The guard refuses every real request.
 - **Strategy:** late-window, high-confidence (PROJECT_BRIEF.md §3; START_HERE.md "Strategy at a Glance"). B07 and B08 did not change it.
 - **Gate status:** Gate 0 passed. Gate 1 has not been decided. **Historical acquisition is not authorized. Live capture is not authorized.**
-- **Active branch:** `b09/kalshi-source-qualification` (B09; `docs/BRANCH_TIMELINE.md`; record `docs/decisions/2026-10-16_b09_kalshi_source_qualification.md`).
+- **Active branch:** `b10/source-reconnaissance` (B10; `docs/BRANCH_TIMELINE.md`; record `docs/decisions/2026-10-19_b10_source_reconnaissance.md`). Previously `b09/kalshi-source-qualification` (B09; record `docs/decisions/2026-10-16_b09_kalshi_source_qualification.md`), now merged by PR #8:
   - B09 was branched directly from final B08 (`5806d8c`), not from `main`, and contains everything through B08.
   - B08 was merged into `main` by PR #7 (merge commit `a6b5411`) and is a preserved historical checkpoint. B07 was merged by PR #6 (`2a46ffd`).
   - **B09 is source qualification only:** Kalshi official historical data as a candidate first source, and the owner-decision packet for A-1 to A-6. It acquires no data, contacts no Kalshi host, and changes no code. Its provisional verdict is NOT CURRENTLY QUALIFIABLE — EVIDENCE MISSING (the AR-3 terms, AR-B9-1 re-verification, gold existence, and retention depth).
@@ -42,7 +54,7 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
     - the G-7 owner inputs;
     - a review record stating A-4 is satisfied.
 - **Blockers before agents see any real observation:**
-  - a registered cycle with `T0` and `m`, which first requires the pre-T0 owner checklist P-1 to P-4 in START_HERE.md;
+  - a registered cycle with `T0` and `m`, which first requires the pre-T0 owner checklist P-1 to P-4 in START_HERE.md, and B10-D10 egress tightening verified by the refusal test and the Layer B check (`docs/owner_actions/README.md` §3), in force before the cycle's `T0 − m`;
   - the H-2 per-row release tool, built, reviewed, and approved through an owner governance change (`docs/protected_information.md`).
 
   The release tool's code is deliberately **not yet written**: RT-B3-05 requires the owner's E-U1 catalog decision and a reviewed shared catalog first (`docs/release_tool_design.md`). B07 storage never releases anything (A-8).
@@ -54,7 +66,7 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
     3. approve a raw-data backup policy (A-3) and confirm or replace the "size class" reading (B7-7);
     4. pursue the licence terms for the first candidate source (Kalshi official historical data; AR-3);
     5. decide E-U1 (equivalence-catalog expansion), the first step before the H-2 release tool;
-    6. prepare the pre-T0 checklist decisions P-1 to P-4 (START_HERE.md);
+    6. prepare the pre-T0 checklist decisions P-1 to P-4 (START_HERE.md), and the B10-D10 egress tightening and refusal test (proposed P-5, pending owner approval);
     7. optionally decide B6S-14 (independent statistical audit of the release rules before the first release; not adopted).
   - **Agents** (no network, synthetic data only, from the active branch, in a batch chartered by the owner):
     - B08 (done; merged by PR #7): raw frame format v3 and collector hardening (F-11, F-12/F-27, F-33, F-37/RT-4), order-book continuity after rejected frames, and normalized capture artifacts;

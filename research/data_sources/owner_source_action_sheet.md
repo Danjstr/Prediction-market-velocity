@@ -1,6 +1,8 @@
 # PMV data sources: owner action sheet and procurement packet (B09, 2026-10-18)
 
 **Status.** This is the canonical owner-facing procurement document.
+
+**B10 update (owner decision B10-D11 as replaced, 2026-10-19).** For Kraken, the gate is no longer written permission. It is "the current governing published terms … snapshotted and classified for private own-account PMV use". Vendor correspondence (M2) is required only if that review leaves a material ambiguity. Non-response is not an acquisition blocker where the published terms clearly authorize the intended private use, and silence is never represented as permission. Kraken rows below that read NEEDS_WRITTEN_PERMISSION / M2 are read in that light. Also (B10-D4): no outreach is made merely to ask whether raw licensed rows may be shown to LLM agents.
 - The detailed research source is `research/data_sources/master_source_inventory.md` (100 rows).
 - **Nothing has been bought, signed, or downloaded.** Acquisition still needs your per-source approval (A-1 to A-6, `docs/external_access.md` §2) and the cloud pipeline (`research/cloud/pmv_cloud_architecture_review.md` §12).
 - You have approved documentation synchronization only. Purchases, vendor terms, data acquisition, live capture, cloud provisioning, and the open B09 decisions are **not** approved.
@@ -54,7 +56,7 @@
 
 | Side | Sources | Condition |
 |---|---|---|
-| Prediction / BTC | Kalshi historical markets, trades, and metadata; Kraken historical BTC trade archive; Kalshi contract, rule, and settlement metadata | Once Kalshi (M1) and Kraken (M2) clear |
+| Prediction / BTC | Kalshi historical markets, trades, and metadata; Kraken historical BTC trade archive; Kalshi contract, rule, and settlement metadata | Once Kalshi (M1) clears and the published Kraken terms are snapshotted and classified (B10-D11; M2 only if ambiguous) |
 | Gold | Databento GC/MGC trades and/or L1 | Once the licence classification clears (M3) |
 | Prospective (later) | Kalshi WebSocket; Kraken WebSocket; BRTI or another reference series once its entitlement is resolved | Separately authorized capture |
 
@@ -69,7 +71,7 @@ This dataset is enough for the proposed M-0 go/no-go test (decision record D-B09
 
 | Tier | Items |
 |---|---|
-| **TIER 0: contact / clear now** | Kalshi (M1); Kraken (M2); Databento (M3); CF Benchmarks BRTI quote (M4); Polymarket (M5) only if scope clarification is needed; you download the Kalshi BTC and gold contract terms |
+| **TIER 0: contact / clear now** | Kalshi (M1); Kraken (M2 only if the published-terms review leaves a material ambiguity, B10-D11); Databento (M3); CF Benchmarks BRTI quote (M4); Polymarket (M5) only if scope clarification is needed; you download the Kalshi BTC and gold contract terms |
 | **TIER 1: acquire once cleared** | Kalshi historical/API data; Kraken historical archive; Databento GC/MGC L1/trades; prospective Kalshi and Kraken capture only when separately authorized |
 | **TIER 2: only if research justifies** | Tardis historical order books; Pyth Metals; deeper Databento books; licensed BRTI history; selected Polymarket commercial or licensed sources |
 | **TIER 3: do not buy now** | Direct CME DataMine; Coinbase licensed data; Kaiko; Coin Metrics; CoinDesk; LMAX; OANDA; Dukascopy; Goldsky; Bitquery; Oddpool; enterprise gold vendors; other redundant sources marked DROP |
@@ -91,7 +93,7 @@ Columns:
 | K1 | Kalshi REST API, historical tier | BTC, gold PMs | Official labels, prices, trade flow | Trades, 1/60/1440-minute candles with bid/ask OHLC, settlements, market objects; back to about 2021-06; cutoff lags about 2–3 months (OWNER_VERIFY) | None | No / yes | Membership expected / no | Free → $0 | Developer Agreement (OWNER-VERIFIED): API use and storage tied to facilitating the member's own trading. Website Data Terms are separate and not applied to API data | NEEDS_WRITTEN_PERMISSION | <https://kalshi-public-docs.s3.amazonaws.com/Kalshi-Developer-Agreement.pdf> | `institutional@kalshi.com`, cc `support@kalshi.com` | M1 | None independent | 0 → 1 |
 | K2 | Kalshi metadata, contract terms, CFTC filings | BTC, gold PMs | Rules, fees, settlement source, universe; resolves DET-1 (gold feed) and DET-2 (BTC rulebook) | Series, events, markets, fee history; contract PDFs; filings from 2024 | — | Current / yes | No / no | Free → $0 | Contract PDFs: owner download. Filings: public record | FREE_TECHNICALLY_AVAILABLE (filings: FREE_AND_USE_CLEARED) | <https://docs.kalshi.com/> | — | Download the KXBTC15M and KXGOLD15M terms | — | 0 |
 | K3 | Kalshi WebSocket | BTC, gold PMs | Prospective books with receipt time; the only future holdout source | Full book (snapshot + delta), trades, lifecycle; live only | Full L2 | Yes / yes (cloud VM) | Yes (KYC) / yes, always | Free → $0 + cloud VM | As K1. The key can also trade, so it is a trading-grade secret | NEEDS_WRITTEN_PERMISSION | as K1 | as K1 | M1 | None | 1 (when authorized) |
-| K4 | Kalshi CF Benchmarks channel and REST passthrough | BTC reference | BRTI (the settlement index) | BRTI values, 60 s window averages; passthrough depth UNKNOWN | — | Yes / yes | Yes / yes + entitlement | UNKNOWN | Kalshi + CF Benchmarks licence | NEEDS_LICENCE_QUOTE | <https://docs.kalshi.com/> | `institutional@kalshi.com` | M1 (price, depth, rights) | B4 (CF Benchmarks direct) | 0 (ask) / 2 (buy) |
+| K4 | Kalshi CF Benchmarks channel and REST passthrough | BTC reference | BRTI (the settlement index) | BRTI values (published at 200 ms; Kalshi 5 Hz channel, B10), 60 s window averages; passthrough depth UNKNOWN | — | Yes / yes | Yes / yes + entitlement | UNKNOWN | Kalshi + CF Benchmarks licence | NEEDS_LICENCE_QUOTE | <https://docs.kalshi.com/> | `institutional@kalshi.com` | M1 (price, depth, rights) | B4 (CF Benchmarks direct) | 0 (ask) / 2 (buy) |
 | K5 | Kalshi `pyth_value` channel | Gold reference | Pyth gold values as Kalshi sees them | Live values with source and receipt times | — | Yes / yes | Yes / yes + entitlement | $1,000/month, 7 days free (Git) → $0 until DET-1 | Kalshi + Pyth terms | NEEDS_WRITTEN_PERMISSION | as K1 | as K1 | M1 | G3 | 2 |
 | P1 | Polymarket Gamma, Data API, CLOB | BTC PMs | Metadata, fills, prospective books | Markets and tokens; indexed fills (three-year window); live L2 | L2 (live) | Yes / yes | No / no | Free → $0 | "Capital Markets Entities" must use data in consultation with Polymarket/ICE; whether an individual's own-account project counts is unclear. US persons are excluded from the international site | NEEDS_WRITTEN_PERMISSION | <https://institutional.polymarket.com/> | `data-licensing@polymarket.com` | M5 (only if needed) | P3 for US persons | 2 |
 | P2 | Polymarket on-chain (Polygon RPC; BigQuery Polygon datasets) | BTC PMs | Canonical fills and payouts | Fill and resolution events from 2022-11 (BigQuery coverage UNKNOWN) | None | Near-live / yes | GCP project or RPC key | Query or provider fees → under $10 initially (estimate) | Same Polymarket/ICE statement covers on-chain derived data | NEEDS_WRITTEN_PERMISSION | as P1 | as P1 | M5 | P1 | 2 |
@@ -101,7 +103,7 @@ Columns:
 
 | ID | Provider / product | Asset | Role | Data / history / granularity | Book | Live / cloud | Acct / key | Price → PMV cost | Licence / terms issue | Status | Follow-up URL | Contact | Ask | Substitute | Tier |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| B1 | Kraken historical archives (trades and OHLCVT) | BTC | Best free BTC trade tape; BRTI-proxy test | Complete public trade history with quarterly updates; OHLCVT 1–1440 minutes (OWNER-VERIFIED) | None | No / yes | No / no | Free → $0 | Whether PMV's private quantitative and ML trading use is permitted personal use or needs market-data permission | NEEDS_WRITTEN_PERMISSION | <https://support.kraken.com/articles/360047543791-downloadable-historical-market-data-time-and-sales-> | `marketdata@kraken.com` | M2 | O1 CoinAPI | 0 → 1 |
+| B1 | Kraken historical archives (trades and OHLCVT) | BTC | Best free BTC trade tape; BRTI-proxy test | Complete public trade history with quarterly updates; seven columns `timestamp, price, volume, type, order_type, misc, trade_id` (B10, verbatim support article); OHLCVT 1–1440 minutes (OWNER-VERIFIED) | None | No / yes | No / no | Free → $0 | Whether PMV's private quantitative and ML trading use is permitted personal use or needs market-data permission | NEEDS_WRITTEN_PERMISSION | <https://support.kraken.com/articles/360047543791-downloadable-historical-market-data-time-and-sales-> | `marketdata@kraken.com` | M2 | O1 CoinAPI | 0 → 1 |
 | B2 | Kraken public REST and WebSocket | BTC | Prospective BTC books, recent trades | Live L2 (checksummed), trades; L3 with key (OWNER-VERIFIED) | L2 (L3 with key) | Yes / yes | No (L3: yes) | Free → $0 + cloud VM | As B1 | NEEDS_WRITTEN_PERMISSION | <https://docs.kraken.com/exchange/guides/general/historical-data> | as B1 | M2 | O2 Tardis | 1 (when authorized) |
 | B3 | Databento CME Bitcoin futures (BTC, MBT) | BTC futures | Optional futures lead-lag and basis | Trades, BBO/L1, book schemas, OHLCV, settlements; CME data from 2010 | Up to MBO | Yes (Standard) / yes | Yes / yes | Historical from about $0.50/GB; $125 credit (OWNER-VERIFIED) → rough estimate $2–50 for 2 years of trades and L1; use the estimator | ML, non-display, and proprietary-use classification open | PAID_SELF_SERVICE | <https://databento.com/pricing> | `support@databento.com` | M3 | Direct CME (Tier 3) | 2 (optional) |
 | B4 | CF Benchmarks BRTI (direct) | BTC reference | High-value real-time BTC reference relevant to event contracts (OWNER-VERIFIED) | BRTI values; history UNKNOWN | — | Yes / UNKNOWN | Yes / yes | No public price; quote required (OWNER-VERIFIED) → UNKNOWN | Licence required for historical and real-time use | NEEDS_LICENCE_QUOTE | <https://www.cfbenchmarks.com/data/indices/BRTI> | <https://www.cfbenchmarks.com/about/contact> | M4 (quote; do not buy yet) | K4 | 0 (quote) / 2 (buy) |
@@ -152,7 +154,7 @@ Columns:
 
 ### M2 — Kraken
 - **To:** `marketdata@kraken.com`.
-- **When:** now.
+- **When:** only if the snapshot and classification of the published Kraken terms leave a material ambiguity (owner decision B10-D11 as replaced, 2026-10-19). Non-response is not an acquisition blocker where the published terms clearly authorize the intended private use; silence is never represented as permission.
 - **Purpose:** whether PMV's private quantitative and ML use is permitted personal use, or needs market-data permission.
 
 ### M3 — Databento

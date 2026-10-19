@@ -1,0 +1,130 @@
+# B10 reviews and dispositions (2026-10-19)
+
+Three existing PMV specialist agents reviewed the uncommitted B10 working tree. Each was told not to edit files, make network requests, or run `check.sh`. All ran as `claude-opus-5-5` (exposure register Part B, M-1). The full reports are in the session record. This file lists every finding and how it was handled.
+
+| Reviewer | Verdict | BLOCKER | MAJOR | MINOR | NOTE |
+|---|---|---|---|---|---|
+| Statistician | CONSISTENT WITH CONDITIONS | 0 | 9 | 5 | 1 |
+| API / Execution Engineer | PROCEED WITH CONDITIONS (revise before commit) | 0 | 1 | 11 | 6 |
+| Reliability / Red-Team | Revise before commit (no BLOCKER) | 0 | 4 | 8 | 4 |
+
+**Rule applied:** every BLOCKER and MAJOR is fixed in the documents or assigned to a named owner decision. There were no BLOCKERs. MINORs were fixed where they changed a claim.
+
+Abbreviations used below:
+- **RD:** `research/data_sources/source_redundancy_decisions.md`
+- **record:** `docs/decisions/2026-10-19_b10_source_reconnaissance.md`
+
+## Statistician
+
+| ID | Sev. | Finding (short) | Disposition |
+|---|---|---|---|
+| S-B10-01 | MAJOR | The BRTI test measured level error; for up/down contracts a constant basis cancels, so the differential error matters. The strike is a legal BRTI anchor. Proxy construction must be fixed beforehand | **Fixed.** RD BRTI Part A: per-contract-type error, strike point-in-time check, proxy fixed first |
+| S-B10-02 | MAJOR | Ordering trap: a noisy proxy can make M-0 fail falsely, and K2 would then stop the project; the candle ask biases toward a false "go" | **Fixed / owner.** Part A runs before M-0; preregistered UNINFORMATIVE outcome; bias directions tabulated. K2 amendment is B10-D8 |
+| S-B10-03 | MAJOR | The 1-minute candle ask as executable price is under-specified: staleness asymmetry, unknown sampling, no size, the ≤1-minute band | **Fixed.** RD "Stage 1 executable-price convention" (next-minute ask high; freshest-admissible baseline; taker-print check; ≤1-minute band not evaluable at the ask) |
+| S-B10-04 | MAJOR | Promotion tests ignore S-9; deferring the live-only CFB/`pyth_value` channels silently excludes them from cycle 1 | **Fixed / owner.** RD "Relation to S-9"; B10-D9 before cycle registration |
+| S-B10-05 | MAJOR | Promotion experiments are not well posed: no primary estimand, δ, power, error budget, or third outcome; D-B09-18 has no such threshold | **Fixed / owner.** RD "Promotion-test protocol"; numbers in B10-D8; the D-B09-18 misattribution removed |
+| S-B10-06 | MAJOR | Dependence and leakage in the BRTI/Pyth tests: shared settlement instants, the strike chain, full-span corrections, materiality on irrelevant windows | **Fixed.** RD Part A items 4–6 and Pyth item 2 |
+| S-B10-07 | MAJOR | Gold: stale Pyth windows fix outcomes mechanically; no numeric threshold; differential basis; low power | **Fixed.** RD Pyth experiment rewritten (stale-window rule, σ·√τ threshold, power, likely UNDERPOWERED-DEFER) |
+| S-B10-08 | MAJOR | Irreversibility analysed only for Kraken L2 | **Fixed.** RD irreversibility table; `ticker` now captured as an integrity cross-check; REST book kept as a reconciliation probe; accepted losses recorded |
+| S-B10-09 | MAJOR | "BRTI is not a new velocity signal" holds only with all constituents; the Coinbase DROP rationale is untested; no cross-venue path | **Fixed.** Rationales reworded as untested; cross-venue information experiment added; other free constituents named as the replacement path |
+| S-B10-10 | MINOR | Capture-but-not-use conditions; the Tardis trigger was contradictory | **Fixed.** RD Kraken book row conditions; Tardis trigger rewritten (UNDERPOWERED-DEFER with a promising estimate; discovery only) |
+| S-B10-11 | MINOR | Stage 1 biases not stated together; the archive CORE verdict assumed timestamp precision | **Fixed.** RD "What Stage 1 cannot show"; archive verdict made conditional, with the REST fallback |
+| S-B10-12 | MINOR | The `expiration_value` prohibition was too broad | **Fixed.** Matrix note 13 limited to the current and unpublished values |
+| S-B10-13 | MINOR | Matrix cells DIRECT where PROXY | **Fixed.** K-H reference cells → PROXY; vendor receipt → PROXY; daily cleared volume → PROXY |
+| S-B10-14 | MINOR | Review file missing | **Fixed.** This file |
+| S-B10-15 | NOTE | Recoverable verdicts fine; continuous-symbol mapping; label expectations | **Noted.** COMEX price-discovery and Polymarket statements labelled as expectations in RD; record the `GC.v.0` per-date mapping at acquisition |
+
+## API / Execution Engineer
+
+| ID | Sev. | Finding (short) | Disposition |
+|---|---|---|---|
+| API-B10-01 | MAJOR | The Kraken L2 "self-verifying" claim is overstated: the checksum verifies the top-10 state, not stream completeness, levels beyond 10, or stalls | **Fixed.** `kraken_l2.md`, record item 3, RD book row, P2 (depth 10 preferred, capture requirements) |
+| API-B10-02 | MINOR | Pagination overlap observed, not documented; dedupe alone hides gaps | **Fixed.** `kraken_historical_trades.md` collector rules; record item 2 |
+| API-B10-03 | MINOR | The 0.08% identical-timestamp figure was the four duplicate rows | **Fixed.** Corrected to zero among unique trades; the profiler now dedupes first |
+| API-B10-04 | MINOR | The REST time is a float64 repr; join on `trade_id` | **Fixed.** Profile and record item 2 |
+| API-B10-05 | MINOR | Checksum fixed-dp formatting is inferred, not documented | **Fixed.** `kraken_l2.md` |
+| API-B10-06 | MINOR | `forecast_percentile_history` (5 s, authenticated) omitted; synthetic candle hazard | **Fixed.** `kalshi_trades.md`, matrix note 2 |
+| API-B10-07 | MINOR | Candle and bar availability timing; spread exactness; `previous` derivable; Databento OHLCV buckets on `ts_recv` | **Fixed.** `kalshi_trades.md`, `kraken_ohlcvt.md`, `databento_gc_mbo.md` qualifiers |
+| API-B10-08 | MINOR | The Kalshi key need only be `read`-scoped, but `read` exposes private data | **Fixed.** `kalshi_orderbook.md` |
+| API-B10-09 | MINOR | Databento era qualifiers (MDP 2, ms timestamps, CMBP-1, `ts_in_delta` presence) | **Fixed.** `databento_gc_trades.md`, `databento_gc_mbo.md`, record item 6 |
+| API-B10-10 | MINOR | Wrong or inconsistent matrix cells | **Fixed.** All listed cells changed; notes 33–34 added; Coinbase live-only marked |
+| API-B10-11 | MINOR | Kalshi `ticker` and REST book have integrity value | **Fixed.** As S-B10-08 |
+| API-B10-12 | MINOR | WS tool robustness (byte cap, frame cap, try/finally, frame checks) | **Fixed.** `kraken_ws_sample.py`; disclosed as a post-use edit |
+| API-B10-13 | NOTE | REST tool acceptable | Noted |
+| API-B10-14 | MINOR | Sample total was about 411 KB, not "under 400 KB" | **Fixed.** Record |
+| API-B10-15 | NOTE | Tardis depth-1000 vs PMV depth parity | **Fixed.** RD Tardis row and experiment |
+| API-B10-16 | NOTE | Proxy credential necessarily in the agent environment | Noted under B10-D6 |
+| API-B10-17 | NOTE | Untracked sandbox placeholder files; review file missing | Staging by explicit path only; this file created |
+| API-B10-18 | NOTE | Claims verified correct | Noted |
+
+## Reliability / Red-Team
+
+| ID | Sev. | Finding (short) | Disposition |
+|---|---|---|---|
+| RT-B10-01 | MAJOR | The wildcard F-09 denies did not stop allowlisted live-data hosts (`api.kraken.com`, `ws.kraken.com`, `api.exchange.coinbase.com`) | **Disclosed / owner.** Record tension table; B10-D10 (revert the allowlist at close; deterministic egress check, BLOCKING before `T0 − m`) |
+| RT-B10-02 | MAJOR | The live-data use was authorized only generically ("None (in scope)" was wrong) | **Fixed / owner.** Record row revised; B10-D1(b) |
+| RT-B10-03 | MAJOR | Terms-first glossed over for Kraken; the brief omitted terms-first | **Fixed / owner.** Record rows added; B10-D11 (no Kraken requests until M2) |
+| RT-B10-04 | MAJOR | `raw.githubusercontent.com` fetches (fixtures and source files) conflict with rules 9 and 11 | **Disclosed / owner.** Record row; B10-D1(c); fixtures registered as X-11 |
+| RT-B10-05 | MINOR | "No gold observation" overstated (unidentified fixture) | **Fixed.** Exposure register and record wording; X-11 |
+| RT-B10-06 | MINOR | "No value recorded" inaccurate (derived statistics; transcripts) | **Fixed.** Wording qualified in the register and the record |
+| RT-B10-07 | MINOR | Proxy credential persists in the local transcript | **Fixed.** Record wording; B10-D6 urgency raised |
+| RT-B10-08 | MINOR | The CME hosts were retried by a subagent | **Fixed.** Record and `cme_datamine.md` |
+| RT-B10-09 | MINOR | Review file missing | **Fixed.** This file |
+| RT-B10-10 | MINOR | "A-4 is not satisfied" dropped from the timeline | **Fixed.** `docs/BRANCH_TIMELINE.md` |
+| RT-B10-11 | MINOR | Tools edited after producing the evidence; unguarded `--out` | **Fixed.** Provenance note in the record; `--out` confined to `/workspace/.recon_tmp/` (tested) |
+| RT-B10-12 | MINOR | Vendor documentation copies left in `$TMPDIR` | **Fixed.** Deleted at batch close |
+| RT-B10-13 | NOTE | Exposure rows correct; X-10 Kalshi period missing | **Fixed.** "Undated; treated as 2026-10-19" |
+| RT-B10-14 | NOTE | Cleanup and layout test pass; suggested a test case for `.recon_tmp/` | **Fixed.** Case added to `tests/unit/test_repository_layout.py` |
+| RT-B10-15 | NOTE | No stray `.claude` directories; sandbox placeholder files | Noted; explicit-path staging |
+| RT-B10-16 | NOTE | Coinbase and Databento probes were HEAD only; provenance complete | Noted |
+
+## Round 2: final re-review of the post-fix state (2026-10-19, after the owner's B10-D1 to B10-D11 rulings)
+
+The same three agents (no new agents) reviewed `05df35a` plus the corrective working tree. Each was asked for PASS / PASS WITH MINORS / FAIL.
+
+| Reviewer | Verdict | BLOCKER | MAJOR | Notes |
+|---|---|---|---|---|
+| Statistician | **PASS WITH MINORS** | 0 | 0 | S-B10-01 to 09 all resolved. Minors m1–m6 fixed: candidate selection uses only closed candles, and the benchmark is labelled conservative and non-admissible; the fill window is max(ask high, remainder of the decision minute plus the next minute); freezing rules; outcome-to-interval mapping; K2 re-run and scope; D9 and D4 consequences written into the redundancy decisions |
+| API / Execution Engineer | First pass **FAIL** (1 MAJOR); final verdict below | 0 | 1 → 0 | API2-B10-01: owner §3 step 4 used `curl %{http_code}`, which shows `000` on a refused CONNECT and could false-pass on an origin 403. Fixed with a CONNECT-only stdlib snippet. Minors m1–m9 fixed: refusal regex excluding 407 plus an in-probe control; wildcard Layer A matching; the `--showlocals` warning; root ownership of managed settings; credential issuer unverified; B-1/B-2 inventory wording; matrix note 28; profile line. Also disclosed a second credential print during its own review (recorded as a process deviation) |
+| Reliability / Red-Team | **PASS WITH MINORS** | 0 | 0 | Confirms the layer and credential handling is correct and honest (no edit of either layer, no route-around), deviations are preserved, there are no raw files, and no credential is in the diff, files, or history. Minors m-1 to m-6 fixed: issuer unverified; D11 applied to the action sheet, the inventory, and phase1; tension-table rows annotated as superseded; data-class Layer A hosts listed for optional owner disposition; D4 note aligned with the owner's wording; this round recorded |
+
+**API / Execution final verdict after the fixes: PASS WITH MINORS** (no BLOCKER, no MAJOR). It confirmed API2-B10-01 and m1–m9 resolved and re-ran the probe (4 failed pending owner action, 4 passed). Its remaining minors were fixed before commit:
+- n1: stale "ns time" in inventory B-1;
+- n2: meaning of an empty reply in §3 step 4;
+- n3: other wildcard forms in the Layer A matcher (glob);
+- n4: step 5 names the current active branch.
+
+**Result: no unresolved BLOCKER or MAJOR in any review.**
+
+## Round 3: focused post-fix review of the runtime-secret hardening (2026-10-19, after `ba1fa9e`)
+
+Scope: the owner's "B10 FINAL SECURITY RECORD CORRECTION" (D6 resolved by control hardening, D10 timing moved to before `T0 − m`, the permanent diagnostic rule, the `/proc` residual). The owner directed that only the API / Execution Engineer and the Reliability / Red-Team review it, with no new agents. The original round 1–2 instances were no longer running, so fresh instances of the same two project agent definitions were used.
+
+Both reviewers worked read-only and offline. Neither ran the live probe or inspected proxy variables.
+
+| Reviewer | First pass | BLOCKER | MAJOR | Re-verify after fixes |
+|---|---|---|---|---|
+| API / Execution Engineer | **PASS WITH MINORS, conditional on API3-B10-01** | 0 | 1 → 0 | **PASS WITH MINORS**; no BLOCKER or MAJOR open |
+| Reliability / Red-Team | **PASS WITH MINORS** | 0 | 0 | **PASS WITH MINORS**; no BLOCKER or MAJOR open |
+
+| ID | Sev | Finding | Disposition |
+|---|---|---|---|
+| API3-B10-01 | MAJOR | `pytest.fail` raised inside `except ValueError` chained the original `urlsplit` error into the report. That error can quote the netloc, userinfo included (confirmed with a dummy value). | **Fixed.** The failure is raised outside the handler. Regression test with a dummy sentinel and stubbed connections |
+| API3-B10-02 / RT3-B10-11 | MINOR / NOTE | The egress test builds `Proxy-Authorization` in memory for its CONNECT; "reconstruct" in the rule covers this if read literally | **Disclosed, pending owner.** Carve-out proposed in `docs/conventions.md`; owner ruling needed before the probe is next run (proposed P-5 (c)) |
+| API3-B10-03 / RT3-B10-01 | MINOR | "was a sandbox/runtime credential" overstated proof | **Fixed.** Reworded in agent text. The owner's verbatim D6 bullet is labelled as such and qualified by precision notes |
+| API3-B10-04 | MINOR | Any 4xx/5xx except 407 counted as a refusal; a 5xx does not prove a policy denial | **Fixed.** 403 only, pinned by a unit test. README step 4 records a 5xx as "refused, unconfirmed" |
+| API3-B10-05 | MINOR | Step 4 conflated a proxy-unreachable error with a refusal | **Fixed.** A control line other than 200 invalidates the run |
+| API3-B10-06 / RT3-B10-03 | MINOR | The record cited this round 3 entry before it existed | **Fixed** by this entry |
+| API3-B10-07, RT3-B10-07 to -10 | MINOR / NOTE | Scanner gaps: second-leak names (`GIT_SSH_COMMAND`, `CLOUDSDK_PROXY_*`), case, sinks, YAML `run: env`, configuration files, Markdown runbooks, more dump forms. Also pipe false positives, untracked-file scanning, and a whole-file exemption | **Fixed.** Scanner rewritten: Git-tracked files; configuration files; fenced Markdown blocks; more forms; separator-bounded matches; shell comments skipped; exact-line exemptions; self-tests for each form |
+| RT3-B10-02 | MINOR | "prevent the known routes" overclaimed: the denies match command text | **Fixed.** Precision note; `docs/conventions.md` enforcement wording |
+| RT3-B10-04 | MINOR | Stale "issuer unverified" line in owner actions §3 | **Fixed.** Annotated as superseded |
+| RT3-B10-05 | MINOR | The pre-`T0 − m` refusal requirement could be skipped silently: registration lists said only P-1 to P-4 | **Fixed.** Added to `docs/phase1.md`, `docs/release_tool_design.md` step 6a, and a pending "Proposed START_HERE.md P-5" row in `docs/owner_actions/README.md`. The START_HERE edit awaits owner approval |
+| RT3-B10-06 | MINOR | The refusal test covers 3 hosts; passing it could be mistaken for meeting the whole requirement | **Fixed.** Stated as necessary, not sufficient. Pre-`T0 − m` host-class classification of every allowlist entry in both layers |
+| RT3-B10-12 | NOTE | Unrecorded residual risk: transcript copies, unproven lifetime | **Fixed.** Recorded in the decision record |
+| RT3-B10-13, API3-B10-08 to -11 | NOTE | Sandbox placeholder files; showlocals guard and snippet correct; dispositions faithful; disclosure history intact | Noted. Staging is by explicit path |
+
+**Result: no unresolved BLOCKER or MAJOR in either review.** Open owner items: the carve-out ruling, the START_HERE P-5 edit, and the `/proc` sandbox read-deny path normalization (non-blocking future hardening).
+
+## Round 1 fixes
+
+The round 1 fixes were re-reviewed in round 2 above.

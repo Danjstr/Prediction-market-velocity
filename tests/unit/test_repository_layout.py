@@ -75,6 +75,7 @@ def test_paths_inside_source_and_control_trees_are_not_ignored(path: str) -> Non
         "local.db",
         "local.sqlite3",
         "run.log",
+        ".recon_tmp/kraken_ws/ws_v2_sample.jsonl",
     ],
 )
 def test_root_level_data_and_logs_stay_ignored(path: str) -> None:
