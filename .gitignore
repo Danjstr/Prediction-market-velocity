@@ -50,3 +50,7 @@ UTC--*
 /*.parquet
 /*.feather
 /*.arrow
+
+# B10 source reconnaissance: temporary raw vendor samples, inspected then deleted.
+# Never committed (owner B10 charter §4–§5).
+/.recon_tmp/

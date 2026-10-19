@@ -2,7 +2,13 @@
 
 Working record for Phase 1. The authoritative requirements are START_HERE.md (Phase 1, Gate 1, Project-Wide Controls), CLAUDE.md, and PROJECT_BRIEF.md; where this file summarizes them, they win. This is not a gate record and not an owner-decision record.
 
-## Current status and next step (as of 2026-10-18, B09)
+## Current status and next step (as of 2026-10-19, B10)
+
+**B10, 2026-10-19 (data source reconnaissance).** Under the owner's B10 charter, B10 (`b10/source-reconnaissance`, branched from final B09 `8b4e026`; B09 merged by PR #8, `bbcdd6b`) ran a bounded read-only reconnaissance: connectivity pass, 19 schema profiles, tiny samples inspected and deleted (Kraken REST trades for 2023-03-01; a 200-message Kraken WS capture; official non-gold Databento fixtures), the source × information value matrix, source verdicts, and a minimum viable source set. Record: `docs/decisions/2026-10-19_b10_source_reconnaissance.md`; results: `research/data_sources/source_redundancy_decisions.md`, `source_feature_value_matrix.md`, `schema_profiles/`.
+- Stage 1, the BTC hypothesis test: Kalshi metadata, trades, and 1-minute candles, plus the Kraken trade archive. Free once M1 and M2 clear.
+- Stage 2, gold: Databento GC/MGC `trades`, `definition`, and `statistics`.
+- Everything else is CONDITIONAL with a stated promotion experiment, REDUNDANT, or DROP.
+- Owner decisions B10-D1 to B10-D11 are pending (B10-D10, the live-host allowlist revert and egress check, becomes blocking before any `T0 − m`). Nothing was acquired, licensed, provisioned, or captured. **B10 is now the active branch**; the B09 bullet below is historical.
 
 **B09 continued, 2026-10-18 (cloud-native direction).** The owner made PMV explicitly cloud-native: the Chromebook is a control and development terminal only, never the primary or intermediate store for bulk data and never a bulk-data relay. Within B09 the owner ordered a master data-source inventory and a review of the proposed GCP architecture before any acquisition. Record: `docs/decisions/2026-10-18_b09_cloud_native_data_strategy.md`. Results:
 - inventory: `research/data_sources/master_source_inventory.md`. Licensing is the dominant blocker. No market-data source is AVAILABLE_NOW. Every Kalshi surface PMV would use is NEEDS_LICENCE_CLARIFICATION;
@@ -16,7 +22,7 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
 - **Phase:** Phase 1. No cycle, `T0`, split, or protected scope exists. No real market observation has been acquired, captured, or released to agents. The guard refuses every real request.
 - **Strategy:** late-window, high-confidence (PROJECT_BRIEF.md §3; START_HERE.md "Strategy at a Glance"). B07 and B08 did not change it.
 - **Gate status:** Gate 0 passed. Gate 1 has not been decided. **Historical acquisition is not authorized. Live capture is not authorized.**
-- **Active branch:** `b09/kalshi-source-qualification` (B09; `docs/BRANCH_TIMELINE.md`; record `docs/decisions/2026-10-16_b09_kalshi_source_qualification.md`).
+- **Active branch:** `b10/source-reconnaissance` (B10; `docs/BRANCH_TIMELINE.md`; record `docs/decisions/2026-10-19_b10_source_reconnaissance.md`). Previously `b09/kalshi-source-qualification` (B09; record `docs/decisions/2026-10-16_b09_kalshi_source_qualification.md`), now merged by PR #8:
   - B09 was branched directly from final B08 (`5806d8c`), not from `main`, and contains everything through B08.
   - B08 was merged into `main` by PR #7 (merge commit `a6b5411`) and is a preserved historical checkpoint. B07 was merged by PR #6 (`2a46ffd`).
   - **B09 is source qualification only:** Kalshi official historical data as a candidate first source, and the owner-decision packet for A-1 to A-6. It acquires no data, contacts no Kalshi host, and changes no code. Its provisional verdict is NOT CURRENTLY QUALIFIABLE — EVIDENCE MISSING (the AR-3 terms, AR-B9-1 re-verification, gold existence, and retention depth).

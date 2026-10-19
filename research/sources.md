@@ -897,3 +897,21 @@ The owner checked these official pages and reported their content. They are reco
 - Used for: prohibition on ML training, validation, and benchmarking without prior written consent
 - Source type: official legal page
 - Verification status: owner-verified (no hash in Git)
+
+## B10 data source reconnaissance (2026-10-19)
+
+All retrieved with `curl` through the PMV egress proxy under the owner's B10 charter. Raw bytes are not in Git. Every profile's Evidence table gives the full URL, UTC retrieval time, HTTP status, size, and SHA-256 (VERIFIED-BY-DOC where quoted verbatim). Record: `docs/decisions/2026-10-19_b10_source_reconnaissance.md`.
+
+| Source | Host(s) | Used for | Profile(s) |
+|---|---|---|---|
+| Kalshi OpenAPI 3.34.0, AsyncAPI 2.0.0, changelog, guides (re-fetched) | `docs.kalshi.com` | Delta check against the 2026-10-15 snapshot; trades, candles, book, lifecycle, CFB and Pyth channels | `kalshi_markets.md`, `kalshi_trades.md`, `kalshi_orderbook.md` |
+| Kraken support articles 360047543791 and 360047124832 (updated 2026-10-12) | `support.kraken.com` | Trade archive (7 columns) and OHLCVT archive formats and hosts | `kraken_historical_trades.md`, `kraken_ohlcvt.md` |
+| Kraken REST OpenAPI pages (Trades, OHLC, Depth), WS v2 trade/book/level3/ohlc, book checksum guide, historical-data guide | `docs.kraken.com` | Field semantics; checksum algorithm | `kraken_*.md` |
+| Kraken public REST `Trades` (sample) and WS v2 (sample) | `api.kraken.com`, `ws.kraken.com` | Actual-sample inspection (deleted) | `kraken_historical_trades.md`, `kraken_l2.md`, `kraken_ws_trades.md` |
+| Databento docs (static section files), `databento/dbn` source and test fixtures at commit `82f76c1de6f5c8a1f4b3711fac423f88a3f91d67` (Apache-2.0 repository) | `databento.com`, `github.com`, `raw.githubusercontent.com` | GLBX.MDP3 schemas, timestamps, schema ladder; fixture layout check (fixtures deleted) | `databento_gc_*.md` |
+| CMEGroupPublic `datamine_python` (client code; SECONDARY) | `github.com`, `raw.githubusercontent.com` | DataMine dataset families | `cme_datamine.md` |
+| Pyth Core and Pro documentation | `docs.pyth.network` | Price schemas, aggregation, confidence, market hours, history API | `pyth_gold.md` |
+| Polymarket documentation | `docs.polymarket.com` | Gamma, CLOB, Data API, market WS, resolution, fees, geoblock | `polymarket_markets_book.md` |
+| Tardis documentation and Terms of Service | `docs.tardis.dev` | Dataset types, timestamps, Kraken coverage, licence clause 9.5 | `tardis_kraken_book.md` |
+| Coinbase CDP documentation (Exchange and Advanced Trade) | `docs.cdp.coinbase.com` | Trade side (maker), sequence, L2/L3 channels | `coinbase_exchange.md` |
+| CF Benchmarks BRTI | none (all hosts blocked; repo evidence only) | Methodology and Kalshi usage, SECONDARY | `cf_benchmarks_brti.md` |

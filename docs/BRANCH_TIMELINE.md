@@ -6,26 +6,22 @@ Old branches keep their original names. Their B-numbers are assigned here only; 
 
 ## CURRENT ACTIVE GROUND-TRUTH BRANCH
 
-**`b09/kalshi-source-qualification` (B09)**
+**`b10/source-reconnaissance` (B10)**
 
-- **Designation:** the owner's B09 batch charter of 2026-10-16 (`docs/decisions/2026-10-16_b09_kalshi_source_qualification.md`, "Designation").
-- **Parent:** B08 `b08/prospective-capture-hardening`, at its final commit `5806d8c83afc6c1788db438394c7a0b978b16350`. B09 was branched directly from that commit, not from `main`, even though `main` already contained B08 through merge commit `a6b5411` (PR #7).
-- **Purpose:** Kalshi official historical data source qualification and the owner-decision packet for A-1 to A-6; then, under the owner's 2026-10-18 direction, the master data-source inventory and the cloud-native architecture review (`docs/decisions/2026-10-18_b09_cloud_native_data_strategy.md`). Documentation and design only:
-  - no market data;
-  - no Kalshi data or API host contacted (one HEAD reachability probe of `docs.kalshi.com` on 2026-10-18, headers only; decision record §5.3);
-  - no credential;
-  - no code change.
-- **Head:** the pushed tip of `origin/b09/kalshi-source-qualification`. A commit cannot contain its own hash, so the "Last recorded" head below is the newest commit recorded at the last timeline update. Verify the tip with `git ls-remote origin refs/heads/b09/kalshi-source-qualification`.
-- **Integration:** one pull request into `main`, opened after the owner's B09 decisions are recorded. Merging is the owner's decision, with a normal merge commit (not squash or rebase), and B09 is not deleted afterwards.
+- **Designation:** the owner's B10 batch charter of 2026-10-19 ("This is the next numbered cumulative development batch"; `docs/decisions/2026-10-19_b10_source_reconnaissance.md`, "Designation").
+- **Parent:** B09 `b09/kalshi-source-qualification`, at its final commit `8b4e0261fad30f978fac19c6d81d11b7334d0c97`. B10 was branched directly from that commit (`git switch --detach 8b4e026; git switch -c b10/source-reconnaissance`), not from `main`, even though `main` already contained B09 through merge commit `bbcdd6b` (PR #8).
+- **Purpose:** bounded read-only data-source reconnaissance: connectivity pass, schema profiles, tiny bounded samples (inspected, then deleted), redundancy comparisons, the source × information value matrix, source verdicts, and the minimum viable source set. Documentation plus four development-only standard-library recon scripts; no production code change, no acquisition, no credential, no cloud resource.
+- **Head:** the pushed tip of `origin/b10/source-reconnaissance`. Verify with `git ls-remote origin refs/heads/b10/source-reconnaissance`.
+- **Integration:** one pull request into `main` when the owner directs. Merging is the owner's decision, with a normal merge commit, and B10 is not deleted afterwards.
 - **Status:**
   - Gate 1 is undecided, A-1 to A-6 are unresolved, A-4 is not satisfied, historical acquisition is not authorized, and live capture is not authorized.
-  - Until the owner designates a successor, every new development branch (B10) starts from this branch's final tip.
+  - Until the owner designates a successor, every new development branch (B11) starts from this branch's final tip.
 
 ## Timeline
 
 | ID | Branch | Parent ID | Head commit | Status | Purpose |
 |---|---|---|---|---|---|
-| B00 | `main` | — | baseline `a07fc29` (Gate 0 PASS at `db09acd`); `main` is now at `a6b5411` (B08 merged, PR #7) | Integration branch. Advances only by merged pull request. | Canonical historical baseline: Phase 0 foundation, Gate 0, backup and recovery |
+| B00 | `main` | — | baseline `a07fc29` (Gate 0 PASS at `db09acd`); `main` is now at `bbcdd6b` (B09 merged, PR #8) | Integration branch. Advances only by merged pull request. | Canonical historical baseline: Phase 0 foundation, Gate 0, backup and recovery |
 | B01 | `docs/activate-isolated-autonomy` (remote only) | B00 | `0dd40ca` | Historical checkpoint. Merged by PR #1 (`4eec20c`) | Activation of the isolated autonomous environment |
 | B02 | `phase1/kalshi-data-foundation` | B01 (branched at `4eec20c`) | `899dae6` | Historical checkpoint. Merged by PR #2 (`856083e`) | Phase 1 batch 1: venue-neutral market-data foundation |
 | B03 | `phase1/kalshi-venue-verification` | B02 (branched at `856083e`) | `4ca18e0` | Historical checkpoint. Merged by PR #3 (`c074e9b`) | Phase 1 batch 2: Kalshi venue verification (documentation) |
@@ -34,7 +30,8 @@ Old branches keep their original names. Their B-numbers are assigned here only; 
 | B06 | `b06/governance-continuity-sync` | B05 (branched at `a1752b4`) | `c0d2a2b` (final) | Historical checkpoint, preserved. Merged by PR #5 (`2314326`) | Recovery of the interrupted batch 4 follow-up; owner rulings; strategy objective; phase roadmap; tax requirement; branch continuity; Phase 1 acquisition-readiness tooling |
 | B07 | `b07/phase1-acquisition-pipeline-hardening` | B06 (branched at final `c0d2a2b`) | `9a6b212` (final) | Historical checkpoint, preserved. Merged by PR #6 (`2a46ffd`) | Phase 1 acquisition pipeline hardening (G-1 to G-6), synthetic data only |
 | B08 | `b08/prospective-capture-hardening` | B07 (branched at final `9a6b212`) | `5806d8c` (final) | Historical checkpoint, preserved. Merged by PR #7 (`a6b5411`) | Phase 1 prospective-capture hardening (F-11, F-12/F-27, F-33, F-37/RT-4, book continuity, normalized artifacts), synthetic data only |
-| B09 | `b09/kalshi-source-qualification` | B08 (branched at final `5806d8c`) | Last recorded: see "B09 commits"; tip = timeline-update commit | **CURRENT ACTIVE GROUND-TRUTH BRANCH** | Kalshi official historical source qualification and the A-1 to A-6 owner-decision packet; documentation only |
+| B09 | `b09/kalshi-source-qualification` | B08 (branched at final `5806d8c`) | `8b4e026` (final) | Historical checkpoint, preserved. Merged by PR #8 (`bbcdd6b`) | Kalshi official historical source qualification and the A-1 to A-6 owner-decision packet; cloud-native data strategy, source inventory, procurement packet; documentation only |
+| B10 | `b10/source-reconnaissance` | B09 (branched at final `8b4e026`) | Last recorded: see "B10 commits"; tip = latest pushed commit | **CURRENT ACTIVE GROUND-TRUTH BRANCH** | Data-source reconnaissance: schema profiles, value matrix, source verdicts, minimum viable source set |
 
 PR numbers come from the merge-commit subjects on `main`.
 
@@ -102,7 +99,23 @@ Listed oldest first, and appended at each timeline update.
 | `b5b3bfb` | Canonical architecture rebuilt from scratch and replaced atomically; inventory checked complete; round 4 Red-Team re-review (RESOLVED) and its fixes. Documentation only |
 | `a9a24a5` | Owner procurement packet: `research/data_sources/owner_source_action_sheet.md` (core matrix, prices, contacts, tiers, datasets, messages). Documentation only; nothing bought or downloaded |
 | `9e6e34b` | Documentation sync of procurement conclusions with owner-verified facts; final tiers; outreach queue M1 to M5. Documentation only |
-| (the commit adding this row) | Owner action sheet rebuilt from scratch as one canonical file (one row per source; canonical outreach numbering); pointers synced. Documentation only. Its hash is the branch tip; see `git ls-remote` |
+| `8b4e026` | Owner action sheet rebuilt from scratch as one canonical file (one row per source; canonical outreach numbering); pointers synced. Documentation only. Final B09 commit |
+
+### B10 commits
+
+Listed oldest first, and appended at each timeline update.
+
+| Commit | Content |
+|---|---|
+| (the commit adding this row) | B10 reconnaissance: charter record, connectivity pass, 19 schema profiles, value matrix, source verdicts, minimum viable source set, recon tools, exposure rows X-7 to X-11, reviews. Its hash is the branch tip; see `git ls-remote` |
+
+## Ancestry verification for B10 (2026-10-19)
+
+Verified before B10 was created, in the isolated sandbox, after `git fetch origin` (`origin/main` advanced `a6b5411..bbcdd6b`):
+- `git cat-file -t 8b4e026` returned `commit`, and `git merge-base --is-ancestor 8b4e026 origin/main` returned 0 (B09 is in `main` through `bbcdd6b`, PR #8);
+- `origin/b09/kalshi-source-qualification` was at `8b4e0261fad30f978fac19c6d81d11b7334d0c97`;
+- no `b10/*` branch existed on `origin`;
+- B10 was created with `git switch --detach 8b4e026` then `git switch -c b10/source-reconnaissance`; `git rev-parse HEAD` returned `8b4e026…`, and `git merge-base --is-ancestor 8b4e026 HEAD` returned 0.
 
 ## Ancestry verification for B09 (2026-10-16)
 
