@@ -78,6 +78,24 @@ Abbreviations used below:
 | RT-B10-15 | NOTE | No stray `.claude` directories; sandbox placeholder files | Noted; explicit-path staging |
 | RT-B10-16 | NOTE | Coinbase and Databento probes were HEAD only; provenance complete | Noted |
 
-## Not re-reviewed
+## Round 2: final re-review of the post-fix state (2026-10-19, after the owner's B10-D1 to B10-D11 rulings)
 
-The fixes were applied by the lead session after the reviews, and the reviewers did not re-review them. The owner may request a focused re-review of the revised RD protocol sections (S-B10-01 to S-B10-07) before adopting B10-D3 or B10-D8.
+The same three agents (no new agents) reviewed `05df35a` plus the corrective working tree. Each was asked for PASS / PASS WITH MINORS / FAIL.
+
+| Reviewer | Verdict | BLOCKER | MAJOR | Notes |
+|---|---|---|---|---|
+| Statistician | **PASS WITH MINORS** | 0 | 0 | S-B10-01 to 09 all resolved. Minors m1–m6 fixed: candidate selection uses only closed candles, and the benchmark is labelled conservative and non-admissible; the fill window is max(ask high, remainder of the decision minute plus the next minute); freezing rules; outcome-to-interval mapping; K2 re-run and scope; D9 and D4 consequences written into the redundancy decisions |
+| API / Execution Engineer | First pass **FAIL** (1 MAJOR); final verdict below | 0 | 1 → 0 | API2-B10-01: owner §3 step 4 used `curl %{http_code}`, which shows `000` on a refused CONNECT and could false-pass on an origin 403. Fixed with a CONNECT-only stdlib snippet. Minors m1–m9 fixed: refusal regex excluding 407 plus an in-probe control; wildcard Layer A matching; the `--showlocals` warning; root ownership of managed settings; credential issuer unverified; B-1/B-2 inventory wording; matrix note 28; profile line. Also disclosed a second credential print during its own review (recorded as a process deviation) |
+| Reliability / Red-Team | **PASS WITH MINORS** | 0 | 0 | Confirms the layer and credential handling is correct and honest (no edit of either layer, no route-around), deviations are preserved, there are no raw files, and no credential is in the diff, files, or history. Minors m-1 to m-6 fixed: issuer unverified; D11 applied to the action sheet, the inventory, and phase1; tension-table rows annotated as superseded; data-class Layer A hosts listed for optional owner disposition; D4 note aligned with the owner's wording; this round recorded |
+
+**API / Execution final verdict after the fixes: PASS WITH MINORS** (no BLOCKER, no MAJOR). It confirmed API2-B10-01 and m1–m9 resolved and re-ran the probe (4 failed pending owner action, 4 passed). Its remaining minors were fixed before commit:
+- n1: stale "ns time" in inventory B-1;
+- n2: meaning of an empty reply in §3 step 4;
+- n3: other wildcard forms in the Layer A matcher (glob);
+- n4: step 5 names the current active branch.
+
+**Result: no unresolved BLOCKER or MAJOR in any review.**
+
+## Round 1 fixes
+
+The round 1 fixes were re-reviewed in round 2 above.

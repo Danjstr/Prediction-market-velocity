@@ -99,7 +99,7 @@ Notes in brackets refer to the numbered list below the table.
 25. Databento `ts_in_delta` gives CME's sending time (tag 52) as `ts_recv − ts_in_delta`.
 26. Pyth Core `publish_time` (integer seconds). Pyth Pro `timestampUs` and `feedUpdateTimestamp` (µs). Stale prices are carried forward when markets are closed. Freshness is detectable only from `feedUpdateTimestamp`.
 27. Kalshi `seq` per subscription (inferred scope); no book checksum.
-28. Kraken `trade_id` is a contiguous per-book sequence (verified +1 on samples). The Kraken L2 book has **no sequence number**; integrity is a CRC32 checksum over the top 10 levels (verified 176/176 in B10).
+28. Kraken `trade_id` is a contiguous per-book sequence (verified +1 on samples). The Kraken L2 book has **no sequence number**; integrity is a CRC32 checksum over the top-10 **state** (verified 176/176 in B10). It does not verify stream completeness, levels beyond 10, or stalls (API-B10-01).
 29. Tardis raw replay keeps exchange-native sequence fields. Normalized CSVs do not add one.
 30. Polymarket book messages carry a `hash` (algorithm undocumented) and no sequence number.
 31. The prediction-contract settlement value is a function of the reference series over the contract's window. It is derivable only if the exact rule and tick set are known (BRTI: DET-2, including Kalshi's de-duplication of ticks; Pyth: DET-1).

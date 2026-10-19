@@ -38,11 +38,11 @@ Total 339,000 bytes, 5,000 rows (4,996 unique trades; see pagination). Profiled 
 | Trade archive | Static ZIP files; full history in ~2 GB parts `Kraken_Trades_Full.zip.part00`–`part13`, plus quarterly incremental ZIPs `Kraken_Trades_2026Q1/Q2/Q3.zip`; published SHA-256 for parts and for the joined ZIP | One CSV per pair, header row; `MANIFEST.json` per archive | ZIP (deflate assumed; not inspected) | "each pair from its first trade on Kraken through 30 September 2026" |
 | REST `Trades` | HTTPS JSON, 1,000 rows per call, cursor `since`→`last` | JSON arrays | none observed | From the first trade (`since` paging); "1–2 seconds" safe delay per call |
 
-Doc conflict, now explained: the developer guide says "Kraken does not provide a bulk historical data dump or websocket replay service", while the support article (updated 2026-10-12) publishes the archive. The archive is a support/marketing download, not an API product. B09 E-B09-BTC-3 should be updated: the archive is documented and current.
+Doc conflict, now explained: the developer guide says "Kraken does not provide a bulk historical data dump or websocket replay service", while the support article (updated 2026-10-12) publishes the archive. The archive is a support/marketing download, not an API product. B09 E-B09-BTC-3 is updated accordingly (B10-D7): the archive is documented and current.
 
 ## Fields
 
-Archive (verbatim, support article): "each row has seven columns: `timestamp, price, volume, type, order_type, misc, trade_id` where `type` is `b` (buy) or `s` (sell) and `order_type` is `l` (limit) or `m` (market). Rows are ordered by timestamp." **This corrects B09**, which recorded only timestamp, price, and volume (`inventory_btc_detail.md` B-2, from search summaries).
+Archive (verbatim, support article): "each row has seven columns: `timestamp, price, volume, type, order_type, misc, trade_id` where `type` is `b` (buy) or `s` (sell) and `order_type` is `l` (limit) or `m` (market). Rows are ordered by timestamp." This corrects B09, which left the archive's columns, sequence field, and timestamp precision unverified (`inventory_btc_detail.md` B-2: "Seq UNKNOWN; TS precision UNKNOWN", support articles refused). The phrase "price, volume, and timestamp only" that circulated during B10 came from the B10 lead's own subagent brief, not from B09. The B09 rows are corrected in this batch (owner decision B10-D7).
 
 REST (verbatim, OpenAPI `trade` schema): "`[<price>, <volume>, <time>, <buy/sell>, <market/limit>, <miscellaneous>, <trade_id>]`".
 

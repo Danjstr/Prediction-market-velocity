@@ -1,6 +1,6 @@
 # PMV source redundancy decisions and minimum viable source set (B10, 2026-10-19)
 
-**Status: evidence-based recommendations, not approved requirements.** These verdicts are reconnaissance results. They approve no acquisition, purchase, licence, capture, or connector. Every acquisition still needs per-source owner approval and the gate A-1 to A-8 (`docs/external_access.md` §2). The licence outreach M1 to M5 (`owner_source_action_sheet.md`) still governs whether any source is usable.
+**Status: adopted by the owner as the acquisition-planning baseline (B10-D3, 2026-10-19). "This is not evidence of predictive value."** The owner's rulings on B10-D1 to B10-D11 are recorded in `docs/decisions/2026-10-19_b10_source_reconnaissance.md`. These verdicts are reconnaissance results. They approve no acquisition, purchase, licence, capture, or connector. Every acquisition still needs per-source owner approval and the gate A-1 to A-8 (`docs/external_access.md` §2). Usability is governed by each source's licence determination (A-2). For Kraken, that means the published-terms snapshot and classification of B10-D11 (as replaced), with correspondence only if a material ambiguity remains. Kalshi, Databento, and others follow their outreach rows (M1, M3–M5) where terms are ambiguous.
 
 **What B10 can and cannot establish.** It can establish information availability, uniqueness, reconstructibility, engineering cost, timing fidelity, and settlement fidelity. It **cannot** show that any feature or source improves calibration or net EV. Every source whose value depends on predictive usefulness stays CONDITIONAL until it passes the normal development walk-forward process. A promotion test is one more degree of freedom: it is logged in the experiment ledger, its comparison and threshold are fixed before it runs, and it uses development data only (never the protected holdout).
 
@@ -8,15 +8,32 @@ Inputs: `source_feature_value_matrix.md`; `schema_profiles/*.md`. Revised after 
 
 ## Promotion-test protocol (applies to every CONDITIONAL source)
 
-Proposed; owner decision B10-D8 adopts it and sets the numbers. Each promotion test is preregistered in the experiment ledger before any look at its outcome, and states:
+Adopted in principle by the owner (B10-D8, 2026-10-19), including the informative/underpowered distinction. "Exact numerical thresholds/power requirements must be frozen during cycle registration BEFORE the corresponding test results are observed." Each promotion test is preregistered in the experiment ledger before any look at its outcome, and states:
 1. **One primary estimand.** For example, Δ tail log loss in fixed probability × remaining-time strata, or net EV at the primary H-5 latency rung. Secondary metrics are reported, never decisive. No OR-logic across metrics.
 2. **A minimum effect δ and decision rule.** A block-bootstrap (by day) lower confidence bound against δ.
 3. **A power and minimum-detectable-effect statement** for the planned development span, using distinct settlement instants or days as the unit (not markets: overlapping series share settlement instants).
-4. **Three outcomes:** PROMOTE, REJECT, or UNDERPOWERED-DEFER. An underpowered test never silently becomes a permanent DROP.
+4. **Three outcomes**, mapped to the confidence interval for the primary estimand (review S2-B10-m3):
+   - PROMOTE when the lower bound exceeds δ;
+   - REJECT when the upper bound is below δ;
+   - UNDERPOWERED-DEFER when the interval straddles δ, or when the preregistered MDE exceeds δ.
+
+   An underpowered test never silently becomes a permanent DROP.
 5. **An error-rate budget** (FWER or FDR) across all promotion tests. The Databento depth ladder (TBBO → MBP-1 → MBP-10 → MBO) and the Kraken book family each count as **one** family.
 6. **A ledger entry for every look**, counted as development-pool degrees of freedom (`docs/phase2.md`).
+7. **Freezing (B10-D8; review S2-B10-m2):**
+   - numbers for tests registered with a cycle are frozen at cycle registration;
+   - any test run before registration has its numbers frozen in the ledger before data access, and registration never resets them;
+   - tests designed later (for example Pyth after DET-1) are frozen at their preregistration, before any look;
+   - diagnostics released before a freeze must not depend on outcomes: no proxy-vs-`expiration_value` or `result`-conditioned statistics from acquisition QA or profiling.
 
-**Relation to S-9 (`docs/phase2.md`).** Promotion is an **acquisition decision only**. Archive-validated results are discovery evidence; any feature from a promoted source still needs the receipt-time (RECEIPT + PIT_CAPTURED) selection comparison before it can enter an audit candidate. Consequence: a reference source (BRTI or Pyth) can enter a cycle-1 candidate only if PMV captures it prospectively, with power, before `T0 − m`. The Kalshi CFB and `pyth_value` channels are live-only, so deferring them decides by default that cycle 1 cannot use them. That is an explicit owner decision (B10-D9), required before cycle registration.
+**Under the owner's default policy (B10-D4)**, where terms do not clearly permit showing licensed rows to agents:
+- M-0, Part A, and every promotion test run as deterministic, preregistered pipelines whose outputs are aggregates;
+- row-level leakage and timestamp audits (strike point-in-time availability, `metadata_updated`, `is_provisional` survivorship, `trade_id` gaps) are deterministic diagnostics designed before the data are seen;
+- every aggregate or diagnostic request on the development pool is a logged look.
+
+How this squares with the Phase 5 Independent Statistical Auditor's mandate to review raw evidence directly is an open question for the owner before the first release (review S2-B10, D4 consequences).
+
+**Relation to S-9 (`docs/phase2.md`).** Promotion is an **acquisition decision only**. Archive-validated results are discovery evidence; any feature from a promoted source still needs the receipt-time (RECEIPT + PIT_CAPTURED) selection comparison before it can enter an audit candidate. Consequence: a reference source (BRTI or Pyth) can enter a cycle-1 candidate only if PMV captures it prospectively, with power, before `T0 − m`. The Kalshi CFB and `pyth_value` channels are live-only, so deferring them decides by default that cycle 1 cannot use them. The owner **deferred** this decision (B10-D9) until the settlement mechanics are resolved and the CF Benchmarks quote is obtained. It may be settled after registration only if capture can still start early enough to reach power before `T0 − m`. While it is deferred, cycle 1 uses the Kraken-only proxy whatever Part A shows, and the BRTI route that an UNINFORMATIVE M-0 opens serves cycle 2 or later, or development discovery from a licence (review S2-B10, D9 consequences).
 
 ## Verdict definitions
 
@@ -55,7 +72,7 @@ Proposed; owner decision B10-D8 adopts it and sets the numbers. Each promotion t
 | Kraken WS v2 `book` (L2, **depth 10 preferred**), PMV capture | CONDITIONAL for **use**; **recommend capture** alongside `trade` | Spread, depth, imbalance, microprice, and queue changes are not derivable from trades. Kraken has no historical L2, so this information cannot be obtained later. The CRC32 checksum verifies the **top-10 state** at each message (176/176 in B10). It does not verify event-stream completeness, levels beyond 10, or stalls (review API-B10-01; capture requirements in `kraken_l2.md`). Conditions for capture-but-not-use (review S-B10-10): non-use is enforced by release controls and logged access; a separate connection, or proof that book volume cannot cause backpressure on the CORE trade channel; top-10 tagged as verified. Pre-`T0 − m` capture is unlikely to power a tail test, so L2 realistically serves cycle 2 |
 | Kraken `level3` | DROP | Needs an authenticated API credential (a new secret surface) for marginal value at this horizon |
 | CF Benchmarks BRTI (direct licence or Kalshi CFB channel) | CONDITIONAL | Expected unique value (untested): **settlement fidelity** (the exact level in settlement units, the venue-to-index basis, and how much of the final-minute average is already realized). Relative to Kraken alone, BRTI also aggregates multi-venue price discovery, so 'not a new velocity signal' holds only when all constituents are retained (review S-B10-09) |
-| Tardis.dev (historical Kraken L2, quotes, `local_timestamp`) | CONDITIONAL | The only economical **historical** BTC book and vendor receipt time. Archive-class data: discovery and training only under S-9. Book features must be truncated to PMV's live depth (Tardis records depth 1000) for training/serving parity. It does not add aggressor side (the free archive has it) and has no Kraken L3. **New licence question:** clause 9.5 excludes LLMs and requires written flow-down terms before disclosure to an "external service provider", including for free samples. This conflicts with PMV's agent-assisted development unless resolved |
+| Tardis.dev (historical Kraken L2, quotes, `local_timestamp`) | CONDITIONAL | The only economical **historical** BTC book and vendor receipt time. Archive-class data: discovery and training only under S-9. Book features must be truncated to PMV's live depth (Tardis records depth 1000) for training/serving parity. It does not add aggressor side (the free archive has it) and has no Kraken L3. **Licence:** clause 9.5 excludes LLMs and requires written flow-down terms before disclosure to an "external service provider", including for free samples. Under the owner's default policy (B10-D4), Tardis rows would stay outside LLM/agent context unless the terms clearly permit that use; deterministic code may process them, and agents work from schemas, aggregates, and diagnostics. No outreach is made merely to ask this |
 | Coinbase (public API and licensed data) | **DROP** (for now) | Ordinary terms need prior written consent for ML use. No free history. The maker-side convention is a correctness hazard. Its unique contributions (largest BRTI weight; cross-exchange lead-lag) are **untested**. The BRTI test addresses only the reference-fidelity part; the cross-venue information experiment below addresses the rest. The loss of live-only Coinbase L2/L3 is recorded as accepted |
 
 **BRTI proxy measurement and promotion experiment (free, development data only; revised after reviews S-B10-01, -02, -06, -12).**
@@ -70,13 +87,13 @@ Proposed; owner decision B10-D8 adopts it and sets the numbers. Each promotion t
 5. Dependence: the unit is the distinct settlement instant (15-minute and hourly series share instants; one window's close average is likely the next window's strike). Block-bootstrap by day. Stratify by rulebook regime and BRTI constituent changes (2024-11-27, 2025-03/07, 2026-07/08).
 6. Any bias correction is estimated walk-forward from settlements already published (after `settlement_ts`) before the decision. Never fit it over the full span.
 
-*Preregistered consequence for M-0 (proposed amendment to D-B09-18 K2; owner decision B10-D8).* If the measured differential error exceeds a fixed bound (in σ·√τ units, set before Part A runs), an M-0 failure is recorded as **UNINFORMATIVE**, not FAILED. K2 then permits a BRTI route (the Kalshi CFB channel, or a licence) instead of stopping the project on a measurement artifact.
+*Preregistered consequence for M-0 (amendment to D-B09-18 K2, adopted in principle by B10-D8; the bound is frozen at cycle registration, before Part A results are observed).* If the measured differential error exceeds that fixed bound (in σ·√τ units), an M-0 failure is recorded as **UNINFORMATIVE**, not FAILED. K2 then permits a BRTI route (the Kalshi CFB channel, or a licence) instead of stopping the project on a measurement artifact. An UNINFORMATIVE result opens only the BRTI route, not Tardis or Pyth spending. A re-run of M-0 through the BRTI route is preregistered with the same thresholds, logged as a second look on the same development span, and the original M-0 result stays on record (review S2-B10-m5).
 
 *Part B: promotion test, run alongside M-0.* Promote BRTI to CORE if replacing the proxy with the exact reference improves the primary estimand (protocol above) by at least δ. Part B needs the reference itself, so it can run only on captured CFB data or licensed history.
 
 **Cross-venue information experiment (new; review S-B10-09).** Whether multi-venue price discovery (BRTI itself as a feature, or a second constituent such as Coinbase, Bitstamp, or Gemini) adds information beyond Kraken alone is untested. Run it on PMV-captured Kalshi CFB data, or on a licensed second constituent, under the protocol above. As a replacement path if the Kraken-only proxy fails, assess the licence and history of one or two further free BRTI constituents (Bitstamp, Gemini, Bullish, Crypto.com, LMAX) before any Coinbase consent request.
 
-**Tardis promotion experiment (revised, review S-B10-10).** Only if (a) a prospective test of Kraken book features on PMV-captured L2 ends **UNDERPOWERED-DEFER with a promising point estimate**, so that more history is needed for discovery and training, or (b) latency and staleness rules need historical receipt-time evidence before PMV capture is long enough; **and** (c) the clause 9.5 and external-service-provider question is resolved in writing. Tardis data serve discovery and training only (archive class under S-9); selection still runs on receipt-time folds. Book features are truncated to PMV's live depth. Smallest slice: Spot plan, quarterly.
+**Tardis promotion experiment (revised, review S-B10-10).** Only if (a) a prospective test of Kraken book features on PMV-captured L2 ends **UNDERPOWERED-DEFER with a promising point estimate**, so that more history is needed for discovery and training, or (b) latency and staleness rules need historical receipt-time evidence before PMV capture is long enough; **and** (c) the published Tardis terms are snapshotted and classified for PMV's use, with rows kept outside agent context unless the terms clearly permit otherwise (B10-D4). Tardis data serve discovery and training only (archive class under S-9); selection still runs on receipt-time folds. Book features are truncated to PMV's live depth. Smallest slice: Spot plan, quarterly.
 
 **Coinbase reconsideration.** Only if the BRTI test fails and BRTI cannot be licensed. Then test whether a Kraken + Coinbase proxy closes the error, under written Coinbase consent.
 
@@ -110,7 +127,7 @@ Recoverable later (can be bought or derived): Kraken OHLCVT, Databento OHLCV and
 |---|---|---|
 | Kalshi L2, quoted size, receipt time (WS book) | CORE capture (P1) | Lost permanently |
 | Kalshi `ticker` (tick-level OI, dollar volume, independent BBO check) | Capture as integrity cross-check (P1) | Lost permanently |
-| Kalshi CFB and `pyth_value` channels (reference as Kalshi receives it, with `received_at`) | CONDITIONAL; capture decision B10-D9 before cycle registration | Lost permanently; cycle 1 cannot use reference features or audit protected labels against them |
+| Kalshi CFB and `pyth_value` channels (reference as Kalshi receives it, with `received_at`) | CONDITIONAL; capture **deferred** by the owner (B10-D9) until the BTC/gold settlement mechanics are resolved and the CF Benchmarks quote is obtained | Lost permanently; cycle 1 cannot use reference features or audit protected labels against them |
 | Kraken L2 book | Capture recommended (P2) | Lost permanently (Tardis sells history only from its own collector) |
 | Polymarket books and sub-minute prices (1-minute history ages out after about 7 days) | Deferred | Lost permanently; **accepted cost** |
 | Kraken `level3`; Coinbase L2/L3 | DROP | Lost permanently; **accepted cost** |
@@ -119,7 +136,9 @@ Recoverable later (can be bought or derived): Kraken OHLCVT, Databento OHLCV and
 
 Optimized against vendor count, duplicated information, paid feeds, connector count, cleaning complexity, synchronization, timestamp ambiguity, storage, and model degrees of freedom. Not optimized for data volume.
 
-### Stage 1: BTC hypothesis test (free once licensed; M1 Kalshi, M2 Kraken)
+### Stage 1: BTC hypothesis test (free once licensed)
+
+**Kraken gate (owner decision B10-D11 as replaced, verbatim):** "No further Kraken bulk acquisition begins until the current governing published terms are snapshotted and classified for private own-account PMV use. Vendor correspondence is required only if that review leaves a material ambiguity. Vendor non-response is not itself an acquisition blocker where the published terms clearly authorize the intended private use." Silence is never represented as permission. Kalshi remains gated by M1 and the A-2 determination.
 
 | # | Dataset | Exact scope | Connector |
 |---|---|---|---|
@@ -129,12 +148,12 @@ Optimized against vendor count, duplicated information, paid feeds, connector co
 | 4 | Kalshi contract terms | KXBTC15M (and siblings) rule text | owner download |
 | 5 | Kraken trade archive, XBTUSD only | Development span, plus REST `Trades` gap fill to the archive cutoff | Archive file fetch (host `assets.kraken.com`) + REST pager |
 
-That is two vendors, two historical connectors, zero paid data. It can run an **informative** M-0 go/no-go (D-B09-18) only if two conditions hold: the BRTI proxy measurement (Part A) bounds the proxy error, and the executable-price convention below is preregistered.
+That is two vendors, two historical connectors, zero paid data. Prospective capture (P1–P2) runs in the separately chartered cloud capture environment, never in the Claude development sandbox (B10-D10). Kraken L2 is captured alongside trades once capture is chartered, and is not used as a feature without its preregistered promotion test (B10-D5). It can run an **informative** M-0 go/no-go (D-B09-18) only if two conditions hold: the BRTI proxy measurement (Part A) bounds the proxy error, and the executable-price convention below is preregistered.
 
 **Stage 1 executable-price convention (proposed; review S-B10-03; D-B09-18 permits M-0 at the ask only if candles give ask quotes at decision resolution).**
-- Features use only candles with `end_period_ts` ≤ decision time (the live candle is mutable).
-- The market baseline uses the freshest admissible prediction-market state: the close of the minute containing the decision. This is conservative against the model.
-- The entry price is the **ask high of the next minute** (primary H-5 rung). The ask close is a diagnostic only.
+- Features **and candidate selection** use only candles with `end_period_ts` ≤ decision time (the live candle is mutable). This covers the probability band, the ~$0.85 candidate floor, and which markets are evaluated, so the evaluated set is never chosen with future information (review S2-B10-m1).
+- The market **benchmark** uses the close of the minute containing the decision. That close is after the decision time, so the benchmark is deliberately conservative against the model; it is not an admissible feature.
+- The entry price for the primary H-5 rung is the **maximum of the ask high over the remainder of the decision minute and the next minute**: the next-minute high alone could miss a worse ask later in the decision minute. The ask close is a diagnostic only.
 - NO-side ask = 1 − YES bid, with high and low swapped.
 - A second, size-bearing check: realized taker-buy prints (`taker_book_side`, `count_fp`), with their selection caveat.
 - No capacity claim (quoted size is absent historically).
@@ -168,18 +187,18 @@ That is two vendors, two historical connectors, zero paid data. It can run an **
 | P1 | Kalshi WS `orderbook_delta`, `trade`, `market_lifecycle_v2`, and `ticker` (integrity cross-check) for the approved series; optional periodic REST order-book reconciliation probes |
 | P2 | Kraken WS v2 `trade` + `book` (depth 10 preferred) for BTC/USD (book captured, use CONDITIONAL; capture requirements in `kraken_l2.md`) |
 | P3 | (Gold, later) Databento live trades, or Kalshi `pyth_value` once DET-1 and pricing allow |
-| P4 | Kalshi CFB channel (and `pyth_value`): **owner decision B10-D9 before cycle registration**, because deferral excludes reference features from cycle 1 |
+| P4 | Kalshi CFB channel (and `pyth_value`): **deferred** (B10-D9) until the BTC/gold settlement and reference mechanics are resolved and the CF Benchmarks quote is obtained. Consequence under S-9: while deferred, cycle 1 cannot use reference-channel features |
 
 ### Not worth acquiring yet
 
 - Kraken OHLCVT full archive (one quarterly file for QA only);
-- Tardis (any plan, including free first-of-month files, until the clause 9.5 question is answered);
+- Tardis (any plan, including free first-of-month files, until its published terms are snapshotted and classified; rows stay outside agent context unless the terms clearly permit it, B10-D4);
 - Coinbase data;
 - CME DataMine;
 - Databento `tbbo`, `bbo-*`, `mbp-1`, `mbp-10`, `mbo`, `ohlcv-*`;
 - CF Benchmarks BRTI licence (request the quote only, M4);
 - Pyth Pro;
-- Kalshi CFB and Pyth WS entitlements (but see B10-D9: live-only; decide before cycle registration);
+- Kalshi CFB and Pyth WS entitlements (deferred, B10-D9; live-only, so the loss while deferred is permanent);
 - Polymarket data of any kind;
 - Kraken `level3`.
 

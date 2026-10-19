@@ -94,8 +94,8 @@ After `git fetch origin` (`origin/main` advanced `a6b5411..bbcdd6b`):
 |---|---|---|---|
 | CLAUDE.md Host-Class Rule: "historical data files are fetched only by deterministic project tooling into the protected raw store … never into agent context"; class 1: real historical observations are agent-visible only after per-row release; `docs/external_access.md` §1.1 rule 9 | The charter expressly permits "tiny bounded OLD historical samples" and "official sample files" for agent inspection | Treated as a **narrow, explicit owner exception for B10 reconnaissance only**. Samples were bounded (≤ 5,000 rows, ≤ 10 MB), old where the endpoint allowed, kept only in git-ignored `.recon_tmp/`, then deleted. Every inspected period is registered as development-exposed (exposure rows X-7 to X-11). Nothing acquired enters the raw store or any development dataset | Confirm that the charter was intended as this exception (B10-D1) |
 | CLAUDE.md class 4 and `docs/external_access.md` §1 `live-data` row: live observations need a charter that authorizes them "for that host, purpose, and observable family"; `api.kraken.com/0/public/` is `live-data` class under §1.1 rules 1 and 8 | The charter says "public market-data endpoints" and allows stream messages "to determine message semantics", but names **no host and no observable family** (review RT-B10-02) | One live Kraken WS capture (200 messages, about 30 s) and one old REST `Trades` pull (5 pages), both BTC, for schema verification. No cycle or `T0` exists, so class 3 is not engaged. Registered as X-7 and X-8. The values are not development data. Beyond schema verification, the profiles record derived activity statistics (spacing, lag, counts) of these samples, which arguably exceeds the authorized purpose (review RT-B10-06) | Confirm that the charter covered `api.kraken.com` and `ws.kraken.com` for BTC, for schema verification (B10-D1). Future charters name hosts and families |
-| Terms-first (`docs/external_access.md` §1.1 rule 3; rule 6 requires it in every agent brief); D-B09-17(a) pending | Kalshi, Kraken, Polymarket, Pyth, and Coinbase terms live on refused hosts | Documentation hosts were read under the charter's "official vendor documentation; public API documentation". **Terms were not read for any of these vendors**, so "no terms bar observed" means only that none was seen, not that terms-first was satisfied (review RT-B10-03). The B10 common agent brief stated the host-class rule but **omitted the terms-first rule** (a rule-6 deviation) | D-B09-17(a) stays the owner's (B10-D2) |
-| Kraken data under a known permission posture | Kraken's API notice requires prior permission for non-personal commercial use of public market data (M2 pending; `owner_source_action_sheet.md` B1/B2). B10 fetched Kraken REST and WS data without reading those terms (RT-B10-03) | Two bounded requests for schema verification only, under the charter | No further Kraken data request of any kind until M2 is answered (B10-D11) |
+| Terms-first (`docs/external_access.md` §1.1 rule 3; rule 6 requires it in every agent brief); D-B09-17(a) pending | Kalshi, Kraken, Polymarket, Pyth, and Coinbase terms live on refused hosts | Documentation hosts were read under the charter's "official vendor documentation; public API documentation". **Terms were not read for any of these vendors**, so "no terms bar observed" means only that none was seen, not that terms-first was satisfied (review RT-B10-03). The B10 common agent brief stated the host-class rule but **omitted the terms-first rule** (a rule-6 deviation) | D-B09-17(a) stays the owner's (B10-D2). *As at `05df35a`; superseded by the owner ruling on B10-D2 below* |
+| Kraken data under a known permission posture | Kraken's API notice requires prior permission for non-personal commercial use of public market data (M2 pending; `owner_source_action_sheet.md` B1/B2). B10 fetched Kraken REST and WS data without reading those terms (RT-B10-03) | Two bounded requests for schema verification only, under the charter | No further Kraken data request of any kind until M2 is answered (B10-D11). *As proposed at `05df35a`; rejected and replaced by the owner (see B10-D11 below): Kraken bulk acquisition waits for a published-terms snapshot and classification, not for correspondence* |
 | `docs/external_access.md` §1.1 rules 9 and 11: every `raw.githubusercontent.com` URL is `hist-data` or `unknown`, and agents do not fetch it | The Databento research agent fetched eight `.dbn` test fixtures from the `databento/dbn` repository (real market data: E-mini S&P 2020-12-28, a US equity, CME options, one unidentified CME instrument from 2023-04-23). It also fetched Rust and Python **source files** from `databento/dbn` and `CMEGroupPublic/datamine_python` via `raw.githubusercontent.com` (review RT-B10-04) | The fixtures were treated as the charter's "official sample files"; repository test fixtures are not designated vendor sample files, so this is an interpretation. The source-file fetches are an undisclosed-in-draft rule-9 deviation, now disclosed. Fixtures deleted; registered as X-11 | Confirm that repository test fixtures count as "official sample files" (folded into B10-D1) |
 | Network control: F-09 wildcard host-class denies (`api.*`, `ws.*`, …) mirrored in the sandbox deny list | `api.kraken.com`, `ws.kraken.com`, and `api.exchange.coinbase.com` were **reachable** although they match `api.*.*`, `ws.*.*`, and `api.*.*.*` (review RT-B10-01). Only exact-named hosts were refused as "on the deny list"; other refusals came from the allowlist. No sandbox bypass occurred (no `allowed_domains`, no sandbox-disable flag). So the wildcard class denies are **not an effective network backstop** once the owner allowlists a host: the embargo on live BTC hosts rests on the allowlist and agent discipline | Recorded here. Kraken WS is a direct equivalent observable for BTC, so this becomes BLOCKING before any cycle's `T0 − m` | Revert the allowlist entries for `api.kraken.com`, `ws.kraken.com`, and `api.exchange.coinbase.com` when B10 closes, and add a deterministic egress check (pre-`T0` checklist) asserting that live-data hosts are refused (B10-D10) |
 | Cloud-native decision (2026-10-18): the Chromebook must not hold bulk data | Temporary samples sat in `/workspace/.recon_tmp/` | About 411 KB in total (339,000 + 62,136 bytes, plus about 10 KB of fixtures), deleted after inspection; small metadata only | None |
@@ -149,7 +149,7 @@ The decision not to sample:
 
 ### Main findings
 
-1. **The Kraken trade archive carries seven columns:** `timestamp, price, volume, type, order_type, misc, trade_id` (support article updated 2026-10-12). This corrects B09 (`inventory_btc_detail.md` B-2: "price, volume, timestamp only"). Aggressor side is therefore free historically, and Tardis does not add it.
+1. **The Kraken trade archive carries seven columns:** `timestamp, price, volume, type, order_type, misc, trade_id` (support article updated 2026-10-12). B09 had left the columns, sequence field, and timestamp precision unverified (`inventory_btc_detail.md` B-2: "Seq UNKNOWN; TS precision UNKNOWN"). **Attribution correction (follow-up):** an earlier version of this item quoted B09 as saying "price, volume, timestamp only". That phrase came from the B10 lead's own subagent brief, not from B09. Aggressor side (inferred taker side) is therefore free historically, and Tardis does not add it. The B09 rows are corrected in this batch (B10-D7).
 2. **Kraken REST `Trades` pagination repeated the boundary trade on every page** (OBSERVED at 4 of 4 boundaries; not documented). Collectors pass `last` verbatim, drop only identical overlap rows, and fail closed on any `trade_id` gap. The REST `time` field is a serialized float64: sub-µs digits are artifacts; join sources on `trade_id`, never on time.
 3. **The Kraken top-10 L2 state is checksum-verifiable at each message boundary:** 176 of 176 CRC32 checksums reproduced from snapshot plus updates (fixed-decimal formatting inferred, not documented). Event-stream completeness, levels beyond 10, and stalls are **not** verifiable: there is no sequence number (review API-B10-01). Kraken offers no historical L2.
 4. **Kraken OHLCVT is derivable from trades.** The archive rows have no VWAP. The REST last bar is uncommitted and mutable.
@@ -157,7 +157,7 @@ The decision not to sample:
 6. **Databento:** `ts_event` is matching-engine time (MDP3; for MDP 2 data before 2017-05-21 it maps to CME SendingTime). `ts_recv` is PTP-synchronized vendor capture time from 2017-05-21 (earlier: equal to `ts_event`, flagged `F_BAD_TS_RECV`; millisecond-only before 2015-11-20). `ts_in_delta` gives CME send time (absent from `definition`, `status`, and `bbo-*`). The schema ladder: trades < TBBO/BBO < MBP-1 < MBP-10 < MBO. From 2017-05-21, MBO derives everything below it given snapshots, but not CMBP-1/CBBO (implied), statistics, definition, or status. **Cheapest sufficient for gold: `trades` + `definition` + `statistics` (+ `status`).** Bar `ts_event` is the bar start (a leakage hazard).
 7. **CME DataMine is the same MDP3 data** through a different delivery path. Its only extras are block trades, EOD files, and PCAP.
 8. **Gold reference:** Pyth XAU is a publisher-median spot reference "derived from futures". The GOLD index feeds are undocumented by Pyth. Pyth Core moved onto Pyth Pro on 2026-08-26 (a potential regime break). Stale prices are carried forward. COMEX and Pyth are different economic objects (basis; session coverage). DET-1 stays open.
-9. **BRTI:** B09 described it as a once-per-second index. It is published at 200 ms (the Kalshi 5 Hz channel). Its unique value is settlement fidelity, not velocity. A free proxy test against Kalshi `expiration_value` is possible inside the CORE data.
+9. **BRTI:** it is published at 200 ms (the Kalshi 5 Hz channel carries it; the ~1 Hz channel adds 60-second averages). **Attribution correction (follow-up):** an earlier version of this item said B09 described BRTI as once-per-second. B09 in fact recorded "200 ms / 1 s" (`master_source_inventory.md` B-12); the once-per-second phrasing came from the B10 lead's subagent brief. B09 rows without a cadence are annotated in this batch (B10-D7). Its expected unique value is settlement fidelity, not velocity (untested). A free proxy test against Kalshi `expiration_value` is possible inside the CORE data.
 10. **Polymarket:** BTC up/down resolves on a Chainlink TWAP. It is another crowd's estimate of a nearly identical event. US persons are close-only. Deferred.
 11. **Tardis licence clause 9.5** excludes LLMs and requires written, Tardis-enforceable terms before disclosure to an "external service provider", including for free samples. This may conflict with PMV's agent-assisted development (new owner question B10-D4).
 12. **Coinbase `side` is the maker side,** the opposite of Kraken and Tardis.
@@ -183,6 +183,8 @@ Registered in `docs/exposure_register.md` Part A as rows X-7 to X-11. No price, 
 
 ## Owner-decision packet (B10)
 
+*As proposed at `05df35a`. The owner ruled on every item on 2026-10-19; see "Owner decisions on the B10 packet" below. Where a ruling differs from a recommendation (B10-D2 clarified, B10-D4 not approved, B10-D7 done now, B10-D8 thresholds frozen at cycle registration, B10-D9 deferred, B10-D11 replaced), the ruling governs.*
+
 | # | Decision | Recommendation | Urgency |
 |---|---|---|---|
 | B10-D1 | Confirm that the B10 charter (a) was intended as a narrow exception to the CLAUDE.md agent-context rule for historical files, limited to reconnaissance; (b) covered `api.kraken.com` and `ws.kraken.com` for BTC, for schema verification; (c) counts repository test fixtures (`databento/dbn`) as "official sample files" | Confirm. Future charters name hosts, observable families, and sample sources explicitly | Before any similar batch |
@@ -197,8 +199,79 @@ Registered in `docs/exposure_register.md` Part A as rows X-7 to X-11. No price, 
 | B10-D10 | Revert the allowlist entries for `api.kraken.com`, `ws.kraken.com`, and `api.exchange.coinbase.com` at B10 close; add a deterministic egress check asserting that live-data hosts are refused | Approve | At B10 close; the check is BLOCKING before any `T0 − m` |
 | B10-D11 | No further Kraken data request of any kind until M2 (Kraken permission) is answered | Approve | Now |
 
+## Owner decisions on the B10 packet (2026-10-19, second direction)
+
+Issued by the owner in "B10 OWNER DECISIONS + FINAL RE-REVIEW" on 2026-10-19, after `05df35a`. The rulings below are verbatim; the "Applied" lines say what this follow-up commit did.
+
+**B10-D1: APPROVED.** "The B10 charter intentionally authorized bounded read-only public-market samples for the named source families for schema/semantics reconnaissance. Future charters must explicitly name hosts/data families."
+- Applied: the B10 samples (X-7, X-8, X-11) stand as authorized reconnaissance. The process deviations listed above stay recorded as they happened.
+
+**B10-D2: APPROVED WITH CLARIFICATION.** "Official public documentation may be read under an explicit research charter. Governing terms must be checked and recorded before actual market-data acquisition/sample use. Reading documentation itself does not require a separate prior terms fetch unless a source-specific restriction says otherwise."
+- Applied: recorded as an owner clarification of terms-first in `docs/external_access.md` §1.1 rule 3. The B10 Kraken sample fetches came **before** any terms review. Under this clarification that is a deviation, and it stays recorded (tension table, Kraken row).
+
+**B10-D3: APPROVED.** "Adopt the B10 minimum-source-set verdicts as the acquisition-planning baseline. This is not evidence of predictive value."
+- Applied: `research/data_sources/source_redundancy_decisions.md` status line.
+
+**B10-D4: NOT APPROVED AS WRITTEN.** "Do not initiate new Kalshi/Kraken/Databento outreach merely to ask whether raw licensed rows may be shown to LLM agents." Default policy (verbatim):
+> - raw/licensed market rows stay outside LLM/agent context unless terms clearly permit that use;
+> - deterministic code may acquire/profile/process authorized data;
+> - agents may work from schemas, provenance, aggregates, diagnostics and appropriately permitted development evidence.
+- Applied: recorded in `docs/external_access.md` §2 (after A-8) and in `source_redundancy_decisions.md`. The Tardis clause 9.5 concern is now handled by this default: Tardis rows would stay outside agent context unless the terms clearly permit it. No outreach is added.
+
+**B10-D5: APPROVED CONDITIONALLY.** "When prospective capture is separately chartered, capture Kraken L2 alongside trades because it is live-only and cannot be recreated later. Do not promote L2 to a model feature without its preregistered promotion test."
+
+**B10-D6: APPROVED.** "Proxy credential must be rotated before B10 closure because it was printed in the session transcript."
+- Status: **owner action pending; not performable from the agent sandbox.** The credential's issuer is unverified: it may be the outer PMV egress proxy, or the Claude Code sandbox runtime, minted per session (`docs/owner_actions/README.md` §3 step 3). Either way, agents cannot rotate it, and no agent-runnable rotation procedure exists in the repository. Agents must not alter the egress layers. The exact owner steps are in `docs/owner_actions/README.md` §3. **B10 is not closed until the owner confirms rotation.**
+
+**B10-D7: APPROVED,** correct the stale B09-derived documentation in this follow-up commit.
+- Applied:
+  - `research/data_sources/inventory_btc_detail.md` B-2 and note 4 / E-B09-BTC-3: seven archive columns, `trade_id` sequence, doc conflict resolved;
+  - `research/data_sources/master_source_inventory.md` B-2, B-12, B-14: columns; BRTI 200 ms publication and the 5 Hz channel;
+  - `research/data_sources/owner_source_action_sheet.md` B1 and K4: same;
+  - the B10 misattributions in items 1 and 9 above, and in `schema_profiles/kraken_historical_trades.md`.
+
+**B10-D8: APPROVED IN PRINCIPLE.** "Adopt the promotion-test framework and the informative/underpowered distinction. Exact numerical thresholds/power requirements must be frozen during cycle registration BEFORE the corresponding test results are observed."
+- Applied: `source_redundancy_decisions.md` protocol wording.
+
+**B10-D9: DEFERRED.** "Do not authorize Kalshi CF Benchmarks/Pyth reference-channel capture yet. First resolve the exact BTC/gold settlement/reference mechanics and obtain the CF Benchmarks licensing quote."
+- Consequence (S-9): until it is decided, cycle 1 cannot use reference-channel features.
+
+**B10-D10: APPROVED.** At B10 close:
+- remove `api.kraken.com`, `ws.kraken.com`, and `api.exchange.coinbase.com` from both established sandbox allowlist layers;
+- preserve documentation hosts;
+- add an automated test proving that prohibited live-data hosts are refused before any protected `T0 − m`/`T0`;
+- run future prospective capture in the separately chartered cloud capture environment, not the Claude development sandbox.
+
+Applied:
+- **Test added:** `tests/integration/test_live_host_egress_refusal.py`. It runs with `PMV_EGRESS_PROBE=1`, otherwise it skips, so `check.sh` and CI make no network attempts. It has:
+  - a Layer A static check of `/etc/claude-code/managed-settings.json`;
+  - three proxy-CONNECT refusal probes (CONNECT only; no TLS, no application request);
+  - three positive controls (the list check and two preserved documentation hosts).
+- **Result on 2026-10-19, before the owner's change (final test version):** 4 failed, 4 passed. Layer A still admits all three hosts, and each returns `HTTP/1.1 200 Connection Established`. The list and matcher self-checks and the two documentation-host controls pass.
+- Refusal detection was also confirmed against an already-refused host: `api.elections.kalshi.com` returned `HTTP/1.1 403 Forbidden`, which the test's refusal pattern accepts. The pattern counts any 4xx/5xx as a refusal except 407.
+- After review API2-B10-01, each refusal probe runs an in-test proxy-path control, and the Layer A check also catches wildcard entries.
+- The test therefore detects the current exposure as intended.
+- **Layer removal: owner action pending; not performable from the agent sandbox.** `managed-settings.json` is read-only to agent sessions, and the egress proxy is outside the container. Procedure: `docs/owner_actions/README.md` §3. Layer A also lists `exchange.coinbase.com`, which B10 never used; its removal is recommended there. **B10 is not closed until the test passes (8 passed) after the owner's change and the Layer B CONNECT-only check in §3 step 4 shows refusals.**
+
+**B10-D11: REJECTED AS WRITTEN AND REPLACED WITH** (verbatim):
+> "No further Kraken bulk acquisition begins until the current governing published terms are snapshotted and classified for private own-account PMV use. Vendor correspondence is required only if that review leaves a material ambiguity. Vendor non-response is not itself an acquisition blocker where the published terms clearly authorize the intended private use."
+
+and "Do not represent silence as permission."
+- Applied: `source_redundancy_decisions.md` Kraken rows and Stage 1; the `owner_source_action_sheet.md` status note (its Kraken rows reading NEEDS_WRITTEN_PERMISSION / M2 are to be read in that light); `master_source_inventory.md` B-2; `docs/phase1.md`. Kraken outreach (M2) becomes conditional on the terms review leaving a material ambiguity.
+
+### Process deviations: final disposition (not erased)
+
+| Deviation | Disposition |
+|---|---|
+| Kraken REST and WS data fetched before any Kraken terms review | Stands as a recorded deviation from terms-first (as clarified by B10-D2). Covered for B10 by the owner's B10-D1 approval of the samples. Future sample use needs terms checked and recorded first |
+| Databento fixtures (and source files) fetched from `raw.githubusercontent.com` | Stands as a recorded deviation from `docs/external_access.md` §1.1 rules 9 and 11. Covered for B10 by B10-D1 (named source families, schema reconnaissance). Fixtures deleted; registered as X-11 |
+| CME hosts retried by a subagent after the lead found them blocked | Stands as recorded; no route-around occurred. Future briefs pass the lead's blocked-host list |
+| Proxy credential printed to the session transcript | Stands as recorded. Not in any repository file. Rotation is required before B10 closure (B10-D6; owner action pending) |
+| **Proxy credential printed again** during the round-2 API/Execution re-review (follow-up): its `env \| grep -i proxy` redaction did not cover `GIT_SSH_COMMAND` or `CLOUDSDK_PROXY_*` | Stands as recorded. Not in any file. The B10-D6 rotation must take place **after** this session, covering both exposures. Owner and agent procedures now warn never to print `env`, proxy URLs, or `GIT_SSH_COMMAND` (`docs/owner_actions/README.md` §3) |
+
 ## Status after B10
 
 - Nothing acquired, purchased, licensed, provisioned, or captured beyond the deleted reconnaissance samples.
 - No `T0`, cycle, split, or protected scope exists.
 - B10 stops for owner review. No merge. No B11.
+- **B10 closure is pending two owner actions:** proxy credential rotation (B10-D6) and live-host removal from both egress layers, verified by `tests/integration/test_live_host_egress_refusal.py` passing (B10-D10). See `docs/owner_actions/README.md` §3.
