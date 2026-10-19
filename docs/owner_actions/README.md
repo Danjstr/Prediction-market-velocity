@@ -9,7 +9,8 @@ Agent sessions cannot write `.claude/agents/` or `.claude/settings.json`. Both a
 | `2026-10-16_agents_split_wording.patch` | Replaces the literal "oldest ~70% / newest ~30%" split wording in six agent files with the prospective-holdout wording | Not blocking (the CLAUDE.md definition governs), but fresh agents read these files first. The owner directed the fix |
 | `2026-10-16_settings_f09_host_class_denies.patch` | Adds deterministic F-09 host-class WebFetch denies | **Priority blocker.** Required before the first historical acquisition (A-1), Phase 1 real collection, and any agent web research after a cycle's `T0 − m` |
 | §3 (no patch; owner terminal steps) | B10-D10 live-host removal from both egress layers (B10-D6 credential rotation: resolved by control hardening, no action) | **Required before any cycle's `T0 − m`**, not before B10 closure (owner correction, 2026-10-19). The refusal test must pass before any `T0 − m` |
-| Proposed START_HERE.md P-5 (no patch yet; governance edit) | Add to the mandatory pre-T0 checklist: (a) both egress layers tightened, with the §3 step 4 Layer B check and the step 5 refusal test (all 10 checks passed) recorded; (b) every allowlist entry in both layers classified by host class, with live-data, live-display, and protected-observable hosts removed or justified (the refusal test passing is necessary, not sufficient); (c) owner confirmation or rejection of the egress test's in-memory proxy-authentication carve-out | **Pending owner approval** to edit START_HERE.md. Until then the requirement binds through `docs/decisions/2026-10-19_b10_source_reconnaissance.md` and `docs/external_access.md` §1.4 |
+| START_HERE.md P-5 (applied as a governance edit) | Mandatory pre-T0 checklist item P-5. Before any `T0 − m`: classify every Layer A and Layer B allowlist entry; remove or explicitly justify live-data, live-display, and protected-observable hosts; verify the Layer A managed policy; verify the owner-side Layer B CONNECT check; all applicable automated refusal checks pass. No test count is fixed | **Approved** (owner decision DR-11, 2026-10-19). The proposed item (c), the proxy-authentication carve-out, was **rejected** (DR-10), and PMV code never reads the runtime proxy variables (DR-16) |
+| §4 (no patch; owner terminal steps) | DR-22: purge the specific local Claude transcripts that contain the runtime credential, identified by safe metadata only | **Owner action after the B11 governance commit is verified.** Agents never perform it |
 
 Both patches were generated against commit `a1752b4`. On 2026-10-16 both were re-checked on B06 (`b06/governance-continuity-sync`): each passes `git apply --check`; the agents patch leaves no stale split term; and the settings patch yields valid JSON. If either target file changes later, `git apply --check` fails, and the patch must be regenerated, not forced.
 
@@ -134,7 +135,7 @@ The repository holds no agent-runnable rotation procedure. Agents must not try t
 1. **Layer A.** Remove `api.kraken.com`, `ws.kraken.com`, and `api.exchange.coinbase.com` (and, recommended, `exchange.coinbase.com`) from `sandbox.network.allowedDomains` in `/etc/claude-code/managed-settings.json`. Keep the documentation hosts `docs.kraken.com`, `support.kraken.com`, and `docs.cdp.coinbase.com`, and the other documentation and research hosts. **For owner disposition (optional; not B10-D10 scope; review RT2-B10-m4):** Layer A also lists data-class or file hosts that an allowlist entry admits despite wildcard denies: `hist.databento.com`, `datamine.cmegroup.com`, `raw.githubusercontent.com` (the B10 fixture-deviation route), `codeload.github.com`, and `api.github.com`. Consider removing or narrowing them. Validate with `python3 -m json.tool /etc/claude-code/managed-settings.json > /dev/null`. Recommended (defense in depth, review API2-B10-m4): make the file root-owned (`sudo chown root:root …; sudo chmod 644 …`). It is currently owned by the agent user with mode 644, so it is read-only to agents only because of the sandbox deny list.
 2. **Layer B.** Remove the same hosts from the PMV egress proxy allowlist. Keep the same documentation hosts. Restart the proxy.
 3. **B10-D6 (superseded 2026-10-19: resolved by control hardening; no action).** First confirm which component issues the credential. Its `srt.` username prefix suggests the Claude Code sandbox-runtime proxy, possibly minted per session, rather than the outer PMV egress proxy (review API2-B10-m5). If it is per-session, rotation means ending every session that saw it (the B10 lead session and the API/Execution re-review session) and confirming that the old value is invalid. Otherwise, rotate the credential with the issuing proxy's own tooling, then restart the container or session so that the new value is injected. Never paste the new credential into a Claude session, a file under `/workspace`, or a commit.
-4. **Layer B alone,** outside the Claude sandbox, in the container shell. Use a CONNECT-only probe, so that no TLS handshake or application request ever reaches a live host, and read the **proxy's** status line. Do not use `curl %{http_code}`: a refused CONNECT shows `000` there, and if a host were still allowed, an origin's own 403 or 404 could be mistaken for a refusal (review API2-B10-01). The probe targets the unauthenticated PMV route `pmv-egress-proxy:3128` (owner-verified, 2026-10-19) directly. It reads no proxy variable and sends no credential. *(Revised 2026-10-19: the earlier snippet read the proxy URL from the environment and built a `Proxy-Authorization` header from it. Layer B needs no credential, so the revised snippet handles none. Whether in-memory transmission to the issuing proxy is acceptable under the permanent diagnostic rule awaits owner confirmation; see the decision record, "Applied".)*
+4. **Layer B alone,** outside the Claude sandbox, in the container shell. Use a CONNECT-only probe, so that no TLS handshake or application request ever reaches a live host, and read the **proxy's** status line. Do not use `curl %{http_code}`: a refused CONNECT shows `000` there, and if a host were still allowed, an origin's own 403 or 404 could be mistaken for a refusal (review API2-B10-01). The probe targets the unauthenticated PMV route `pmv-egress-proxy:3128` (owner-verified, 2026-10-19) directly. It reads no proxy variable and sends no credential. *(Revised 2026-10-19: the earlier snippet read the proxy URL from the environment and built a `Proxy-Authorization` header from it. Layer B needs no credential, so the revised snippet handles none. In-memory transmission of runtime credentials by PMV code was later rejected (owner decision DR-10).)*
    ```bash
    python3 - <<'PY'
    import socket
@@ -158,14 +159,46 @@ The repository holds no agent-runnable rotation procedure. Agents must not try t
    ```bash
    PMV_EGRESS_PROBE=1 uv run --locked pytest tests/integration/test_live_host_egress_refusal.py -q
    ```
-   Expected: 10 passed (8 at B10 `ba1fa9e`; the round 3 hardening added two offline checks).
-   - The Layer A static check reads `managed-settings.json`, including wildcard entries.
-   - Three CONNECT probes must be refused, each with an in-test proxy-path control.
-   - Four offline self-checks pass (host list, matcher, 403-only refusal pattern, malformed-proxy redaction), and two documentation-host positive controls pass.
+   Optionally, give the combined probes a route by prefixing `PMV_EGRESS_PROXY_HOST=<host> PMV_EGRESS_PROXY_PORT=<port>`. Use credential-free host/port metadata only, never a URL or userinfo (owner decision DR-16). The test never reads the runtime proxy variables.
+
+   Expected: every applicable check passes, and none fails. No count is fixed (owner decision DR-11).
+   - **Layer A static check:** reads `managed-settings.json`, including wildcard entries. This check is always applicable.
+   - **Offline self-checks:** always applicable, including the check that no runtime proxy variable is ever read.
+   - **Combined CONNECT probes:** each must be refused, with an in-test proxy-path control. The probes send **no credential** (DR-10). They are **skipped as not applicable**, never counted as passed, in two cases:
+     - `PMV_EGRESS_PROXY_HOST` / `PMV_EGRESS_PROXY_PORT` are unset;
+     - the proxy answers `407`.
+
+     The evidence is then the Layer A static check plus step 4.
+   - **Documentation-host positive controls:** follow the same rule.
 
    Never run it with `-l`/`--showlocals`.
 
    A refusal here alone does not prove Layer B; step 4 does.
-6. Report the step 4 and step 5 results to the session, so that they can be recorded in `docs/decisions/2026-10-19_b10_source_reconnaissance.md`. These steps change no repository file.
+6. Report the step 4 and step 5 results to the session, so that they can be recorded in the cycle's decision or gate record. These steps change no repository file.
 
-**Standing requirement.** The step 5 test must pass before any cycle's `T0 − m` (owner decision B10-D10). Future prospective capture runs in the separately chartered cloud capture environment, not in the Claude development sandbox.
+**Standing requirement.** START_HERE.md pre-T0 checklist **P-5** (owner decision DR-11, 2026-10-19), which also requires classifying every Layer A and Layer B allowlist entry. Earlier basis: owner decision B10-D10. Future prospective capture runs in the separately chartered cloud capture environment, not in the Claude development sandbox.
+
+## 4. DR-22: purge the sensitive local Claude transcripts (owner, after the B11 commit is verified)
+
+**Decision.** Owner decision DR-22 (2026-10-19; `docs/decisions/2026-10-19_owner_data_readiness_decisions.md`): purge after the durable record. Some local Claude Code session transcripts under `~/.claude/projects/` contain the runtime proxy credential that was printed twice during B10. They also contain actual Kraken sample values, which are development-exposed (DR-14).
+
+**Until cleanup:**
+- treat those transcripts as sensitive;
+- do not share them;
+- exclude them from backups where practical;
+- never inspect the credential value or copy it into Git or any other record.
+
+**When.** Only after all three hold:
+1. the sanitized B11 governance commit (`b11/btc-poc-owner-decisions`) is committed;
+2. the commit is verified (pushed, `git ls-remote` matches, CI or `scripts/check.sh` passes);
+3. the non-secret incident information is durable. It already is, in `docs/decisions/2026-10-19_b10_source_reconnaissance.md` (process deviations; "Owner correction: runtime-secret hardening").
+
+**Steps, from a normal terminal outside Claude Code:**
+1. **Identify the affected files by safe metadata only:** session ID, modification time, and path.
+   - Affected: the B10 lead session and the B10 round-2 API/Execution re-review session (both 2026-10-19), plus any later session in which the credential could have been echoed.
+   - Never search file contents for the credential, never print it, and never open a transcript to look for it.
+2. **Delete or purge only those specific transcript files**, and any backup copies of them, where practical.
+3. **Do not delete unrelated Claude history.**
+4. **Record that the purge was done** (date and the number of files; no file content) in a later decision record. The purge changes no repository file.
+
+**Agents never perform this action.** A Claude session must not delete local transcript files, inspect credential values, or search for the secret to identify the transcripts.

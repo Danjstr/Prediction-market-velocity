@@ -6,23 +6,24 @@ Old branches keep their original names. Their B-numbers are assigned here only; 
 
 ## CURRENT ACTIVE GROUND-TRUTH BRANCH
 
-**`b10/source-reconnaissance` (B10)**
+**`b11/btc-poc-owner-decisions` (B11)**
 
-- **Designation:** the owner's B10 batch charter of 2026-10-19 ("This is the next numbered cumulative development batch"; `docs/decisions/2026-10-19_b10_source_reconnaissance.md`, "Designation").
-- **Parent:** B09 `b09/kalshi-source-qualification`, at its final commit `8b4e0261fad30f978fac19c6d81d11b7334d0c97`. B10 was branched directly from that commit (`git switch --detach 8b4e026; git switch -c b10/source-reconnaissance`), not from `main`, even though `main` already contained B09 through merge commit `bbcdd6b` (PR #8).
-- **Purpose:** bounded read-only data-source reconnaissance: connectivity pass, schema profiles, tiny bounded samples (inspected, then deleted), redundancy comparisons, the source × information value matrix, source verdicts, and the minimum viable source set. Documentation plus four development-only standard-library recon scripts; no production code change, no acquisition, no credential, no cloud resource.
-- **Head:** the pushed tip of `origin/b10/source-reconnaissance`. Verify with `git ls-remote origin refs/heads/b10/source-reconnaissance`.
-- **Integration:** one pull request into `main` when the owner directs. Merging is the owner's decision, with a normal merge commit, and B10 is not deleted afterwards.
+- **Designation:** the owner's direction of 2026-10-19, "OWNER REVIEW OF PROPOSED DR-1 TO DR-15 CHANGES + FINAL OWNER DECISIONS + BTC POC SCOPE REVISION" (owner decision DR-23; `docs/decisions/2026-10-19_owner_data_readiness_decisions.md`).
+- **Parent:** B10 `b10/source-reconnaissance`, at its final commit `c0288820748e21f606f7dd258c95d7711b69e15a`. B11 was branched directly from that commit, not from the `main` merge commit `4019a75` (PR #9).
+- **Purpose** (owner, verbatim): "durable owner data-readiness decisions; BTC active proof-of-concept scope; gold shelved for now; market-family-specific model policy; proxy-security compliance; owner-review exposure registration; Kraken timestamp/taker-event correction; P-5 pre-T0-m control; transcript-cleanup owner action." No cloud provisioning in this branch.
+- **Head:** the pushed tip of `origin/b11/btc-poc-owner-decisions`. Verify with `git ls-remote origin refs/heads/b11/btc-poc-owner-decisions`.
+- **Integration:** one pull request into `main` when the owner directs. Merging is the owner's decision, with a normal merge commit, and B11 is not deleted afterwards.
 - **Status:**
-  - Gate 1 is undecided, A-1 to A-6 are unresolved, A-4 is not satisfied, historical acquisition is not authorized, and live capture is not authorized.
-  - B10-D6 is resolved by control hardening. B10-D10 egress-layer live-host removal is required before any cycle's `T0 − m`, not for B10 closure (owner correction, 2026-10-19; `docs/owner_actions/README.md` §3).
-  - Until the owner designates a successor, every new development branch (B11) starts from this branch's final tip.
+  - Active scope: **ACTIVE POC: BTC; GOLD: SHELVED FOR NOW** (DR-17).
+  - Gate 1 is undecided. Cloud-foundation work is approved (DR-1), but nothing is provisioned. Bulk acquisition waits for the Kalshi pilot gate (DR-2) and Kraken terms classification (DR-3). Live capture is not started (DR-8).
+  - Owner action DR-22 (transcript purge) follows verification of the B11 commit (`docs/owner_actions/README.md` §4).
+  - Until the owner designates a successor, every new development branch (B12) starts from this branch's final tip.
 
 ## Timeline
 
 | ID | Branch | Parent ID | Head commit | Status | Purpose |
 |---|---|---|---|---|---|
-| B00 | `main` | — | baseline `a07fc29` (Gate 0 PASS at `db09acd`); `main` is now at `bbcdd6b` (B09 merged, PR #8) | Integration branch. Advances only by merged pull request. | Canonical historical baseline: Phase 0 foundation, Gate 0, backup and recovery |
+| B00 | `main` | — | baseline `a07fc29` (Gate 0 PASS at `db09acd`); `main` is now at `4019a75` (B10 merged, PR #9) | Integration branch. Advances only by merged pull request. | Canonical historical baseline: Phase 0 foundation, Gate 0, backup and recovery |
 | B01 | `docs/activate-isolated-autonomy` (remote only) | B00 | `0dd40ca` | Historical checkpoint. Merged by PR #1 (`4eec20c`) | Activation of the isolated autonomous environment |
 | B02 | `phase1/kalshi-data-foundation` | B01 (branched at `4eec20c`) | `899dae6` | Historical checkpoint. Merged by PR #2 (`856083e`) | Phase 1 batch 1: venue-neutral market-data foundation |
 | B03 | `phase1/kalshi-venue-verification` | B02 (branched at `856083e`) | `4ca18e0` | Historical checkpoint. Merged by PR #3 (`c074e9b`) | Phase 1 batch 2: Kalshi venue verification (documentation) |
@@ -32,7 +33,8 @@ Old branches keep their original names. Their B-numbers are assigned here only; 
 | B07 | `b07/phase1-acquisition-pipeline-hardening` | B06 (branched at final `c0d2a2b`) | `9a6b212` (final) | Historical checkpoint, preserved. Merged by PR #6 (`2a46ffd`) | Phase 1 acquisition pipeline hardening (G-1 to G-6), synthetic data only |
 | B08 | `b08/prospective-capture-hardening` | B07 (branched at final `9a6b212`) | `5806d8c` (final) | Historical checkpoint, preserved. Merged by PR #7 (`a6b5411`) | Phase 1 prospective-capture hardening (F-11, F-12/F-27, F-33, F-37/RT-4, book continuity, normalized artifacts), synthetic data only |
 | B09 | `b09/kalshi-source-qualification` | B08 (branched at final `5806d8c`) | `8b4e026` (final) | Historical checkpoint, preserved. Merged by PR #8 (`bbcdd6b`) | Kalshi official historical source qualification and the A-1 to A-6 owner-decision packet; cloud-native data strategy, source inventory, procurement packet; documentation only |
-| B10 | `b10/source-reconnaissance` | B09 (branched at final `8b4e026`) | Last recorded: see "B10 commits"; tip = latest pushed commit | **CURRENT ACTIVE GROUND-TRUTH BRANCH** | Data-source reconnaissance: schema profiles, value matrix, source verdicts, minimum viable source set |
+| B10 | `b10/source-reconnaissance` | B09 (branched at final `8b4e026`) | `c028882` (final) | Historical checkpoint, preserved. Merged by PR #9 (`4019a75`) | Data-source reconnaissance: schema profiles, value matrix, source verdicts, minimum viable source set |
+| B11 | `b11/btc-poc-owner-decisions` | B10 (branched at final `c028882`) | Last recorded: see "B11 commits"; tip = latest pushed commit | **CURRENT ACTIVE GROUND-TRUTH BRANCH** | Owner data-readiness decisions DR-1 to DR-23: BTC active POC, gold shelved for now, market-family model policy, proxy-security compliance, exposure rows X-12 to X-14, Kraken correction, P-5, transcript-purge owner action. Governance only; no cloud provisioning |
 
 PR numbers come from the merge-commit subjects on `main`.
 
@@ -110,7 +112,22 @@ Listed oldest first, and appended at each timeline update.
 |---|---|
 | `05df35a` | B10 reconnaissance: charter record, connectivity pass, 19 schema profiles, value matrix, source verdicts, minimum viable source set, recon tools, exposure rows X-7 to X-11, reviews |
 | `ba1fa9e` | Owner decisions B10-D1 to B10-D11 recorded; stale B09 Kraken/BRTI rows corrected; live-host egress refusal test; owner procedure for the egress-layer removal and proxy rotation (pending); round 2 re-reviews |
-| (the commit adding this row) | Owner correction of the runtime-secret record: B10-D6 resolved by control hardening; B10-D10 removal timing moved to before `T0 − m`; permanent diagnostic rule (`docs/conventions.md`) with a static guard test; egress test credential hardening; owner Layer B probe no longer reads proxy variables; round 3 focused review. Its hash is the branch tip; see `git ls-remote` |
+| `c028882` | Owner correction of the runtime-secret record: B10-D6 resolved by control hardening; B10-D10 removal timing moved to before `T0 − m`; permanent diagnostic rule (`docs/conventions.md`) with a static guard test; egress test credential hardening; owner Layer B probe no longer reads proxy variables; round 3 focused review. Final B10 commit |
+
+### B11 commits
+
+Listed oldest first, and appended at each timeline update.
+
+| Commit | Content |
+|---|---|
+| (the commit adding this row) | Owner data-readiness decisions DR-1 to DR-23 recorded; BTC active POC and gold shelved for now (PROJECT_BRIEF, START_HERE, CLAUDE.md); market-family model policy; DR-10/DR-16 proxy-security compliance (egress test, WS and REST recon tools, static guard); exposure rows X-12 to X-14; Kraken timestamp correction; P-5; DR-22 owner action. Its hash is the branch tip; see `git ls-remote` |
+
+## Ancestry verification for B11 (2026-10-19)
+
+Verified when B11 was created, in the isolated sandbox:
+- `git ls-remote origin refs/heads/b10/source-reconnaissance` was `c0288820748e21f606f7dd258c95d7711b69e15a`; `origin/main` was `4019a75`, a merge commit (PR #9) whose second parent is `c028882`;
+- no `b11/*` branch existed on `origin`;
+- B11 was created with `git switch -c b11/btc-poc-owner-decisions` at HEAD `c028882` (the final B10 tip); `git rev-parse HEAD` returned `c0288820748e21f606f7dd258c95d7711b69e15a`, and `git merge-base --is-ancestor c028882 HEAD` returned 0.
 
 ## Ancestry verification for B10 (2026-10-19)
 

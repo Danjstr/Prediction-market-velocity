@@ -92,6 +92,10 @@ If all Claude accounts and agents disappeared after development, the finished so
 
 - Focus on approximately 15-minute to 1-hour prediction markets.
 - Initial assets: Bitcoin and gold.
+- Active scope (owner decisions DR-17 to DR-21, 2026-10-19; PROJECT_BRIEF.md §1 "Active scope"):
+  - **ACTIVE POC: BTC.** Kalshi short-horizon BTC markets, with Kraken trade data as the underlying.
+  - **GOLD: SHELVED FOR NOW.** Not cancelled, abandoned, or permanently dropped. Existing gold work is preserved, but there is no new gold acquisition, pipeline, feature, or model work during the BTC proof of concept.
+  - **FUTURE EXPANSION: SPECIALIST MARKET-SELECTION REVIEW AFTER BTC POC.** Not an automatic move to gold.
 - No sentiment-analysis strategy.
 - Primary research direction: short-horizon velocity and related quantitative market dynamics.
 - Support entering partway through a market window and forecasting only the remaining horizon.
@@ -250,6 +254,11 @@ Select based on:
 - stability.
 
 The simplest reliable model with the strongest economic result should win.
+
+**MODEL POLICY: SHARED PLATFORM + MARKET-FAMILY-SPECIFIC MODELS** (owner decisions DR-20 and DR-21; PROJECT_BRIEF.md §8):
+- Infrastructure is shared: acquisition, schemas, point-in-time alignment, feature primitives, splitting, evaluation, calibration, economics, risk, execution, and monitoring.
+- Fitted models are specific to a homogeneous recurring market family. They do not pool unrelated asset families by default, and there is no model per individual contract by default. Each family model earns promotion independently.
+- Order: B0 (an analytic underlying benchmark) and B1 (the market's implied probability), then logistic or regularized models, then boosted trees if justified, and sequence models only after simpler models and sufficient sequential data.
 
 # Risk
 

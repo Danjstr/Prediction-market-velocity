@@ -2,7 +2,30 @@
 
 Working record for Phase 1. The authoritative requirements are START_HERE.md (Phase 1, Gate 1, Project-Wide Controls), CLAUDE.md, and PROJECT_BRIEF.md; where this file summarizes them, they win. This is not a gate record and not an owner-decision record.
 
-## Current status and next step (as of 2026-10-19, B10)
+## Current status and next step (as of 2026-10-19, B11)
+
+**Active scope (owner decisions DR-17 to DR-21; PROJECT_BRIEF.md §1 "Active scope"):**
+- **ACTIVE POC: BTC.** Kalshi short-horizon BTC markets, with Kraken XBTUSD/BTCUSD trades as the underlying.
+- **GOLD: SHELVED FOR NOW.** Not cancelled, abandoned, or permanently dropped. Existing gold research is preserved. No new gold acquisition, pipeline, feature, or model work.
+- **FUTURE EXPANSION: SPECIALIST MARKET-SELECTION REVIEW AFTER BTC POC.**
+- **MODEL POLICY: SHARED PLATFORM + MARKET-FAMILY-SPECIFIC MODELS.**
+
+The current active branch is B11, `b11/btc-poc-owner-decisions`. It is a governance-only branch, with no cloud provisioning.
+
+**Owner data-readiness decisions, 2026-10-19 (after B10 merged by PR #9, `4019a75`).** Seven PMV specialists reviewed the obtainable data (one owner-authorized 1,000-row Kraken trade sample, exposure row X-12; Kalshi specifications; gold schema only). All seven returned GO WITH CONDITIONS. The owner then recorded decisions DR-1 to DR-15 (`docs/decisions/2026-10-19_owner_data_readiness_decisions.md`):
+- **Approved:**
+  - cloud-foundation work (DR-1): infrastructure, acquisition pipelines, capture infrastructure, normalization, features, and baselines;
+  - BTC Stage 1 on Kalshi plus Kraken (DR-2), with a **bounded Kalshi KXBTC15M pilot gate** before bulk Kalshi acquisition;
+  - Kraken archive plus REST gap-fill, after terms classification (DR-3);
+  - prospective Kalshi and Kraken capture in principle (DR-8);
+  - pre-T0 checklist **P-5** (DR-11).
+- **Gold:** first ruled exploratory only (DR-5), then **shelved for now** (DR-17). Optional sources do not delay Stage 1, and CME DataMine stays DROP (DR-6). BRTI does not block initial research (DR-7).
+- **Not approved:**
+  - real money, protected evaluation, or `T0`/`T0 − m`;
+  - EV, break-even, sizing, or capacity claims before the fee schedule is versioned (DR-9).
+- The proxy-authentication carve-out is **rejected** (DR-10). PMV code never reads or parses the runtime proxy variables (DR-16).
+- **Owner action pending (DR-22):** after the B11 commit is verified, the owner purges the specific local transcripts that contain the runtime credential (`docs/owner_actions/README.md` §4).
+- **Next:** a charter for the cloud-foundation batch (DR-1). The Kalshi pilot (DR-2) needs Kalshi M1 / A-2 first. Kraken bulk acquisition needs the terms classification (DR-3). Nothing is provisioned, acquired, or captured yet.
 
 **B10, 2026-10-19 (data source reconnaissance).** Under the owner's B10 charter, B10 (`b10/source-reconnaissance`, branched from final B09 `8b4e026`; B09 merged by PR #8, `bbcdd6b`) ran a bounded read-only reconnaissance: connectivity pass, 19 schema profiles, tiny samples inspected and deleted (Kraken REST trades for 2023-03-01; a 200-message Kraken WS capture; official non-gold Databento fixtures), the source × information value matrix, source verdicts, and a minimum viable source set. Record: `docs/decisions/2026-10-19_b10_source_reconnaissance.md`; results: `research/data_sources/source_redundancy_decisions.md`, `source_feature_value_matrix.md`, `schema_profiles/`.
 - Stage 1, the BTC hypothesis test: Kalshi metadata, trades, and 1-minute candles, plus the Kraken trade archive. Free once Kalshi clears (M1, A-2) and the published Kraken terms are snapshotted and classified for private own-account use (B10-D11 as replaced; correspondence only if a material ambiguity remains).
@@ -12,7 +35,7 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
 - **Owner correction (2026-10-19, runtime-secret hardening):**
   - D6 is resolved by control hardening. The exposed credential was not a PMV Squid credential (most likely a sandbox/runtime credential; issuer and lifetime not proven); there is no PMV Squid password to rotate.
   - D10 removal of `api.kraken.com`, `ws.kraken.com`, and `api.exchange.coinbase.com` from both egress layers is not required to close B10. It is required before any `T0 − m` (`docs/owner_actions/README.md` §3).
-  - `tests/integration/test_live_host_egress_refusal.py` (with `PMV_EGRESS_PROBE=1`) still fails 4 of its 10 checks by design until then, and must pass before any `T0 − m`.
+  - `tests/integration/test_live_host_egress_refusal.py` (with `PMV_EGRESS_PROBE=1`) still fails its Layer A check by design until then. Its applicable checks must pass before any `T0 − m` (P-5, owner decision DR-11).
   - A permanent diagnostic rule is in `docs/conventions.md`.
 - Nothing was acquired, licensed, provisioned, or captured. **B10 is now the active branch**; the B09 bullet below is historical.
 
@@ -66,7 +89,7 @@ Working record for Phase 1. The authoritative requirements are START_HERE.md (Ph
     3. approve a raw-data backup policy (A-3) and confirm or replace the "size class" reading (B7-7);
     4. pursue the licence terms for the first candidate source (Kalshi official historical data; AR-3);
     5. decide E-U1 (equivalence-catalog expansion), the first step before the H-2 release tool;
-    6. prepare the pre-T0 checklist decisions P-1 to P-4 (START_HERE.md), and the B10-D10 egress tightening and refusal test (proposed P-5, pending owner approval);
+    6. prepare the pre-T0 checklist decisions P-1 to P-4 (START_HERE.md), and P-5, the egress tightening and refusal checks (owner decision DR-11);
     7. optionally decide B6S-14 (independent statistical audit of the release rules before the first release; not adopted).
   - **Agents** (no network, synthetic data only, from the active branch, in a batch chartered by the owner):
     - B08 (done; merged by PR #7): raw frame format v3 and collector hardening (F-11, F-12/F-27, F-33, F-37/RT-4), order-book continuity after rejected frames, and normalized capture artifacts;

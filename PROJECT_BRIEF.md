@@ -8,6 +8,28 @@ This document is the source of truth for project requirements. Agents must not a
 
 Build a production-quality autonomous quantitative trading system for short-horizon prediction markets, initially focused on Bitcoin and gold markets on Kalshi and Polymarket.
 
+### Active scope (owner decisions DR-17 to DR-21, 2026-10-19)
+
+The mission above is the long-term mission. For current work, the owner has narrowed active scope as follows. Record: `docs/decisions/2026-10-19_owner_data_readiness_decisions.md`.
+
+- **ACTIVE POC: BTC.** PMV is to prove or disprove the velocity/path concept on Bitcoin before expanding active research, data acquisition, engineering, and modeling scope.
+  - Prediction market: Kalshi short-horizon BTC markets.
+  - Underlying: Kraken XBTUSD/BTCUSD trade data.
+  - Prospective capture, once its gates are met:
+    - Kalshi order book, trades, ticker, lifecycle, and relevant metadata, with PMV receipt timestamps;
+    - Kraken trades and book, with PMV receipt timestamps.
+  - BRTI is a conditional settlement-reference-fidelity source. It does not block initial BTC signal research.
+  - No additional vendor is required merely to begin the BTC proof of concept.
+- **GOLD: SHELVED FOR NOW.** Gold is not cancelled, abandoned, or permanently dropped. All existing gold research, evidence, and documentation is preserved, and gold may be reconsidered later. During the current proof of concept there is:
+  - no new gold acquisition;
+  - no GC/MGC pipeline implementation;
+  - no gold feature or model work;
+  - no requirement to resolve gold DET-1 now.
+- **FUTURE EXPANSION: SPECIALIST MARKET-SELECTION REVIEW AFTER BTC POC.** When the BTC proof of concept reaches its defined decision point, PMV does not proceed to gold automatically. The existing PMV specialists review the available prediction-market families for structural compatibility with the velocity/path methodology (criteria in the decision record, DR-19). Gold is a future candidate alongside other compatible markets.
+- **MODEL POLICY: SHARED PLATFORM + MARKET-FAMILY-SPECIFIC MODELS** (§8, DR-20 and DR-21).
+
+References to Bitcoin and gold elsewhere in this brief remain the long-term design. Where they conflict with this section for current work, this section governs until the owner changes it.
+
 ---
 
 ## 2. Critical Architectural Requirement: Agent Independence
@@ -40,7 +62,7 @@ The agents' goal is to make themselves operationally irrelevant by encoding thei
 
 ## 3. Core Trading Hypothesis
 
-- Focus on approximately 15-minute to 1-hour prediction markets for assets such as Bitcoin and gold.
+- Focus on approximately 15-minute to 1-hour prediction markets for assets such as Bitcoin and gold. (Active proof of concept: Bitcoin only; gold is shelved for now. See §1 "Active scope".)
 - Do **NOT** build a sentiment-analysis strategy.
 - The central research direction is short-horizon price velocity and related quantitative market dynamics.
 
@@ -227,6 +249,22 @@ Model selection should be based on:
 - implementation complexity.
 
 **The simplest model that produces the strongest reliable economic result should win.**
+
+### Model architecture and development order (owner decisions DR-20 and DR-21, 2026-10-19)
+
+**Shared PMV platform + market-family-specific fitted models.**
+- **Shared infrastructure:** acquisition, canonical schemas, point-in-time alignment, reusable velocity/path feature primitives, chronological splitting, walk-forward evaluation, calibration, economics, risk controls, execution, monitoring, and reproducibility.
+- **No pooling across asset families by default.** Fitted models do not pool unrelated asset families unless that is shown to help. Possible specialization units include BTC 15-minute, BTC 1-hour, and a future ETH or gold family.
+- **The normal specialization unit is the market family.** That means a sufficiently homogeneous recurring market family or series. PMV does not train a new model for every individual recurring contract by default.
+- **Sharing across horizons is empirical.** Whether BTC 15-minute and BTC 1-hour can share a model is an empirical question.
+- **Independent promotion.** Every market-family model must independently earn promotion.
+
+**Development order** for the selected BTC family. Complexity must earn its place out of sample.
+1. **B0:** an analytic/statistical underlying-price benchmark, where appropriate.
+2. **B1:** the prediction market's own implied probability.
+3. A logistic or regularized probability model.
+4. A boosted-tree model, if justified.
+5. CNN, RNN, or other sequence models, only after simpler models and sufficient sequential data exist.
 
 ---
 

@@ -5,6 +5,11 @@ acquisition tool (the acquisition gate in docs/external_access.md §2 still gove
 history). It writes the raw response bytes, unmodified, into a git-ignored directory
 (default /workspace/.recon_tmp/kraken_rest_trades) and prints one manifest line per page.
 
+Requests go through an HTTP CONNECT tunnel to the PMV egress proxy route
+(PMV_EGRESS_PROXY_HOST / PMV_EGRESS_PROXY_PORT; owner decisions DR-10 and DR-16). The default
+urllib opener is not used: it reads the runtime proxy variables and builds a proxy
+authorization header from them.
+
 Usage: python3 -I kraken_rest_trades_sample.py --since-ns <ns> --pages <n> [--out DIR]
 """
 
@@ -13,24 +18,60 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import json
+import os
 import pathlib
+import re
+import ssl
 import time
-import urllib.request
 from datetime import UTC, datetime
 
-ENDPOINT = "https://api.kraken.com/0/public/Trades"
+HOST = "api.kraken.com"
+ENDPOINT = f"https://{HOST}/0/public/Trades"
 RECON_ROOT = pathlib.Path("/workspace/.recon_tmp")  # git-ignored; raw samples only here
+# A bare DNS name or IPv4 address: no scheme, userinfo, port, path, or whitespace.
+SAFE_PROXY_HOST = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?")
 MAX_PAGES = 5  # owner B10 charter: <= 5,000 rows per source/schema
 MAX_BYTES = 10 * 1024 * 1024  # owner B10 charter: <= 10 MB per source/schema
 
 
+def proxy_address() -> tuple[str, int]:
+    """Read the credential-free PMV egress proxy route (owner decision DR-16).
+
+    The runtime proxy variables are never read or parsed, even for a host or port, because
+    they may hold a credential-bearing URL. Values are not echoed in error messages.
+    """
+    host = os.environ.get("PMV_EGRESS_PROXY_HOST", "")
+    port = os.environ.get("PMV_EGRESS_PROXY_PORT", "")
+    if not SAFE_PROXY_HOST.fullmatch(host):
+        raise SystemExit("set PMV_EGRESS_PROXY_HOST to a bare hostname or IPv4 address")
+    if not (port.isascii() and port.isdigit() and 1 <= int(port) <= 65535):
+        raise SystemExit("set PMV_EGRESS_PROXY_PORT to an integer from 1 to 65535")
+    return host, int(port)
+
+
 def fetch(url: str) -> bytes:
-    request = urllib.request.Request(  # noqa: S310 (fixed https endpoint)
-        url, headers={"User-Agent": "pmv-b10-recon/1"}
+    if not url.startswith(ENDPOINT + "?"):
+        raise SystemExit("only the fixed Kraken Trades endpoint is allowed")
+    proxy_host, proxy_port = proxy_address()
+    # Owner decision DR-10 (2026-10-19): PMV code never builds proxy credentials. The CONNECT
+    # carries no credential; a proxy that demands authentication (407) stops the tool.
+    conn = http.client.HTTPSConnection(
+        proxy_host, proxy_port, timeout=30, context=ssl.create_default_context()
     )
-    with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+    conn.set_tunnel(HOST, 443)
+    try:
+        path = url.removeprefix(f"https://{HOST}")
+        conn.request("GET", path, headers={"User-Agent": "pmv-b10-recon/1"})
+        response = conn.getresponse()
+        if response.status != 200:
+            raise SystemExit(f"HTTP status {response.status}")
         body: bytes = response.read(MAX_BYTES + 1)
+    except OSError as exc:
+        raise SystemExit(f"request failed: {type(exc).__name__}") from None
+    finally:
+        conn.close()
     if len(body) > MAX_BYTES:
         raise SystemExit("response exceeds the per-source byte limit")
     return body

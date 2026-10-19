@@ -32,6 +32,11 @@ The canonical statement is PROJECT_BRIEF.md §3 ("Strategy objective: late-windo
 - Results are reported by entry-price band and remaining-time band (`docs/phase2.md`). **High-probability-tail calibration is a core success criterion**; AUC alone is not.
 - All of these thresholds are **development hypotheses**, tested only on development data and frozen before protected evaluation.
 - **Current scope order (Phase 1 charter, `docs/phase1.md`).** Kalshi comes first; Polymarket is deferred until separately approved and verified. Bitcoin and gold are the target underlyings, but whether in-scope gold contracts exist is still unverified (F-16, E-1).
+- **Active scope (owner decisions DR-17 to DR-21, 2026-10-19; `docs/decisions/2026-10-19_owner_data_readiness_decisions.md`; PROJECT_BRIEF.md §1 "Active scope"). This overrides the previous bullet for current work.**
+  - **ACTIVE POC: BTC.** Kalshi short-horizon BTC markets, with Kraken XBTUSD/BTCUSD trade data as the underlying.
+  - **GOLD: SHELVED FOR NOW.** It is not cancelled, abandoned, or permanently dropped. Existing gold research is preserved. There is no new gold acquisition, GC/MGC pipeline, or gold feature or model work during the BTC proof of concept.
+  - **FUTURE EXPANSION: SPECIALIST MARKET-SELECTION REVIEW AFTER BTC POC.** It is not an automatic move to gold.
+  - **MODEL POLICY: SHARED PLATFORM + MARKET-FAMILY-SPECIFIC MODELS.**
 
 Current status and the next step are in `docs/phase1.md`. Open owner decisions are listed in the latest decision records under `docs/decisions/`. The current active branch is in `docs/BRANCH_TIMELINE.md`.
 
@@ -133,7 +138,8 @@ The prospective protected period is the required formation for the first cycle a
 - **P-1** model-cutoff enforcement and model pinning (E-B4-2);
 - **P-2** cycle design: one long cycle or shorter or staged cycles, with power, model-cutoff burden, research-embargo burden, and governance cost (E-B4-5);
 - **P-3** the quantitative "near-deterministic" reconstruction / inference criterion for the protected-information boundary, at the protected label's native granularity, from development data only (E-B4-7);
-- **P-4** freezing the feature, model, and regime search space at `T0`, or allowing continued development during accumulation (E-B4-9(b)).
+- **P-4** freezing the feature, model, and regime search space at `T0`, or allowing continued development during accumulation (E-B4-9(b));
+- **P-5** network egress, satisfied before the cycle's `T0 − m` (owner decision DR-11, 2026-10-19; `docs/decisions/2026-10-19_owner_data_readiness_decisions.md`): every Layer A (Claude Code managed allowlist) and Layer B (PMV egress proxy) allowlist entry is classified by host class; live-data, live-display, and protected-observable hosts are removed or explicitly justified; the Layer A managed policy is verified; the owner-side Layer B CONNECT check is verified; and all applicable automated refusal checks pass. No particular test count is fixed.
 
 Phase 1 may use only a declared development, discovery, or pilot subset for outcome-dependent work. Data inspected during Phase 1 is development-only for that cycle.
 
