@@ -73,6 +73,13 @@ Archive `timestamp` precision and format (integer seconds vs fractional) are **U
   - assert `trade_id` steps of exactly +1 across page boundaries and fail closed on any gap (dedupe alone would silently accept a gap);
   - detect a non-advancing `last` (a stall if more than 1,000 trades shared one timestamp).
 - Timestamps are non-decreasing. Among the 4,995 unique trades, no two consecutive distinct trades share a timestamp. (An earlier draft reported 0.08%: those were the four duplicated boundary rows; review API-B10-03.)
+  - **Correction (owner decision DR-4, 2026-10-19): this statement is no longer reliable as a general property.** The owner data-readiness review sample (exposure row X-12: REST `Trades` XBTUSD, 2024-01-10 14:00:01–14:29:29 UTC, 1,000 rows, 999 unique) showed the opposite:
+    - 164 same-timestamp clusters, of up to 17 prints each;
+    - 442 of 998 consecutive pairs share a timestamp;
+    - each cluster has one side and one order type, with prices moving monotonically in the aggressor's direction, consistent with one taker order sweeping several maker levels;
+    - the 999 unique prints collapse to about 538 apparent taker events (557 distinct timestamps, with 28 sub-microsecond near-pairs merged).
+
+    Whether Kraken's representation changed between eras or the 2023 check was flawed is unresolved. It is recorded as an observed representation discrepancy. Feature engineering must not equate raw print count with independent trade intensity, and needs a taker-event aggregation representation (DR-3). The 2023 statement above is kept as originally recorded.
 
 ## Sample spacing (old 2023-03-01 interval; descriptive only)
 

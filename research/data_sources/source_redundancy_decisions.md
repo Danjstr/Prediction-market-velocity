@@ -174,6 +174,8 @@ That is two vendors, two historical connectors, zero paid data. Prospective capt
 
 ### Stage 2: gold track (after M3; exploratory in cycle 1 per D-B09-21)
 
+**Status (owner decision DR-17, 2026-10-19): GOLD SHELVED FOR NOW.** The active proof of concept is BTC. This stage is kept as planning evidence; it is not cancelled. There is no gold acquisition, pipeline, feature, or model work during the BTC proof of concept, and DET-1 does not need resolving now. After the BTC proof of concept reaches its decision point, the next market family comes from a specialist market-selection review (DR-19), not automatically from gold. Record: `docs/decisions/2026-10-19_owner_data_readiness_decisions.md`.
+
 | # | Dataset | Exact scope |
 |---|---|---|
 | 6 | Databento GLBX.MDP3 `trades` | GC and MGC, front and next contracts across rolls, development span (run the cost estimator first) |

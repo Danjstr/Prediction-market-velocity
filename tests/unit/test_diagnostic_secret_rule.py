@@ -45,6 +45,10 @@ RULES: dict[str, re.Pattern[str]] = {
         r"showlocals|\bpytest\b" + _SAME_COMMAND + r"\s-l(?=\s|$|['\"])", re.IGNORECASE
     ),
     "proc-environ": re.compile(r"/proc/[^\s'\"]*environ"),
+    # Owner decision DR-10 (2026-10-19): PMV code never builds a proxy authorization header.
+    "proxy-auth-construction": re.compile(
+        r"Proxy-Authorization\s*:\s*(?:Basic|Bearer|Digest|Negotiate)\b", re.IGNORECASE
+    ),
 }
 # Python output of the environment or of secret-bearing names.
 PYTHON_RULES: dict[str, re.Pattern[str]] = {
@@ -60,6 +64,21 @@ PYTHON_RULES: dict[str, re.Pattern[str]] = {
         re.IGNORECASE,
     ),
     "python-subprocess-env": re.compile(r"\(\s*\[?\s*[\"'](?:env|printenv|set|export)[\"']"),
+    # Owner decision DR-16 (2026-10-19): never read or parse the runtime proxy variables, not
+    # even for a host or port. Writing them in a test (monkeypatch.setenv) is not a read.
+    "python-proxy-var-read": re.compile(
+        r"(?:environ(?:\.get|\.pop|\.setdefault)?\s*[\[(]|getenv\s*\()\s*[\"']"
+        r"(?:HTTPS?|ALL)_PROXY[\"']",
+        re.IGNORECASE,
+    ),
+    "python-proxy-discovery": re.compile(
+        r"\b(?:getproxies(?:_environment)?|proxy_bypass_environment)\s*\("
+    ),
+    # DR-16: urllib's default opener and ProxyHandler read the runtime proxy variables
+    # in-process (getproxies, proxy_bypass) and build a proxy authorization header from them.
+    "python-urllib-env-proxy": re.compile(
+        r"\b(?:urlopen|urlretrieve|build_opener|install_opener|ProxyHandler)\s*\("
+    ),
 }
 # Shell and workflow forms, where these are command invocations.
 _CMD_START = r"(?:^|[;&|(`:]|\$\()\s*"
@@ -69,6 +88,8 @@ SHELL_RULES: dict[str, re.Pattern[str]] = {
     "set-dump": re.compile(_CMD_START + r"set" + _CMD_END, re.MULTILINE),
     "export-dump": re.compile(_CMD_START + r"export" + _CMD_END, re.MULTILINE),
     "ps-environment": re.compile(r"\bps\s+[A-Za-z]*e[A-Za-z]*\b"),
+    # Owner decision DR-16: no expansion of the runtime proxy variables in any command.
+    "shell-proxy-var-expansion": re.compile(r"\$\{?(?:HTTPS?|ALL)_PROXY\b", re.IGNORECASE),
     "echo-secret-name": re.compile(
         r"\b(?:echo|printf)\b" + _SAME_COMMAND + r"\$\{?" + _GUARDED_NAME, re.IGNORECASE
     ),
@@ -199,6 +220,9 @@ SHELL_HITS = [
     "curl -sv https://example.com",
     "curl --verbose https://example.com",
     "curl --trace-ascii t https://example.com",
+    'curl -H "Proxy-Authorization: Basic $TOKEN" https://example.com',
+    'curl -x "$HTTPS_PROXY" https://example.com',
+    "p=${https_proxy#*@}",
     "wget --debug https://example.com",
     "pytest --showlocals",
     "uv run pytest -q -l",
@@ -225,6 +249,15 @@ PYTHON_HITS = [
     "subprocess.run('env', shell=True)",
     "open('/proc/self/environ')",
     "addopts = '--showlocals'",
+    'headers += f"Proxy-Authorization: Basic {token}"',
+    'proxy = os.environ.get("HTTPS_PROXY")',
+    "proxy = os.environ['http_proxy']",
+    'host = urllib.parse.urlsplit(os.getenv("ALL_PROXY")).hostname',
+    "proxies = urllib.request.getproxies()",
+    "with urllib.request.urlopen(request, timeout=30) as response:",
+    "opener = urllib.request.build_opener()",
+    "handler = urllib.request.ProxyHandler()",
+    "auth = 'proxy-authorization: basic ' + token",
 ]
 SHELL_ALLOWED = [
     "set -euo pipefail",
@@ -236,6 +269,7 @@ SHELL_ALLOWED = [
     "export UV_CACHE_DIR",
     "ps aux",
     "# make_canary <label>: set `canary` to a value",
+    'export PMV_EGRESS_PROXY_HOST="pmv-egress-proxy"',
 ]
 PYTHON_ALLOWED = [
     'os.environ.get("PMV_ENV")',
@@ -245,6 +279,10 @@ PYTHON_ALLOWED = [
     'config = {"env": "dev"}',
     'subprocess.run(["git", "status"])',
     """cases = [('export NAME="FAKE VALUE"', "FAKE VALUE")]""",
+    'monkeypatch.setenv("HTTPS_PROXY", dummy)',
+    'host = os.environ.get("PMV_EGRESS_PROXY_HOST", "")',
+    "conn = http.client.HTTPSConnection(proxy_host, proxy_port, timeout=30)",
+    "conn.set_tunnel(HOST, 443)",
 ]
 
 

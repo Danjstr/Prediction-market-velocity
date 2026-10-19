@@ -98,7 +98,28 @@ Permanent PMV rule (owner, 2026-10-19, B10 runtime-secret hardening; `docs/decis
   - the static backstop `tests/unit/test_diagnostic_secret_rule.py`. It scans Git-tracked code, automation, and configuration files, and fenced shell and Python blocks in Markdown.
 
   Neither replaces review.
-- Implementation note, **pending owner confirmation** (not part of the rule text): `tests/integration/test_live_host_egress_refusal.py` builds a `Proxy-Authorization` header in memory from the injected proxy URL, solely to authenticate its CONNECT probe to that same proxy, as any proxy-aware client does. It never outputs it, and no `assert` touches it. Read literally, "reconstruct" covers this. The proposed carve-out is: "in-process transmission to the issuing proxy by a network client is not disclosure". It needs an owner ruling before the probe is next run.
+- **No in-memory carve-out (owner decision DR-10, 2026-10-19; `docs/decisions/2026-10-19_owner_data_readiness_decisions.md`).** The owner ruling, verbatim: "PMV code/tests may not reconstruct authenticated proxy URLs or Proxy-Authorization from runtime sandbox credentials." Network checks use the Layer A static managed-policy verification and the owner-side unauthenticated Layer B CONNECT test. Combined sandbox testing may occur only if runtime authentication is handled transparently, without PMV code inspecting credentials.
+  - The earlier proposed carve-out ("in-process transmission to the issuing proxy by a network client is not disclosure") was rejected.
+- **PMV code never reads or parses the runtime proxy variables (owner decision DR-16, 2026-10-19).** This covers `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and their lowercase variants, **even to extract only a hostname or port**, because they may contain a credential-bearing URL. PMV code never:
+  - reads, parses, or inspects them (hostname, port, username, or password);
+  - reconstructs userinfo;
+  - constructs a proxy authorization header.
+
+  Safe alternatives:
+  - **(A)** the owner-verified unauthenticated Layer B route `pmv-egress-proxy:3128`, used directly;
+  - **(B)** credential-free PMV settings `PMV_EGRESS_PROXY_HOST` and `PMV_EGRESS_PROXY_PORT`, holding host/port metadata only. Code validates them as a bare host and port and does not echo them;
+  - **(C)** if runtime networking cannot route or authenticate transparently without PMV code reading a runtime proxy variable, the probe is **NOT APPLICABLE / SKIPPED**. A proxy that demands authentication (407) is handled the same way: never passed.
+
+  The secret rule is never weakened to make a probe work.
+
+  **No indirect dependence (owner B11 sign-off, 2026-10-19).** Tracked PMV code, tests, automation, and recon tooling must not depend on `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, or lowercase equivalents, either directly or indirectly through a child process or in-process network library.
+  - **In-process libraries.** A library called by PMV code counts as PMV code reading the variables. An example is the default `urllib.request` opener: `urlopen`, or `ProxyHandler`, which reads the variables through `getproxies` and `proxy_bypass`. PMV code that needs a proxy opens an explicit CONNECT tunnel to the credential-free route, for example `http.client` with `set_tunnel`.
+  - **Child processes.** If tracked PMV code invokes an external network client (for example `curl` or `wget`), it must prevent inheritance or use of those runtime proxy variables, for example by starting the client with a sanitized environment (`env -i`, as in `scripts/install_uv.sh` and `scripts/install_betterleaks.sh`). Where proxy routing is required, it uses only explicitly supplied, credential-free PMV routing metadata such as `PMV_EGRESS_PROXY_HOST` / `PMV_EGRESS_PROXY_PORT`.
+  - **Owner-operated manual networking** outside tracked PMV code is governed by the sandbox and network controls. It is not an exception that tracked PMV code may rely on.
+
+  No mechanism may read or copy the runtime proxy values to satisfy this rule.
+
+  Static backstop rules: `proxy-auth-construction`, `python-proxy-var-read`, `python-proxy-discovery`, `python-urllib-env-proxy`, and `shell-proxy-var-expansion`. Writing a dummy value in a test (`monkeypatch.setenv`) is not a read.
 
 ## Raw Data
 

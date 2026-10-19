@@ -1,7 +1,8 @@
 """B10 reconnaissance: capture a few consecutive Kraken spot WebSocket v2 public messages.
 
 Development-time research tool only; not the PMV collector (src/pmv/capture governs real
-capture). Standard library only: an HTTP CONNECT tunnel through the sandbox egress proxy,
+capture). Standard library only: an HTTP CONNECT tunnel through the PMV egress proxy route
+(PMV_EGRESS_PROXY_HOST / PMV_EGRESS_PROXY_PORT; owner decisions DR-10 and DR-16),
 TLS, and a minimal RFC 6455 client (text frames, ping/pong, close). Each received text frame
 is written unmodified with the local receipt time (time.time_ns()) to a JSONL file in a
 git-ignored directory. Caps: --max-messages (<= 400) and --seconds (<= 60).
@@ -18,15 +19,17 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import socket
 import ssl
 import struct
 import time
-import urllib.parse
 from datetime import UTC, datetime
 
 HOST = "ws.kraken.com"
 RECON_ROOT = pathlib.Path("/workspace/.recon_tmp")  # git-ignored; raw samples only here
+# A bare DNS name or IPv4 address: no scheme, userinfo, port, path, or whitespace.
+SAFE_PROXY_HOST = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?")
 MAX_BYTES = 10 * 1024 * 1024  # owner B10 charter: <= 10 MB per source/schema
 MAX_FRAME_BYTES = 1024 * 1024
 PATH = "/v2"
@@ -51,18 +54,26 @@ def confined(path: str) -> pathlib.Path:
     return resolved
 
 
+def proxy_address() -> tuple[str, int]:
+    """Read the credential-free PMV egress proxy route (owner decision DR-16).
+
+    The runtime proxy variables are never read or parsed, even for a host or port, because
+    they may hold a credential-bearing URL. Values are not echoed in error messages.
+    """
+    host = os.environ.get("PMV_EGRESS_PROXY_HOST", "")
+    port = os.environ.get("PMV_EGRESS_PROXY_PORT", "")
+    if not SAFE_PROXY_HOST.fullmatch(host):
+        raise SystemExit("set PMV_EGRESS_PROXY_HOST to a bare hostname or IPv4 address")
+    if not (port.isascii() and port.isdigit() and 1 <= int(port) <= 65535):
+        raise SystemExit("set PMV_EGRESS_PROXY_PORT to an integer from 1 to 65535")
+    return host, int(port)
+
+
 def open_tunnel() -> ssl.SSLSocket:
-    proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
-    if not proxy:
-        raise SystemExit("no HTTPS proxy configured")
-    parsed = urllib.parse.urlsplit(proxy)
-    sock = socket.create_connection((parsed.hostname or "localhost", parsed.port or 3128), 20)
+    sock = socket.create_connection(proxy_address(), 20)
+    # Owner decision DR-10 (2026-10-19): PMV code never builds proxy credentials. The CONNECT
+    # carries no credential; a proxy that demands authentication (407) stops the tool.
     headers = f"CONNECT {HOST}:443 HTTP/1.1\r\nHost: {HOST}:443\r\n"
-    if parsed.username:
-        user = urllib.parse.unquote(parsed.username)
-        password = urllib.parse.unquote(parsed.password or "")
-        token = base64.b64encode(f"{user}:{password}".encode()).decode()
-        headers += f"Proxy-Authorization: Basic {token}\r\n"
     sock.sendall((headers + "\r\n").encode())
     reply = b""
     while b"\r\n\r\n" not in reply:
@@ -71,6 +82,8 @@ def open_tunnel() -> ssl.SSLSocket:
             raise SystemExit("proxy closed the tunnel")
         reply += chunk
     status = reply.split(b"\r\n", 1)[0]
+    if b" 407" in status:
+        raise SystemExit("proxy requires authentication; PMV code must not supply it (DR-10)")
     if b" 200" not in status:
         raise SystemExit(f"proxy refused: {status.decode(errors='replace')}")
     context = ssl.create_default_context()
