@@ -96,6 +96,35 @@ The same three agents (no new agents) reviewed `05df35a` plus the corrective wor
 
 **Result: no unresolved BLOCKER or MAJOR in any review.**
 
+## Round 3: focused post-fix review of the runtime-secret hardening (2026-10-19, after `ba1fa9e`)
+
+Scope: the owner's "B10 FINAL SECURITY RECORD CORRECTION" (D6 resolved by control hardening, D10 timing moved to before `T0 − m`, the permanent diagnostic rule, the `/proc` residual). The owner directed that only the API / Execution Engineer and the Reliability / Red-Team review it, with no new agents. The original round 1–2 instances were no longer running, so fresh instances of the same two project agent definitions were used.
+
+Both reviewers worked read-only and offline. Neither ran the live probe or inspected proxy variables.
+
+| Reviewer | First pass | BLOCKER | MAJOR | Re-verify after fixes |
+|---|---|---|---|---|
+| API / Execution Engineer | **PASS WITH MINORS, conditional on API3-B10-01** | 0 | 1 → 0 | **PASS WITH MINORS**; no BLOCKER or MAJOR open |
+| Reliability / Red-Team | **PASS WITH MINORS** | 0 | 0 | **PASS WITH MINORS**; no BLOCKER or MAJOR open |
+
+| ID | Sev | Finding | Disposition |
+|---|---|---|---|
+| API3-B10-01 | MAJOR | `pytest.fail` raised inside `except ValueError` chained the original `urlsplit` error into the report. That error can quote the netloc, userinfo included (confirmed with a dummy value). | **Fixed.** The failure is raised outside the handler. Regression test with a dummy sentinel and stubbed connections |
+| API3-B10-02 / RT3-B10-11 | MINOR / NOTE | The egress test builds `Proxy-Authorization` in memory for its CONNECT; "reconstruct" in the rule covers this if read literally | **Disclosed, pending owner.** Carve-out proposed in `docs/conventions.md`; owner ruling needed before the probe is next run (proposed P-5 (c)) |
+| API3-B10-03 / RT3-B10-01 | MINOR | "was a sandbox/runtime credential" overstated proof | **Fixed.** Reworded in agent text. The owner's verbatim D6 bullet is labelled as such and qualified by precision notes |
+| API3-B10-04 | MINOR | Any 4xx/5xx except 407 counted as a refusal; a 5xx does not prove a policy denial | **Fixed.** 403 only, pinned by a unit test. README step 4 records a 5xx as "refused, unconfirmed" |
+| API3-B10-05 | MINOR | Step 4 conflated a proxy-unreachable error with a refusal | **Fixed.** A control line other than 200 invalidates the run |
+| API3-B10-06 / RT3-B10-03 | MINOR | The record cited this round 3 entry before it existed | **Fixed** by this entry |
+| API3-B10-07, RT3-B10-07 to -10 | MINOR / NOTE | Scanner gaps: second-leak names (`GIT_SSH_COMMAND`, `CLOUDSDK_PROXY_*`), case, sinks, YAML `run: env`, configuration files, Markdown runbooks, more dump forms. Also pipe false positives, untracked-file scanning, and a whole-file exemption | **Fixed.** Scanner rewritten: Git-tracked files; configuration files; fenced Markdown blocks; more forms; separator-bounded matches; shell comments skipped; exact-line exemptions; self-tests for each form |
+| RT3-B10-02 | MINOR | "prevent the known routes" overclaimed: the denies match command text | **Fixed.** Precision note; `docs/conventions.md` enforcement wording |
+| RT3-B10-04 | MINOR | Stale "issuer unverified" line in owner actions §3 | **Fixed.** Annotated as superseded |
+| RT3-B10-05 | MINOR | The pre-`T0 − m` refusal requirement could be skipped silently: registration lists said only P-1 to P-4 | **Fixed.** Added to `docs/phase1.md`, `docs/release_tool_design.md` step 6a, and a pending "Proposed START_HERE.md P-5" row in `docs/owner_actions/README.md`. The START_HERE edit awaits owner approval |
+| RT3-B10-06 | MINOR | The refusal test covers 3 hosts; passing it could be mistaken for meeting the whole requirement | **Fixed.** Stated as necessary, not sufficient. Pre-`T0 − m` host-class classification of every allowlist entry in both layers |
+| RT3-B10-12 | NOTE | Unrecorded residual risk: transcript copies, unproven lifetime | **Fixed.** Recorded in the decision record |
+| RT3-B10-13, API3-B10-08 to -11 | NOTE | Sandbox placeholder files; showlocals guard and snippet correct; dispositions faithful; disclosure history intact | Noted. Staging is by explicit path |
+
+**Result: no unresolved BLOCKER or MAJOR in either review.** Open owner items: the carve-out ruling, the START_HERE P-5 edit, and the `/proc` sandbox read-deny path normalization (non-blocking future hardening).
+
 ## Round 1 fixes
 
 The round 1 fixes were re-reviewed in round 2 above.

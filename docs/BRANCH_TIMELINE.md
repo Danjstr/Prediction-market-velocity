@@ -15,7 +15,7 @@ Old branches keep their original names. Their B-numbers are assigned here only; 
 - **Integration:** one pull request into `main` when the owner directs. Merging is the owner's decision, with a normal merge commit, and B10 is not deleted afterwards.
 - **Status:**
   - Gate 1 is undecided, A-1 to A-6 are unresolved, A-4 is not satisfied, historical acquisition is not authorized, and live capture is not authorized.
-  - B10 closure is pending the owner's proxy credential rotation (B10-D6) and egress-layer live-host removal (B10-D10; `docs/owner_actions/README.md` §3).
+  - B10-D6 is resolved by control hardening. B10-D10 egress-layer live-host removal is required before any cycle's `T0 − m`, not for B10 closure (owner correction, 2026-10-19; `docs/owner_actions/README.md` §3).
   - Until the owner designates a successor, every new development branch (B11) starts from this branch's final tip.
 
 ## Timeline
@@ -109,7 +109,8 @@ Listed oldest first, and appended at each timeline update.
 | Commit | Content |
 |---|---|
 | `05df35a` | B10 reconnaissance: charter record, connectivity pass, 19 schema profiles, value matrix, source verdicts, minimum viable source set, recon tools, exposure rows X-7 to X-11, reviews |
-| (the commit adding this row) | Owner decisions B10-D1 to B10-D11 recorded; stale B09 Kraken/BRTI rows corrected; live-host egress refusal test; owner procedure for the egress-layer removal and proxy rotation (pending); round 2 re-reviews. Its hash is the branch tip; see `git ls-remote` |
+| `ba1fa9e` | Owner decisions B10-D1 to B10-D11 recorded; stale B09 Kraken/BRTI rows corrected; live-host egress refusal test; owner procedure for the egress-layer removal and proxy rotation (pending); round 2 re-reviews |
+| (the commit adding this row) | Owner correction of the runtime-secret record: B10-D6 resolved by control hardening; B10-D10 removal timing moved to before `T0 − m`; permanent diagnostic rule (`docs/conventions.md`) with a static guard test; egress test credential hardening; owner Layer B probe no longer reads proxy variables; round 3 focused review. Its hash is the branch tip; see `git ls-remote` |
 
 ## Ancestry verification for B10 (2026-10-19)
 

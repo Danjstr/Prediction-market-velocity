@@ -76,6 +76,30 @@ Engineering conventions only. Project governance lives in PROJECT_BRIEF.md, CLAU
 - If a genuine false positive cannot reasonably be rewritten, stop and obtain an explicit, approved exception-policy decision before committing it.
 
 - Venue credentials (none exist yet) live only in the Claude-denied `~/pmv-credentials/`, are handed directly to a collector running outside Claude Code, and never enter the repository, logs, configuration, or agent context. Credential isolation must be in place before **any** venue credential exists, including a data-only one. If a venue requires broader-than-data permissions, stop for owner approval first (`docs/protected_information.md`).
+
+## Diagnostics and Runtime Secrets
+
+Permanent PMV rule (owner, 2026-10-19, B10 runtime-secret hardening; `docs/decisions/2026-10-19_b10_source_reconnaissance.md`, "Owner correction: runtime-secret hardening"). It applies to agents, owner runbooks, scripts, tests, CI, and production code.
+
+- Never print, log, serialize, echo, hash for disclosure, reconstruct, or include in traceback or error output:
+  - `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` values;
+  - `Proxy-Authorization`;
+  - proxy usernames or passwords;
+  - authenticated proxy URLs;
+  - runtime sandbox tokens or credentials.
+- Ordinary diagnostics must not use: `env`, `printenv`, `export -p`, `set`, `declare -p`, `compgen -v`, `curl -v` / `--verbose`, `curl --trace` / `--trace-ascii`, `wget --debug`, pytest `--showlocals`, or direct `/proc/*/environ` reads.
+- Diagnostics may report only safe metadata: whether a variable is present (yes/no), the proxy hostname and port, whether a credential is present (yes/no), and connection or refusal status.
+- Future network diagnostics must never print, serialize, or reconstruct runtime proxy credentials (B10-D6 as corrected).
+- Agent application notes (not part of the owner's rule text):
+  - In B10, the runtime credential also appeared in `GIT_SSH_COMMAND` and `CLOUDSDK_PROXY_*`. Treat those, and any other variable that may carry a proxy URL or runtime token, as covered by "runtime sandbox tokens or credentials" (review RT3-B10-07).
+  - The listed commands are examples. Other whole-environment dumps (`export` with no arguments, `declare -x`, `typeset -p`, `ps e…`, logging `os.environ`) fall under the same rule.
+- Enforcement:
+  - managed-policy denies outside the repository (owner-applied, 2026-10-19). They match command text, so they block the known routes, not every indirect one;
+  - the static backstop `tests/unit/test_diagnostic_secret_rule.py`. It scans Git-tracked code, automation, and configuration files, and fenced shell and Python blocks in Markdown.
+
+  Neither replaces review.
+- Implementation note, **pending owner confirmation** (not part of the rule text): `tests/integration/test_live_host_egress_refusal.py` builds a `Proxy-Authorization` header in memory from the injected proxy URL, solely to authenticate its CONNECT probe to that same proxy, as any proxy-aware client does. It never outputs it, and no `assert` touches it. Read literally, "reconstruct" covers this. The proposed carve-out is: "in-process transmission to the issuing proxy by a network client is not disclosure". It needs an owner ruling before the probe is next run.
+
 ## Raw Data
 
 - Raw captures live only in the external store described in `docs/raw_data.md`, never in Git. Its root, disk thresholds, retention class, and backup policy are explicit configuration with no defaults.

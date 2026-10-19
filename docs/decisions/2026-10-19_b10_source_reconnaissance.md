@@ -222,6 +222,7 @@ Issued by the owner in "B10 OWNER DECISIONS + FINAL RE-REVIEW" on 2026-10-19, af
 
 **B10-D6: APPROVED.** "Proxy credential must be rotated before B10 closure because it was printed in the session transcript."
 - Status: **owner action pending; not performable from the agent sandbox.** The credential's issuer is unverified: it may be the outer PMV egress proxy, or the Claude Code sandbox runtime, minted per session (`docs/owner_actions/README.md` §3 step 3). Either way, agents cannot rotate it, and no agent-runnable rotation procedure exists in the repository. Agents must not alter the egress layers. The exact owner steps are in `docs/owner_actions/README.md` §3. **B10 is not closed until the owner confirms rotation.**
+- **Superseded (owner correction, 2026-10-19):** RESOLVED BY CONTROL HARDENING. There is no PMV Squid password to rotate. See "Owner correction: runtime-secret hardening" below.
 
 **B10-D7: APPROVED,** correct the stale B09-derived documentation in this follow-up commit.
 - Applied:
@@ -252,6 +253,7 @@ Applied:
 - After review API2-B10-01, each refusal probe runs an in-test proxy-path control, and the Layer A check also catches wildcard entries.
 - The test therefore detects the current exposure as intended.
 - **Layer removal: owner action pending; not performable from the agent sandbox.** `managed-settings.json` is read-only to agent sessions, and the egress proxy is outside the container. Procedure: `docs/owner_actions/README.md` §3. Layer A also lists `exchange.coinbase.com`, which B10 never used; its removal is recommended there. **B10 is not closed until the test passes (8 passed) after the owner's change and the Layer B CONNECT-only check in §3 step 4 shows refusals.**
+- **Timing superseded (owner correction, 2026-10-19):** removal is not required to close B10. It is required before any cycle's `T0 − m`. See "Owner correction: runtime-secret hardening" below.
 
 **B10-D11: REJECTED AS WRITTEN AND REPLACED WITH** (verbatim):
 > "No further Kraken bulk acquisition begins until the current governing published terms are snapshotted and classified for private own-account PMV use. Vendor correspondence is required only if that review leaves a material ambiguity. Vendor non-response is not itself an acquisition blocker where the published terms clearly authorize the intended private use."
@@ -269,9 +271,77 @@ and "Do not represent silence as permission."
 | Proxy credential printed to the session transcript | Stands as recorded. Not in any repository file. Rotation is required before B10 closure (B10-D6; owner action pending) |
 | **Proxy credential printed again** during the round-2 API/Execution re-review (follow-up): its `env \| grep -i proxy` redaction did not cover `GIT_SSH_COMMAND` or `CLOUDSDK_PROXY_*` | Stands as recorded. Not in any file. The B10-D6 rotation must take place **after** this session, covering both exposures. Owner and agent procedures now warn never to print `env`, proxy URLs, or `GIT_SSH_COMMAND` (`docs/owner_actions/README.md` §3) |
 
+Both credential-print rows stand as written. Their rotation requirement is superseded by the owner correction below. The exposures themselves remain disclosed.
+
+## Owner correction: runtime-secret hardening (2026-10-19, third direction)
+
+Issued by the owner in "B10 FINAL SECURITY RECORD CORRECTION" on 2026-10-19, after `ba1fa9e`. It follows the owner-side investigation of the runtime secret and the owner's terminal hardening. The owner's findings and rulings are recorded below as given. The earlier B10-D6 and B10-D10 text above is kept, annotated as superseded.
+
+### Owner-verified findings
+
+1. The host shell has no `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` values.
+2. The PMV launcher contains only the unauthenticated route `pmv-egress-proxy:3128`. It has no username or password userinfo, no `srt.` token, and no command substitution that generates credentials.
+3. `pmv-egress-proxy` has no Squid `auth_param` / `proxy_auth` configuration and no Squid password or auth files. It holds no PMV-owned proxy credential to rotate.
+4. No persistent `srt.`-style runtime token exists in the PMV control directory.
+5. The exposed credential was therefore not a PMV Squid secret. The evidence strongly indicates that it was introduced by the Claude managed sandbox/runtime networking layer. **Its exact issuer and lifetime are not proven.**
+6. The owner added managed-policy secret guards outside Claude.
+7. A fresh Claude sandbox verified the guards (2026-10-19):
+   - **Live-denied:** `env`; `printenv`; `HTTP_PROXY`, `HTTPS_PROXY`, and `ALL_PROXY` inspection; `Proxy-Authorization` inspection; `curl --verbose`, `--trace`, and `--trace-ascii`; `pytest --showlocals`; `cat`/`head`/`sed`/`xxd`/Python reads of `/proc/self/environ`; `set`; `declare -p`; `compgen -v`.
+   - **Configured denies / additional write boundary:** the Read tool on `/proc/self/environ`, and Edit and Write of `managed-settings.json`. These were not live-denied by policy in that run: other tool checks stopped them first (a device-file guard; read-before-write). The deny rules are present in managed policy, and the managed-settings path is also on the sandbox's write-deny list.
+8. Sandbox controls remain: `sandbox.enabled = true`, `failIfUnavailable = true`, `allowUnsandboxedCommands = false`, `allowManagedDomainsOnly = true`, `disableBypassPermissionsMode = "disable"`.
+9. Permitted documentation access still works.
+10. **Residual defense-in-depth item (non-blocking; future hardening, not a B10 blocker):** the sandbox file-read deny paths for `/proc` appear normalized under `/workspace` (for example `/workspace/proc/self/environ`). The managed permission deny is therefore currently the effective protection for the real `/proc` paths. Recommended owner fix: express those sandbox read-deny entries as absolute paths that resolve to the real `/proc`.
+
+### B10-D6: RESOLVED BY CONTROL HARDENING (replaces the rotation requirement)
+
+Owner disposition, verbatim. Its first bullet is qualified by finding 5 and by the precision notes below.
+
+- The exposed credential was a sandbox/runtime credential, not a PMV Squid credential.
+- There is no PMV Squid password to rotate.
+- The two historical transcript exposures remain disclosed (process deviations above).
+- Persistent managed controls now prevent the known credential-disclosure routes.
+- Future network diagnostics must never print, serialize, or reconstruct runtime proxy credentials.
+
+Precision notes (agent, from the round 3 reviews RT3-B10-01, -02, -12 and API3-B10-03; they qualify the evidence, not the ruling):
+- What is proven is that the credential was **not** a PMV Squid credential. Its sandbox/runtime origin is the most likely explanation (finding 5). Its issuer and lifetime are not proven.
+- The managed denies match command text. They block the known command-text routes (finding 7). They cannot exclude every indirect route, such as a script file that dumps the environment. The Read-tool and managed-settings Edit/Write denies are configured but not live-proven, and the sandbox `/proc` read-deny paths are mis-normalized (finding 10). Review and the static backstop below remain necessary.
+- **Residual risk:** the plaintext of both exposures remains in local Claude session transcripts under `~/.claude/projects/`. They are outside Git, but may be included in any backup of that directory. Because the lifetime is unproven, the credential cannot be assumed expired. Optionally, the owner can confirm that it has expired, or purge or exclude those transcripts from backups and sharing. Agents must not open or search them for it.
+
+### B10-D10: timing corrected
+
+Immediate removal of the Kraken/Coinbase live-data hosts is **not** required to close B10.
+- Live/public market hosts may remain available during explicitly authorized development or reconnaissance.
+- Before `T0 − m` / protected evaluation, both PMV network-control layers must be tightened so that development agents cannot reach prohibited live or future data.
+- The pre-`T0 − m` checklist must include an automated refusal test: `PMV_EGRESS_PROBE=1 uv run --locked pytest tests/integration/test_live_host_egress_refusal.py` with all 10 checks passed, plus the owner's Layer B check (`docs/owner_actions/README.md` §3).
+- No `T0` or `T0 − m` exists now.
+- The hosts were not removed in this task. The test is expected to keep failing its 4 Layer A and refusal checks (of 10) until the owner tightens the layers.
+- The pre-T0 owner checklist in START_HERE.md lists P-1 to P-4. This requirement is binding through this record and `docs/external_access.md` §1.4. It is also listed wherever cycle registration prerequisites are listed (`docs/phase1.md`, `docs/release_tool_design.md` step 6a), and as a pending owner action in `docs/owner_actions/README.md`. Adding it to START_HERE.md as a checklist item (proposed P-5) is a governance edit that awaits owner approval.
+- **The refusal test passing is necessary, not sufficient** (review RT3-B10-06). The test covers three named hosts. The requirement covers every host through which development agents could reach prohibited live or future data. Before `T0 − m`, the owner also classifies every Layer A and Layer B allowlist entry by host class (`docs/external_access.md` §1), including the data or file hosts listed for owner disposition in `docs/owner_actions/README.md` §3 step 1, and any host serving a protected observable family. Live-data, live-display, and protected-observable hosts are removed or explicitly justified.
+
+### Permanent diagnostic rule
+
+Recorded in `docs/conventions.md`, "Diagnostics and Runtime Secrets", as given by the owner. A static backstop, `tests/unit/test_diagnostic_secret_rule.py`, scans the code and automation trees for the forbidden forms.
+
+### Applied (this corrective commit)
+
+- `docs/conventions.md`: the permanent rule.
+- `tests/unit/test_diagnostic_secret_rule.py`: the static backstop (no network). It scans Git-tracked Python, shell, workflow, and configuration files, plus fenced shell and Python blocks in Markdown runbooks. It has rule self-tests (hits and allowed forms), exact-line exemptions, and a repository scan. Findings report only file, line, and rule name.
+- `tests/integration/test_live_host_egress_refusal.py`:
+  - no `assert` touches the proxy URL, which pytest assertion introspection could otherwise render on failure;
+  - a missing or malformed proxy fails with a fixed message. The failure is raised outside the `ValueError` handler, so `urlsplit`'s message, which can quote the userinfo, is not chained into the report (review API3-B10-01, MAJOR, fixed). A regression test uses a dummy sentinel;
+  - only `403` counts as a proxy refusal. 407 and 5xx fail (review API3-B10-04). A unit test pins this;
+  - an autouse fixture refuses probes when local-variable tracebacks are enabled;
+  - the docstring states the credential-handling rule.
+  - Probe logic is otherwise unchanged. The live probe was not run in this session, because the owner directed that proxy variables not be inspected.
+  - **Pending owner confirmation (RT3-B10-11, API3-B10-02):** the probe builds a `Proxy-Authorization` header in memory, from the injected proxy URL, to authenticate to that same proxy. Read literally, the rule's word "reconstruct" covers this. Reviewers judged the handling sound: the header is sent only to the issuing proxy and is never output. The owner should confirm a narrow carve-out ("in-process transmission to the issuing proxy by a network client is not disclosure") before the probe is next run, which is before `T0 − m`. If the owner declines, the in-sandbox probe would send no credential, and an authenticating sandbox proxy would answer 407, which fails closed.
+- `docs/owner_actions/README.md` §3: D6 marked resolved. The step 4 snippet targets the unauthenticated `pmv-egress-proxy:3128` route that the owner verified. Layer B needs no credential, so the snippet reads no proxy variable and sends no auth header. The expected results now require 403, and a failed control line invalidates the run. The D10 timing is corrected. A pending row proposes START_HERE P-5.
+- `docs/external_access.md` §1.4, `docs/phase1.md`, `docs/BRANCH_TIMELINE.md`, `docs/release_tool_design.md` step 6a: closure status, the D10 timing, and the pre-`T0 − m` refusal requirement.
+- `research/governance/b10_reviews.md`: round 3, the focused post-fix review.
+
 ## Status after B10
 
 - Nothing acquired, purchased, licensed, provisioned, or captured beyond the deleted reconnaissance samples.
 - No `T0`, cycle, split, or protected scope exists.
 - B10 stops for owner review. No merge. No B11.
-- **B10 closure is pending two owner actions:** proxy credential rotation (B10-D6) and live-host removal from both egress layers, verified by `tests/integration/test_live_host_egress_refusal.py` passing (B10-D10). See `docs/owner_actions/README.md` §3.
+- ~~**B10 closure is pending two owner actions:** proxy credential rotation (B10-D6) and live-host removal from both egress layers, verified by `tests/integration/test_live_host_egress_refusal.py` passing (B10-D10). See `docs/owner_actions/README.md` §3.~~ Superseded by the owner correction above.
+- **B10-D6 resolved by control hardening; B10-D10 removal deferred to before any `T0 − m`.** No owner action is outstanding for B10 closure from D6 or D10. The `/proc` sandbox read-deny path normalization is recorded as future defense-in-depth hardening.

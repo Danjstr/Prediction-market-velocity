@@ -16,9 +16,16 @@ an application request, so no market data can be received even if a host were re
 A refusal from inside the sandbox proves the combined path refuses; proving Layer B alone
 requires the owner's run outside the Claude sandbox (docs/owner_actions/README.md, §3).
 
-Never run this file with ``-l``/``--showlocals``: the proxy credential is read from the
-environment at runtime, and a traceback with locals could print it. The credential is never
-written, logged, or included in an assertion message.
+Credential handling (permanent PMV diagnostic rule, B10 runtime-secret hardening,
+2026-10-19; ``docs/conventions.md``). The sandbox runtime may inject an authenticated proxy
+URL into the environment. This file uses it only in memory, inside ``_connect_status``, to
+authenticate the CONNECT to that same proxy, as any proxy-aware client does. It is never
+printed, logged, returned, or included in an assertion or failure message. No ``assert``
+statement touches it, because pytest assertion introspection would render the operands; a
+missing or malformed proxy fails with a fixed message and no chained exception (a regression
+test covers this), and connection errors report only the exception type. The probes refuse
+to run with local-variable tracebacks
+(``-l``/``--showlocals``) enabled.
 
 This check is required to pass before any cycle's ``T0 - m`` (pre-T0 checklist).
 """
@@ -38,8 +45,10 @@ PROHIBITED_LIVE_HOSTS = ("api.kraken.com", "ws.kraken.com", "api.exchange.coinba
 # Documentation hosts that B10-D10 preserves; also the positive control for the probe.
 PRESERVED_DOC_HOSTS = ("docs.kraken.com", "docs.cdp.coinbase.com")
 MANAGED_SETTINGS = Path("/etc/claude-code/managed-settings.json")
-# A proxy refusal: any 4xx/5xx except 407 (407 means the probe failed to authenticate).
-REFUSAL_STATUS = re.compile(r"^HTTP/1\.[01] (?!407)[45]\d\d\b")
+# A proxy policy refusal is 403. Anything else fails: 407 means the probe failed to
+# authenticate, and 5xx (DNS or upstream failure) does not prove a policy denial (review
+# API3-B10-04).
+REFUSAL_STATUS = re.compile(r"^HTTP/1\.[01] 403\b")
 ESTABLISHED_STATUS = re.compile(r"^HTTP/1\.[01] 200\b")
 
 probe = pytest.mark.skipif(
@@ -57,11 +66,20 @@ def _proxy_auth_header(parsed: urllib.parse.SplitResult) -> str:
 
 def _connect_status(host: str) -> str:
     """Return the proxy's status line for CONNECT host:443, or a connection-error marker."""
-    parsed = urllib.parse.urlsplit(
-        os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy") or ""
-    )
-    assert parsed.hostname, "no HTTPS proxy configured: not running inside the sandbox"
-    address = (parsed.hostname, parsed.port or 3128)
+    malformed = False
+    try:
+        parsed = urllib.parse.urlsplit(
+            os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy") or ""
+        )
+        address = (parsed.hostname or "", parsed.port or 3128)
+    except ValueError:
+        # urlsplit's message can quote the whole netloc, userinfo included. Fail outside the
+        # handler so that the original exception is not chained into the report.
+        malformed = True
+    if malformed:
+        pytest.fail("HTTPS proxy setting is malformed", pytrace=False)
+    if not address[0]:
+        pytest.fail("no HTTPS proxy configured: not running inside the sandbox", pytrace=False)
     try:
         with socket.create_connection(address, timeout=15) as sock:
             sock.sendall(
@@ -75,6 +93,12 @@ def _connect_status(host: str) -> str:
     except OSError as exc:
         return f"connection-error: {type(exc).__name__}"
     return reply.split(b"\r\n", 1)[0].decode("latin-1")
+
+
+@pytest.fixture(autouse=True)
+def _refuse_local_variable_tracebacks(request: pytest.FixtureRequest) -> None:
+    if os.environ.get("PMV_EGRESS_PROBE") == "1" and request.config.getoption("showlocals"):
+        pytest.fail("egress probes refuse to run with local-variable tracebacks", pytrace=False)
 
 
 def _allows(entry: str, host: str) -> bool:
@@ -96,6 +120,36 @@ def test_prohibited_host_list_is_exact() -> None:
         "ws.kraken.com",
         "api.exchange.coinbase.com",
     }
+
+
+def test_refusal_pattern_accepts_only_policy_denial() -> None:
+    assert REFUSAL_STATUS.match("HTTP/1.1 403 Forbidden")
+    for line in ("HTTP/1.1 407 Proxy Authentication Required", "HTTP/1.1 503 Unavailable"):
+        assert not REFUSAL_STATUS.match(line)
+    assert not REFUSAL_STATUS.match("HTTP/1.1 200 Connection Established")
+
+
+def test_malformed_proxy_failure_omits_proxy_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A malformed proxy URL fails with the fixed message only (review API3-B10-01).
+
+    The value is a dummy built from fragments. Its fullwidth number sign makes urlsplit raise a
+    ValueError that quotes the netloc. Connections are stubbed to fail, so the test can never
+    reach the network even if a future Python accepts the value.
+    """
+
+    def _no_network(*_args: object, **_kwargs: object) -> socket.socket:
+        raise AssertionError("network connection attempted")
+
+    monkeypatch.setattr(socket, "create_connection", _no_network)
+    sentinel = "dummy" + "-sentinel-" + "7f3a"
+    monkeypatch.setenv("HTTPS_PROXY", "http://u:" + sentinel + "@ex\uff03ample:3128")
+    monkeypatch.delenv("https_proxy", raising=False)
+    with pytest.raises(pytest.fail.Exception) as excinfo:
+        _connect_status("example.invalid")
+    assert excinfo.value.__context__ is None
+    assert excinfo.value.__cause__ is None
+    assert "malformed" in str(excinfo.value)
+    assert sentinel not in str(excinfo.value)
 
 
 def test_allowlist_matcher_covers_wildcards() -> None:

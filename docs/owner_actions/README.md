@@ -8,7 +8,8 @@ Agent sessions cannot write `.claude/agents/` or `.claude/settings.json`. Both a
 |---|---|---|
 | `2026-10-16_agents_split_wording.patch` | Replaces the literal "oldest ~70% / newest ~30%" split wording in six agent files with the prospective-holdout wording | Not blocking (the CLAUDE.md definition governs), but fresh agents read these files first. The owner directed the fix |
 | `2026-10-16_settings_f09_host_class_denies.patch` | Adds deterministic F-09 host-class WebFetch denies | **Priority blocker.** Required before the first historical acquisition (A-1), Phase 1 real collection, and any agent web research after a cycle's `T0 − m` |
-| §3 (no patch; owner terminal steps) | B10-D10 live-host removal from both egress layers, and B10-D6 proxy credential rotation | **Required before B10 closure** (owner decisions B10-D6 and B10-D10). The refusal test must pass before any `T0 − m` |
+| §3 (no patch; owner terminal steps) | B10-D10 live-host removal from both egress layers (B10-D6 credential rotation: resolved by control hardening, no action) | **Required before any cycle's `T0 − m`**, not before B10 closure (owner correction, 2026-10-19). The refusal test must pass before any `T0 − m` |
+| Proposed START_HERE.md P-5 (no patch yet; governance edit) | Add to the mandatory pre-T0 checklist: (a) both egress layers tightened, with the §3 step 4 Layer B check and the step 5 refusal test (all 10 checks passed) recorded; (b) every allowlist entry in both layers classified by host class, with live-data, live-display, and protected-observable hosts removed or justified (the refusal test passing is necessary, not sufficient); (c) owner confirmation or rejection of the egress test's in-memory proxy-authentication carve-out | **Pending owner approval** to edit START_HERE.md. Until then the requirement binds through `docs/decisions/2026-10-19_b10_source_reconnaissance.md` and `docs/external_access.md` §1.4 |
 
 Both patches were generated against commit `a1752b4`. On 2026-10-16 both were re-checked on B06 (`b06/governance-continuity-sync`): each passes `git apply --check`; the agents patch leaves no stale split term; and the settings patch yields valid JSON. If either target file changes later, `git apply --check` fails, and the patch must be regenerated, not forced.
 
@@ -112,10 +113,15 @@ The mechanism is chosen and committed before `T0 − m`, as part of cycle prepar
 
 ## 3. B10-D10 and B10-D6: live-host removal and proxy credential rotation (owner, 2026-10-19)
 
+**Status (owner correction, 2026-10-19; `docs/decisions/2026-10-19_b10_source_reconnaissance.md`, "Owner correction: runtime-secret hardening"):**
+- **B10-D6 is resolved by control hardening.** The exposed credential was not a PMV Squid credential. It was most likely injected by the Claude sandbox/runtime networking layer; its issuer and lifetime are not proven. `pmv-egress-proxy` has no authentication configuration, and there is no PMV password to rotate. Step 3 is superseded and kept for the record.
+- **B10-D10 removal (steps 1, 2, 4, 5) is not required to close B10.** It is required before any cycle's `T0 − m` / protected evaluation. Live and public market hosts may stay available during explicitly authorized development or reconnaissance.
+- Diagnostics follow the permanent rule in `docs/conventions.md`, "Diagnostics and Runtime Secrets".
+
 **Why the owner must do this.** Both network layers, and the proxy credential, are outside what an agent session may change:
 - **Layer A**, the Claude Code sandbox allowlist, is `sandbox.network.allowedDomains` in `/etc/claude-code/managed-settings.json`. The sandbox makes it read-only.
 - **Layer B** is the PMV egress proxy outside the container.
-- **The proxy credential** is the one injected into sandboxed processes as `HTTPS_PROXY`/`CLOUDSDK_PROXY_*`, at `localhost:3128`. **Its issuer is unverified** (outer PMV egress proxy, or the Claude Code sandbox runtime; see step 3). Either way, agents cannot rotate it.
+- **The proxy credential** is the one injected into sandboxed processes as `HTTPS_PROXY`/`CLOUDSDK_PROXY_*`, at `localhost:3128`. **Its issuer is unverified** (outer PMV egress proxy, or the Claude Code sandbox runtime; see step 3). Either way, agents cannot rotate it. *(Superseded 2026-10-19: the owner verified that the PMV egress proxy has no authentication, which rules out the first option; see the status above.)*
 
 The repository holds no agent-runnable rotation procedure. Agents must not try to widen, edit, or route around either layer (`docs/backup_and_recovery.md`).
 
@@ -127,31 +133,35 @@ The repository holds no agent-runnable rotation procedure. Agents must not try t
 **Steps, from a normal terminal outside Claude Code:**
 1. **Layer A.** Remove `api.kraken.com`, `ws.kraken.com`, and `api.exchange.coinbase.com` (and, recommended, `exchange.coinbase.com`) from `sandbox.network.allowedDomains` in `/etc/claude-code/managed-settings.json`. Keep the documentation hosts `docs.kraken.com`, `support.kraken.com`, and `docs.cdp.coinbase.com`, and the other documentation and research hosts. **For owner disposition (optional; not B10-D10 scope; review RT2-B10-m4):** Layer A also lists data-class or file hosts that an allowlist entry admits despite wildcard denies: `hist.databento.com`, `datamine.cmegroup.com`, `raw.githubusercontent.com` (the B10 fixture-deviation route), `codeload.github.com`, and `api.github.com`. Consider removing or narrowing them. Validate with `python3 -m json.tool /etc/claude-code/managed-settings.json > /dev/null`. Recommended (defense in depth, review API2-B10-m4): make the file root-owned (`sudo chown root:root …; sudo chmod 644 …`). It is currently owned by the agent user with mode 644, so it is read-only to agents only because of the sandbox deny list.
 2. **Layer B.** Remove the same hosts from the PMV egress proxy allowlist. Keep the same documentation hosts. Restart the proxy.
-3. **B10-D6.** First confirm which component issues the credential. Its `srt.` username prefix suggests the Claude Code sandbox-runtime proxy, possibly minted per session, rather than the outer PMV egress proxy (review API2-B10-m5). If it is per-session, rotation means ending every session that saw it (the B10 lead session and the API/Execution re-review session) and confirming that the old value is invalid. Otherwise, rotate the credential with the issuing proxy's own tooling, then restart the container or session so that the new value is injected. Never paste the new credential into a Claude session, a file under `/workspace`, or a commit.
-4. **Layer B alone,** outside the Claude sandbox, in the container shell, using the new proxy settings. Use a CONNECT-only probe, so that no TLS handshake or application request ever reaches a live host, and read the **proxy's** status line. Do not use `curl %{http_code}`: a refused CONNECT shows `000` there, and if a host were still allowed, an origin's own 403 or 404 could be mistaken for a refusal (review API2-B10-01).
+3. **B10-D6 (superseded 2026-10-19: resolved by control hardening; no action).** First confirm which component issues the credential. Its `srt.` username prefix suggests the Claude Code sandbox-runtime proxy, possibly minted per session, rather than the outer PMV egress proxy (review API2-B10-m5). If it is per-session, rotation means ending every session that saw it (the B10 lead session and the API/Execution re-review session) and confirming that the old value is invalid. Otherwise, rotate the credential with the issuing proxy's own tooling, then restart the container or session so that the new value is injected. Never paste the new credential into a Claude session, a file under `/workspace`, or a commit.
+4. **Layer B alone,** outside the Claude sandbox, in the container shell. Use a CONNECT-only probe, so that no TLS handshake or application request ever reaches a live host, and read the **proxy's** status line. Do not use `curl %{http_code}`: a refused CONNECT shows `000` there, and if a host were still allowed, an origin's own 403 or 404 could be mistaken for a refusal (review API2-B10-01). The probe targets the unauthenticated PMV route `pmv-egress-proxy:3128` (owner-verified, 2026-10-19) directly. It reads no proxy variable and sends no credential. *(Revised 2026-10-19: the earlier snippet read the proxy URL from the environment and built a `Proxy-Authorization` header from it. Layer B needs no credential, so the revised snippet handles none. Whether in-memory transmission to the issuing proxy is acceptable under the permanent diagnostic rule awaits owner confirmation; see the decision record, "Applied".)*
    ```bash
    python3 - <<'PY'
-   import base64, os, socket, urllib.parse
-   p = urllib.parse.urlsplit(os.environ["HTTPS_PROXY"])
-   auth = ""
-   if p.username:
-       raw = f"{urllib.parse.unquote(p.username)}:{urllib.parse.unquote(p.password or '')}"
-       auth = "Proxy-Authorization: Basic " + base64.b64encode(raw.encode()).decode() + "\r\n"
+   import socket
+   PROXY = ("pmv-egress-proxy", 3128)  # Layer B, unauthenticated
    for h in ["api.kraken.com", "ws.kraken.com", "api.exchange.coinbase.com", "docs.kraken.com"]:
-       with socket.create_connection((p.hostname, p.port or 3128), timeout=15) as s:
-           s.sendall(f"CONNECT {h}:443 HTTP/1.1\r\nHost: {h}:443\r\n{auth}\r\n".encode())
-           print(h, s.recv(4096).split(b"\r\n", 1)[0].decode("latin-1"))
+       try:
+           with socket.create_connection(PROXY, timeout=15) as s:
+               s.sendall(f"CONNECT {h}:443 HTTP/1.1\r\nHost: {h}:443\r\n\r\n".encode())
+               print(h, s.recv(4096).split(b"\r\n", 1)[0].decode("latin-1"))
+       except OSError as exc:
+           print(h, "connection-error:", type(exc).__name__)
    PY
    ```
-   Expected: a 4xx/5xx refusal line (not 407) for each prohibited host, and `200 Connection Established` for `docs.kraken.com`. Any `200` for a prohibited host is a failure. An empty line or a connection error means the host was refused but the refusal is unconfirmed; record it as such. Point `HTTPS_PROXY` at the Layer B proxy directly when testing Layer B alone. **Never print `env`, proxy URLs, or `GIT_SSH_COMMAND` in a Claude session**: a partial redaction leaked the credential twice in B10.
-5. **Both layers,** in a new Claude Code session on the current active branch (`docs/BRANCH_TIMELINE.md`; `b10/source-reconnaissance` at B10 close):
+   Expected: `200 Connection Established` for the `docs.kraken.com` control, and a `403` policy refusal for each prohibited host. If the control line is not `200`, the run is invalid: the probe did not get through Layer B. With a valid control:
+   - any `200` for a prohibited host is a failure;
+   - a 5xx (for example a DNS or upstream error) does not prove a policy denial; record it as "refused, unconfirmed";
+   - an empty line or a connection error for a prohibited host is also "refused, unconfirmed".
+
+   A `407` means Layer B unexpectedly requires authentication: stop and investigate, and do not add credentials to the probe. **Never print, echo, or inspect proxy variables, proxy URLs, or `GIT_SSH_COMMAND` in a Claude session** (`docs/conventions.md`, "Diagnostics and Runtime Secrets"): a partial redaction leaked the runtime credential twice in B10.
+5. **Both layers,** in a new Claude Code session on the current active branch (`docs/BRANCH_TIMELINE.md`), before any cycle's `T0 − m`:
    ```bash
    PMV_EGRESS_PROBE=1 uv run --locked pytest tests/integration/test_live_host_egress_refusal.py -q
    ```
-   Expected: 8 passed.
+   Expected: 10 passed (8 at B10 `ba1fa9e`; the round 3 hardening added two offline checks).
    - The Layer A static check reads `managed-settings.json`, including wildcard entries.
    - Three CONNECT probes must be refused, each with an in-test proxy-path control.
-   - Two list/matcher self-checks pass, and two documentation-host positive controls pass.
+   - Four offline self-checks pass (host list, matcher, 403-only refusal pattern, malformed-proxy redaction), and two documentation-host positive controls pass.
 
    Never run it with `-l`/`--showlocals`.
 
