@@ -1,7 +1,25 @@
-# B12 — BTC Kalshi historical pilot and data-science readiness
+# B12 — BTC Kalshi historical pilot and data-science readiness (amended for PMV 2.0)
 
 **Branch:** `b12/btc-kalshi-pilot`, created 2026-10-19 directly from the final B11 tip `c986f49227a47b855a547db96e65356f3674a9b8` (not from the `main` merge `92e46c1`).
-**Charter:** owner "START B12 — BTC KALSHI HISTORICAL PILOT + DATA-SCIENCE READINESS" (2026-10-19). It implements the DR-2 pilot gate (`docs/decisions/2026-10-19_owner_data_readiness_decisions.md`).
+
+**Charters:**
+- owner "START B12 — BTC KALSHI HISTORICAL PILOT + DATA-SCIENCE READINESS" (2026-10-19), which implements the DR-2 pilot gate (`docs/decisions/2026-10-19_owner_data_readiness_decisions.md`);
+- amended by owner "APPROVE PMV 2.0 WITH REVIEW MODIFICATIONS / BEGIN B12 STRATEGY AMENDMENT + REVISED BTC FEASIBILITY PILOT" (2026-10-20; record `docs/decisions/2026-10-20_b12_pmv2_strategy_pivot.md`, PV-13 to PV-15).
+
+**Purpose after the amendment (PV-13).** The pilot is **no longer intended to validate PMV 2.0 by itself**. It must establish:
+- contract and label integrity;
+- timestamp behavior;
+- available history;
+- spread behavior;
+- quote staleness;
+- trade activity;
+- executable cost floors;
+- whether coarse 60/120-second movement is large enough even in principle;
+- whether historical lead/lag analysis is meaningful;
+- an old-strategy settlement comparator.
+
+P1–P9 are kept where still valid. P10–P16, early-close and pause incidence, the old-strategy control C1–C3, the stop conditions S-1 to S-6, and the pilot discipline rules were **added on 2026-10-20, before any Kalshi row was seen** (§5.4 to §5.8).
+
 **Status: BLOCKED BEFORE THE FIRST KALSHI OBSERVATION.** No Kalshi market observation has been fetched, viewed, or profiled in B12. Every empirical question in the charter (§§6–11) is still **UNKNOWN**. This record holds three things:
 - the access blockers;
 - the tooling built so the pilot can run deterministically once access is granted;
@@ -61,8 +79,8 @@ These are the documented expectations the pilot must test. Sources: `research/ka
 | File | Role |
 |---|---|
 | `research/data_sources/recon_tools/kalshi_pilot_sample.py` | Bounded fetch. Fixed public endpoint templates only; `KXBTC15M` scope guard; historical tier only (a market at or after `market_settled_ts` is refused); cumulative ceilings of **10 MB** and **10,000 rows** across invocations, enforced from `manifest.jsonl` before any response is written; at most 10 trade pages per market; raw bytes plus a SHA-256 manifest under the git-ignored `/workspace/.recon_tmp/kalshi_pilot`; credential-free CONNECT through `PMV_EGRESS_PROXY_HOST`/`PORT`, or `--direct` (owner-run). It never reads the runtime proxy variables (DR-16). |
-| `src/pmv/pilot/kalshi_btc.py` | Offline profiler: `python -m pmv.pilot.kalshi_btc DIR [--show]`. Produces an aggregate-only JSON report covering native field types, nulls, numeric-string decimals, timestamp digits, ordering, duplicates, pagination, label integrity, candle coverage, the late-window × ask-band table (YES and NO sides, with distinct contracts and settlement instants), trade activity by remaining-time band, and trade↔candle reconciliation under both boundary conventions and offsets of −60, 0, and +60 s, with and without block trades. `--show` prints head and tail raw rows to the terminal only. Strict parsing: floats, bools, and offset-less times are refused and counted as malformed, never repaired. |
-| `tests/unit/test_pilot_kalshi_btc.py`, `tests/unit/test_kalshi_pilot_sample_tool.py` | Deterministic tests on invented fixtures. The tool tests are offline (`fetch` is stubbed) and cover templates, the scope guard, the cutoff refusal, pagination termination, cumulative ceilings, and non-echo of proxy settings. They found and fixed one real defect: the trades request had dropped its `ticker` filter. |
+| `src/pmv/pilot/kalshi_btc.py` | Offline profiler: `python -m pmv.pilot.kalshi_btc DIR [--show] [--fee-scenario NAME=COEFFICIENT ...]`. **2026-10-20 additions:** P10 to P16a, lifecycle incidence, and C1 (§5.4 to §5.5), with labelled fee scenarios: default spread-only, each marked `SCENARIO_NOT_AUTHORITATIVE`. **Defect fixed:** a trade without `taker_outcome_side`, a field Kalshi added on 2026-05-06, was counted as malformed and dropped. That would have hidden every older trade from P13. It is now kept, and its absence is counted. **Original features:** Produces an aggregate-only JSON report covering native field types, nulls, numeric-string decimals, timestamp digits, ordering, duplicates, pagination, label integrity, candle coverage, the late-window × ask-band table (YES and NO sides, with distinct contracts and settlement instants), trade activity by remaining-time band, and trade↔candle reconciliation under both boundary conventions and offsets of −60, 0, and +60 s, with and without block trades. `--show` prints head and tail raw rows to the terminal only. Strict parsing: floats, bools, and offset-less times are refused and counted as malformed, never repaired. |
+| `tests/unit/test_pilot_kalshi_btc.py`, `tests/unit/test_kalshi_pilot_sample_tool.py` | Deterministic tests on invented fixtures, including the 2026-10-20 measurements. The tool tests are offline (`fetch` is stubbed) and cover templates, the scope guard, the cutoff refusal, pagination termination, cumulative ceilings, and non-echo of proxy settings. They found and fixed one real defect: the trades request had dropped its `ticker` filter. |
 
 ## 5. Pre-registered pilot protocol (written before any Kalshi row was seen)
 
@@ -78,7 +96,14 @@ python3 -I $T --direct markets-page                  # one page of 200 settled m
 python3 -I $T --direct market --ticker <T_i>         # i = 1..12 (selection rule below)
 python3 -I $T --direct --out /workspace/.recon_tmp/kalshi_pilot_repeat market --ticker <T_1>   # replay determinism
 uv run --locked python -m pmv.pilot.kalshi_btc /workspace/.recon_tmp/kalshi_pilot > /workspace/.recon_tmp/b12_profile.json
+# after DR-9: add the versioned schedule as a scenario (S-1b), e.g. --fee-scenario dr9_v1=<coefficient>
 ```
+
+**Fee scenarios (PV-21).**
+- `spread_only` (no fee) is always run. It is the most generous cost floor.
+- The only other scenario that may feed a stop condition is the **authoritative, versioned** Kalshi schedule (DR-9). If that schedule is not of the form `coefficient × P × (1 − P)` per contract, the profiler is extended, with tests, before it is used. The new form is not approximated.
+- Any other scenario is exploratory, labelled as such, and never cited.
+- No fee number in this protocol is canonical.
 
 ### 5.2 Market selection (fixed in advance)
 
@@ -105,6 +130,126 @@ uv run --locked python -m pmv.pilot.kalshi_btc /workspace/.recon_tmp/kalshi_pilo
 | P9 | Terms (§2.2) | No explicit prohibition of private research use or storage | Explicit prohibition |
 
 A result between "pass" and "stop" is **GO WITH CONDITIONS**, with the condition named.
+
+*2026-10-20 note.* P1–P9 stay valid under PMV 2.0:
+- P1 now also serves as the two-sided-quote coverage check for P10 and P15;
+- P5 still gates B0 and distance-to-strike, which both strategies need;
+- P9 is extended by S-5.
+
+### 5.4 PMV 2.0 descriptive measurements P10–P16 (pre-registered 2026-10-20, before any row was seen)
+
+**Common definitions:**
+- **Decision point:** an in-window minute boundary `E` (a candle `end_period_ts`, with `open_time < E ≤ close_time`).
+- **Two-sided quote:** usable YES bid and ask closes (strictly inside (0, 1)) with bid < ask. Crossed or locked quotes are counted, never repaired.
+- **Remaining-time bands:** ≤1, >1–2, >2–3, >3–5, >5–10, >10 minutes.
+- **Price bands** on the YES mid: <0.10, 0.10–0.29, 0.30–0.69, 0.70–0.89, 0.90–0.96, ≥0.97.
+- **Reporting:** every table reports distinct contracts and settlement instants next to rows.
+- **Status of the results:** all are descriptive. None is an edge, profitability, or calibration claim.
+
+| ID | Measurement | Report key |
+|---|---|---|
+| P10 | Spread at minute boundaries, by remaining-time band × price band: quantiles, the count at or below 1¢ and 2¢, and the quote-state counts | `p10_spread` |
+| P11 | Share of adjacent minutes with an unchanged close bid/ask (with and without volume), and with a zero bid and ask OHLC range, by band × price band. Missing minutes are never bridged | `p11_quote_staleness` |
+| P12 | Trades per contract-minute and inter-trade gap quantiles by remaining-time band; block-trade share | `p12_trade_arrival` |
+| P13 | The raw-string precision profile (fractional digits shown). The **observed** timing resolution, which formatting alone does not establish (`.000` carries no sub-second information): the fraction class (none / all-zero / non-zero), the distribution of significant non-zero fractional digits, the whole-minute share, and `observed_resolution` (below). Also same-timestamp print groups and their size distribution, and `taker_outcome_side` population (yes / no / absent / invalid) by UTC month | `p13_trade_timestamps` |
+| P14 | Print-to-print absolute price change and gap for consecutive non-block prints less than 60 s apart, by band; share of print-minutes with two or more prints | `p14_print_dispersion` |
+| P15 | **Cost-hurdle / perfect-foresight ceiling** (below) | `p15_cost_hurdle` |
+| P16a | Kalshi-side lead/lag measurability, from the **observed** resolution (P13), never the digit count, and from event dispersion. Over the last 300 s of each contract: the share of whole seconds with a non-block print; the share of distinct print times among non-block prints (identical stamps carry no ordering); inter-print gaps; and the minimum resolvable lag (0 s for `sub_second`, 2 s for `whole_second`, undefined otherwise) | `p16a_lead_lag_measurability` |
+| P16b | Aligned Kraken cross-correlation at the available precision (lags 0–120 s, with a reversed-shift placebo and day-blocked intervals). **Not run in B12:** it needs the DR-3 Kraken archive file for the sampled dates. Pre-registered here | — |
+| L | Early-close and pause incidence: window durations, close times off the 15-minute grid or different from `expected_expiration_time`, `can_close_early`, and overlaps with the documented Thursday 03:00–05:00 ET pause, with the candles and trades seen inside each overlap | `lifecycle_incidence` |
+
+**Observed resolution (P13; pre-registered 2026-10-20 in the owner's pre-commit review, before any data was seen).** The classes are checked in this order:
+
+| Class | Rule |
+|---|---|
+| `coarser_than_second` | At least 50% of stamps fall exactly on a minute |
+| `sub_second` | At least 50% of stamps carry a non-zero fractional part |
+| `whole_second` | Under 1% carry a non-zero fractional part, however many digits are shown |
+| `mixed` | Anything else |
+| `unknown` | No parsed stamp |
+
+**P15 definition.** For each decision point `E` with a two-sided quote, and each horizon `h` ∈ {60, 120} s:
+- **Horizon limits.** The 1-minute grid cannot represent 30 s, so the 30-second horizon is prospective-only. An exit boundary after `close_time` is counted as `crosses_close`, never scored, because settlement is not an exit. A missing or one-sided exit quote is counted.
+- **Close-to-close:**
+  - YES net = bid(E+h) − ask(E) − fee(ask(E)) − fee(bid(E+h));
+  - NO net = bid(E) − ask(E+h) − fee(1 − bid(E)) − fee(1 − ask(E+h)).
+
+  Perfect foresight takes the better side.
+- **Generous:** as close-to-close, but the exit uses the best bid high (YES) or ask low (NO) over the bars in (E, E+h]. That is an intra-minute extreme of unknown size and timing, so it is an upper bound.
+- **Mid diagnostic:** |mid(E+h) − mid(E)| > spread(E) + 2 × fee(mid(E)).
+- **Per cell** (h × band × price band) and per fee scenario, report:
+  - the share of decision points with a positive close-to-close ceiling;
+  - the share with a positive generous ceiling;
+  - the share where the mid move exceeds cost;
+  - the number of contracts with a positive generous ceiling;
+  - quantiles of the best close-to-close net.
+- **What P15 is not.** A positive ceiling is necessary, never sufficient. It ignores latency, depth, queue position, adverse selection, and the fact that a touch is not a fill. **No profitability claim may be made from P15.**
+
+### 5.5 Old-strategy settlement control (PV-14)
+
+| ID | Control | In B12 |
+|---|---|---|
+| C1 | Market tail calibration. **At most one row per contract × band** (≤1, >1–2, >2–3, >3–5 minutes): the **earliest** in-window minute in that band at which either side's executable ask is at least 0.85. If both sides qualify in that same minute, the side with the higher ask is used, and YES on a tie. If the other side qualifies later in the band, it is not used, and that case is counted. This rule was amended in the owner's pre-commit review on 2026-10-20, before any data was seen: the earlier per-side rule could put two rows from one flipping contract into one cell. Per band × ask band: wins, mean ask, win frequency (Wilson 95%), gap = frequency − mean ask with a 95% **day-block** bootstrap interval (2,000 resamples, seed 20261020, whole UTC close dates), and the gap net of each scenario's mean fee | Computed (`c1_old_strategy_control`). **Descriptive only:** 12 markets are far below the power needed for any calibration claim |
+| C2 | B0 analytic digital fair value (Kraken σ known at decision time, distance to the knowable strike, remaining time, the 60-second averaging caveat) versus the executable ask | Pre-registered; runs with P16b. Needs Kraken prices and P5 |
+| C3 | Market-implied σ (inverted from the ask) versus subsequently realized Kraken σ over the remaining window | Pre-registered; runs with P16b. Needs Kraken prices and P5 |
+
+**Inferential use.** C1–C3 are used inferentially only on the development pool after bulk acquisition, under these same definitions.
+- If the settlement arm shows a lower day-block bound above zero after the authoritative fee, it **continues on its own merits** (PV-14).
+- Positive evidence is never suppressed because PMV 2.0 is primary.
+
+### 5.6 Stop conditions (pre-registered 2026-10-20, before any row was seen; PV-15)
+
+Every threshold here is a development hypothesis. The owner may amend it only **before** the pilot runs. None is chosen after seeing results.
+
+**Mechanical evaluation.** The profiler evaluates S-1, S-2, and S-3 itself, with the thresholds below as named constants (report key `stop_screen`), so no analyst judgement enters them. S-4 to S-6 are reported as `MANUAL`: they rest on the P1–P9 checks, the terms, and the fee schedule.
+
+**Liquid cell.** A P15 cell counts as liquid only if **all** of the following hold:
+- it has at least 3 contracts and at least 20 decision points;
+- the P12 trades-per-contract-minute for its remaining-time band is at least 1.0;
+- the P11 unchanged-close-quote share for its band × price band is at most 0.80.
+
+| ID | Condition | Consequence |
+|---|---|---|
+| S-1a | Under `spread_only`, the **generous** P15 ceiling is positive at fewer than 5% of decision points in **every** liquid cell, at both horizons | **HISTORICAL COST-HURDLE SCREEN FAILED — OWNER NO-GO REVIEW REQUIRED.** No automatic advance to prospective capture. See the note below. |
+| S-1b | After DR-9: the same test under the authoritative schedule | As S-1a |
+| S-2 | P13 `observed_resolution` is `coarser_than_second`, or the P16a late-window seconds-with-print share is below 0.05. A `mixed` or `unknown` resolution gives UNDETERMINED and goes to the owner | **Historical lead/lag analysis stops.** P16b is not run, and the question becomes prospective-only (Span D). A `whole_second` result limits P16b to lags of 2 s or more. |
+| S-3 | A band × price-band cell fails the liquid-cell test | **Remove the cell from the opportunity universe.** If no liquid cell remains, the S-1a consequence applies. |
+| S-4 | P3, P4, or P5 stop (labels, strike re-derivation, point-in-time strike); or close-time changes, early closes, or off-grid closes in more than 1 of 12 markets without a documented rule | **Stop.** Contract and settlement metadata are not point-in-time safe. |
+| S-5 | P9 explicit prohibition in the terms; or the DR-9 fee schedule is not obtained | **Stop** for a terms prohibition. Without DR-9, **stop cost analysis**: P15 is reported under `spread_only` only, S-1b cannot be evaluated, and no Stage C economics begin. |
+| S-6 | Any P1, P2, P6, P7, or P8 stop | As registered in §5.3 |
+
+**S-1 semantics (owner's pre-commit review, 2026-10-20).** The bounded pilot is too small to falsify the whole PMV 2.0 program on its own.
+- **If S-1 fails,** PMV does **not** advance to prospective capture. It returns "HISTORICAL COST-HURDLE SCREEN FAILED — OWNER NO-GO REVIEW REQUIRED". The owner may then:
+  - terminate the 30–120-second path;
+  - enlarge the development-only historical feasibility sample under a new approved protocol;
+  - change the candidate opportunity strata for a principled reason;
+  - or stop PMV 2.0.
+- **Failure of a generous perfect-foresight ceiling is strong negative evidence.** No threshold may be tuned after the result is seen.
+- **If S-1 does not fail,** that is not evidence of edge. Advancing still needs owner approval.
+
+**Outcomes of the pilot:**
+- a **pass** of the 30–120-second track means only that S-1a, S-1b (when evaluable), S-3, S-4, and S-5 did not stop it;
+- with owner approval, that supports **Stage C**, prospective Span D capture under DR-8, P-5, and terms;
+- it never supports an edge claim.
+
+### 5.7 Pilot discipline and trial budget
+
+- **Fixed tables.** The tables in §5.3 to §5.5 are the complete pre-registered set.
+- **Exploratory additions.** Any table or cut added after the data is seen is labelled exploratory, logged as a research degree of freedom, and never used by a stop condition.
+- **Market selection** is the §5.2 rule, unchanged. Neither the band edges nor the horizons are changed after the data is seen.
+- **Exposure.** Every row fetched is development-exposed. It is registered in `docs/exposure_register.md` Part A after the run, and can never become protected (PV-16).
+- **Specialist review.** After the run, all eight specialists review `b12_profile.json`, with the Independent Statistical Auditor in fresh context.
+
+### 5.8 What this pilot cannot answer
+
+- 30-second horizons.
+- Any intra-minute executable path, depth, queue position, or fill probability.
+- Exit fillability near close.
+- Adverse selection.
+- Sub-second lead/lag.
+- Any edge, profitability, or calibration claim, given 12 markets.
+
+All of these are Span D questions (`docs/phase2.md`, PMV 2.0 section).
 
 ## 6. Provisional historical known-at policy (to be confirmed by the pilot)
 
@@ -165,7 +310,7 @@ Built on the existing development-exposed Kraken evidence (`research/data_source
 
 ## 10. Specialist review
 
-**Not run.** The charter asks the seven specialists to review "the ACTUAL derived evidence". None exists yet, and a verdict on documentation alone would contradict the charter's §6 ("Do not issue conclusions from schema documentation alone"). The review runs after the §5 pilot has produced `b12_profile.json`.
+**Not run.** After the PMV 2.0 amendment, all eight specialists review the pilot (§5.7). The original charter asked the seven specialists to review "the ACTUAL derived evidence". None exists yet, and a verdict on documentation alone would contradict the charter's §6 ("Do not issue conclusions from schema documentation alone"). The review runs after the §5 pilot has produced `b12_profile.json`.
 
 ## 11. Batch accounting (docs/external_access.md §1.3)
 
@@ -173,3 +318,4 @@ Built on the existing development-exposed Kraken evidence (`research/data_source
 - Refused host attempts: **1** (`live-data` class; `api.elections.kalshi.com` and `external-api.kalshi.com`, refused by the permission classifier before any connection).
 - Terms events: **0** (no terms page was reachable).
 - Raw pilot data: none exists, so there is nothing to delete.
+- **2026-10-20 (PMV 2.0 review).** The API / Execution review fetched `docs`-class pages from `docs.kalshi.com` (`openapi.yaml`, `llms.txt`, and eight guide and reference pages) into a temporary directory outside the repository. They contained no observations, so there was no exposure. The fetches are logged in `research/sources.md`. The OpenAPI specification had changed since the 2026-10-19 snapshot (PV-20). No venue API host, stream, or live-display page was contacted.
