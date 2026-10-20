@@ -212,7 +212,19 @@ Count exposure conservatively:
 - include open positions;
 - include resting orders at their worst-case fill;
 - include orders in unknown state as live exposure until reconciled;
-- include capital locked until settlement.
+- include capital locked until settlement;
+- for PMV 2.0 round trips, count the **full premium** of every open position as its worst-case loss. A stop price is an attempt to exit, not a loss bound: binary books gap, and an exit can fail into settlement.
+
+Under PMV 2.0 (owner decision PV-17, 2026-10-20), each position must fit both:
+- the stop-plus-stressed-slippage budget;
+- the full-premium catastrophic budget.
+
+The policy also defines a no-new-entry cutoff before close, an earlier forced-flat cutoff, and a deterministic exit ladder. Unintended settlement exposure is RED. The empty-bid forced-exit hierarchy is an open owner decision (PV-18) and is never improvised.
+
+Banking (PV-9, PV-10) creates no EV:
+- the owner's L1/L2/L3 levels are ceilings, not order sizes or real-capital authorization;
+- refills are finite and booked as strategy losses;
+- ruin is measured on total strategy equity against the absolute loss budget.
 
 Treat Bitcoin-linked and gold-linked contracts, overlapping windows, and markets on the same underlying move as potentially correlated unless evidence shows otherwise.
 

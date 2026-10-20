@@ -915,3 +915,25 @@ All retrieved with `curl` through the PMV egress proxy under the owner's B10 cha
 | Tardis documentation and Terms of Service | `docs.tardis.dev` | Dataset types, timestamps, Kraken coverage, licence clause 9.5 | `tardis_kraken_book.md` |
 | Coinbase CDP documentation (Exchange and Advanced Trade) | `docs.cdp.coinbase.com` | Trade side (maker), sequence, L2/L3 channels | `coinbase_exchange.md` |
 | CF Benchmarks BRTI | none (all hosts blocked; repo evidence only) | Methodology and Kalshi usage, SECONDARY | `cf_benchmarks_brti.md` |
+
+## B12 PMV 2.0 review: Kalshi documentation re-fetch (2026-10-20)
+
+The API / Execution specialist fetched these pages from `docs.kalshi.com` (`docs` class) during the read-only PMV 2.0 strategy review. They went into a temporary directory outside the repository. Raw bytes are not in Git. The pages contained no market observations, so there is no exposure-register entry. Times are file modification times in UTC, approximate to the second. Record: `docs/decisions/2026-10-20_b12_pmv2_strategy_pivot.md` (PV-20).
+
+The specification changed with no version bump. `openapi.yaml` (`info.version` 3.34.0) is now 378,255 bytes. The 2026-10-19T04:18:27Z snapshot recorded in `schema_profiles/kalshi_markets.md` was 375,483 bytes, SHA-256 `bd0c218a…`. Schema-dependent parsers must pin and re-check the specification hash. No profile has been re-derived from the new bytes yet.
+
+| Path under `https://docs.kalshi.com/` | Retrieved (UTC) | SHA-256 of retrieved bytes |
+|---|---|---|
+| `openapi.yaml` | 2026-10-20T02:36:28Z | `25f07afd9c09a7b005b1ccbfc06ad94928aa7d43d837ad3e43b0db7b7fc0283e` |
+| `llms.txt` | 2026-10-20T02:37:14Z | `2c64c416e6bd279f50ac92d25dd7ce9c9b007a825f962ead5f598401a4b46645` |
+| `getting_started/fee_rounding.md` | 2026-10-20T02:37:13Z | `0e75e087de5e90897e59a19a13ccb5d554a417177a28fc3a9a05fee18152f669` |
+| `getting_started/order_direction.md` | 2026-10-20T02:37:23Z | `596c8beb4eb6ccf67199762ea92cd6d471bb7b593ebcf427810e9b70cc66ba63` |
+| `getting_started/market_lifecycle.md` | 2026-10-20T02:37:25Z | `fc1e534166262db091638dcc5e2629c4456aa3579aa8eb987a381867731a359e` |
+| `getting_started/order_groups.md` | 2026-10-20T02:37:26Z | `36a85cc9e534564c56ef046fd66aeac00ec4d899af22bd87a99e1045aade1e86` |
+| `getting_started/subaccounts.md` | 2026-10-20T02:38:58Z | `9bdeeff8c3d8f0dc62d1dbcb91dc47382520bfd1ab381d30cb53fc32d9cabf77` |
+| `getting_started/market_settlement.md` | 2026-10-20T02:39:02Z | `ae5b054f4489952276cfdfb4f5144eef861e231118b58c1124a7a1e0a4d773f7` |
+| `api-reference/orders/create-order-v2.md` | 2026-10-20T02:37:23Z | `48105893f53ca9e2e340fe34cadfaa659d38d792ab2470b57e2f53036e5d15d8` |
+| `api-reference/portfolio/update-subaccount-netting.md` | 2026-10-20T02:39:00Z | `4cc3d5ccfd7996f129c3db250ce36eb040e7e7d1697c5d85d1dc6fadaf7c0b4f` |
+| `websockets/user-fills.md` | 2026-10-20T02:39:01Z | `fb28a66dcddb49f56d0e7fe1798112c6eba4d8ff2342addd4ebea958f5661c68` |
+
+These pages were used only for the review's execution-mechanics findings, recorded in `research/governance/b12_pmv2_specialist_reviews.md` as OFFICIAL DOCUMENTATION. They are not yet folded into `research/kalshi/api_documentation_findings.md`. Doing so, against the new specification hash, is a later venue-verification task.

@@ -59,6 +59,8 @@
 >
 > If the pilot materially fails these checks, stop before bulk acquisition and return to the owner.
 
+*Annotation (2026-10-20). The owner decision record `docs/decisions/2026-10-20_b12_pmv2_strategy_pivot.md` (PV-13 to PV-15) extends this pilot for PMV 2.0. The text above is unchanged and still binding. The pilot now also measures P10–P16 and lifecycle incidence, runs the old-strategy control C1, and applies the pre-registered stop conditions S-1 to S-6 (`research/kalshi/b12_btc_kalshi_pilot.md` §5.4–§5.6). The "tail asks in approximately the 0.85–0.99 region" check stays as a data-quality check for the settlement arm. It is no longer the pilot's central question.*
+
 ### DR-3. Kraken: approved after terms classification
 
 > Kraken XBTUSD historical trades remain the initial BTC underlying source.

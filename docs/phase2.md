@@ -317,7 +317,7 @@ Four points deserve emphasis:
    - Multi-venue and multi-asset metrics resample the **same** calendar blocks for every asset and venue, which preserves cross-sectional correlation.
    - Daily P&L, drawdown, and losing streaks use a stationary bootstrap of daily P&L, with a preregistered mean block length.
    - Correlated-exposure caps (Phase 4.5) aggregate by `outcome_cell_id` and by overlapping information interval. An hourly contract and the 15-minute contract ending at the same instant are one exposure to the terminal fixing.
-6. **Power (F-07).**
+6. **Power (F-07).** *For PMV 2.0, the estimand is re-specified before the first protected cycle is registered: see "PMV 2.0 executable-price targets, dependence, and trial budget". The text below defines it for the settlement arm.*
    - **Primary confirmatory estimand:** the paired per-cell loss difference against the executable-price-implied probability, on eligible `RECEIPT` cells. It tests information not already in the price, and its SD is set by forecast disagreement, not by outcome variance.
    - **Secondary estimand:** after-cost EV per traded cell.
    - For each estimand, the required effective N is `n = ((z_{1−α/2} + z_{1−β}) σ_s / Δ)²`. `σ_s` and the ESS ratio are estimated on development `RECEIPT` data available at cycle registration. Where none exist, as in the first cycle, the gate record states assumed values, their sources, and a sensitivity table, chosen conservatively (larger `σ_s`, smaller ESS ratio, smaller `Δ`). Historical-archive estimates may inform the assumption but are labeled as such.
@@ -349,7 +349,114 @@ Four points deserve emphasis:
   - Report a provably complete subset as a sensitivity analysis.
   - A source with no possible bound stays discovery-only.
 
+## PMV 2.0 executable-price targets, dependence, and trial budget (owner decision, 2026-10-20)
+
+**Owner record:** `docs/decisions/2026-10-20_b12_pmv2_strategy_pivot.md` (PV-2, PV-5 to PV-8, PV-16, PV-17). The objective is in PROJECT_BRIEF.md §3.
+
+**Status.** The direction is owner-approved. The details below are the working design. They change approved validation methodology, so they are frozen only at Gate 2, after Statistician review and an Independent Statistical Auditor review of the affected components (the Statistician co-authored them). Every numeric value below is a development hypothesis.
+
+### Stage 1 labels (policy-independent)
+
+Notation: decision time `t`, on the preregistered clock grid, using PMV receipt time; side `s` ∈ {YES, NO}; horizon `h` from a preregistered set `H` of at most three primary horizons (initially about 30, 60, and 120 s); clip size `q`; measured entry latency `L_in`; measured exit latency `L_out`; round-trip time `RTT`.
+
+| Label | Definition | Notes |
+|---|---|---|
+| Executable entry `E(t, s, q)` | Depth-walked ask for side `s` at `t + L_in`, from the book as PMV received it | NO ask = 1 − YES bid (OFFICIAL DOCUMENTATION) |
+| Executable exit `X(t, s, q, h)` | Depth-walked bid for side `s` at `t + L_in + h + L_out` | Pessimized: the worse of that book and the book one `RTT` later |
+| Movement distribution | `X − E` as a discrete distribution over ticks, plus excursions (maximum favorable and adverse) over the path | Calibrated per class or quantile |
+| First passage `FP(t, s; u, d, h)` | First of: TARGET (exit bid ≥ E + u), STOP (exit bid ≤ E − d), TIMEOUT (h), CUTOFF (forced-flat time), on a **small preregistered barrier grid** of at most nine (u, d) pairs | Competing-risks / multinomial target, never a P&L label |
+| Settlement label | The official result (§12) | Kept for the settlement arm, the B0 anchor, and failed-exit pricing |
+| Mid-price change | `mid(t + h) − mid(t)` | **Diagnostic only, never evidence.** The gap between it and the executable label measures bid-ask bounce. |
+
+**Rules:**
+- **No policy in the label.** Stop, target, timeout, and sizing policies are evaluated by the Stage 2 deterministic simulator on these labels. A policy outside the preregistered barrier grid needs new labels and counts as a new trial.
+- **Horizon clipping.** A row whose `t + L_in + h + L_out` falls after the forced-flat cutoff is not eligible for exit labels. Such rows are counted and reported, never scored as if settlement were an exit.
+- **Taker-only fills (PV-6).** Labels assume crossing displayed depth. A touch is never a fill, and no queue position is assumed.
+- **Fees.** Fees are applied in Stage 2 from the versioned schedule (DR-9), never inside a Stage 1 label.
+
+### Purge, embargo, and dependence
+
+- **Per-row label interval.** `[t − max_lookback, t + L_in + h_max + L_out + RTT]`.
+  - Walk-forward folds purge every row whose interval crosses a boundary.
+  - Rows used with settlement labels keep the contract information interval `I(k)` and Policy 2.
+- **Embargo.** At least one calendar day at every fold boundary, because volatility and liquidity regimes persist.
+- **Dependence units are unchanged.**
+  - `time_block_id` is the UTC calendar day.
+  - Strikes in one event, and contracts sharing a terminal fixing, share one BTC path. They count once per `outcome_cell_id` for inference.
+  - Within one contract, overlapping labels give an effective sample of about (window length ÷ horizon) per contract, however densely rows are sampled.
+- **Decision grid.**
+  - Decision times are clock-based on a preregistered grid.
+  - Event triggers are allowed only if they are past-only and causal, computed exactly as live would compute them.
+  - Archive candle or trade times are never decision times for PMV 2.0 evidence.
+
+### Statistical units (PV-7)
+
+| Purpose | Unit |
+|---|---|
+| Training observation | Decision instant, weighted so that each contract's rows sum to `1/n_contracts_in_cell` and each cell carries equal weight (item 7) |
+| Validation block | Calendar day; folds cut at day boundaries |
+| Bootstrap | Whole calendar days: a stationary bootstrap with a preregistered mean block of 1–3 days, or the existing `time_block_id` bootstrap (Policy 4) |
+| Significance | Per-day aggregate statistics with Newey–West and block-bootstrap intervals; the wider governs |
+| Economic evaluation | Daily net P&L series. Trades and overlapping horizons are never treated as independent |
+
+### Trial budget and configuration ledger (PV-7)
+
+- **What a configuration is:** (horizon, barrier pair, feature cell, model class, side rule, remaining-time eligibility, latency/fill rung).
+- **Logging.** Every attempted configuration, including abandoned ones, is logged in the experiment ledger (`docs/experiments.md`) before its result is inspected.
+- **Ceiling (owner resolution O-PV-3, 2026-10-20).** **324 configurations is an absolute maximum ceiling, not a target or an allocation**: 3 horizons × 9 barrier pairs × 4 feature cells × 3 model classes.
+  - Fewer are used whenever the scientific question permits.
+  - The exact model, horizon, and barrier grid is preregistered before the relevant data are evaluated.
+  - Every attempted configuration counts against the ledger.
+- **Selection inference.** Inference on the selected configuration accounts for the whole logged set: Hansen's SPA test or White's Reality Check with the day-block bootstrap, plus deflated Sharpe ratios. Each Stage D preregistration names at most two confirmatory configurations.
+- **Latency ladder.** As H-5 and S-8: a conservative primary rung is the headline. A result counts only if it survives the preregistered stress rung. The proposed default stress rung is twice the measured p95 end-to-end latency.
+
+### Factorial feature comparison (PV-8)
+
+- **Cells:** A (price, volatility, threshold distance, time remaining), A + PM, A + BTC, A + PM + BTC.
+- **Fairness:** identical candidate instants from the model-free decision rule; equal tuning budgets; nested walk-forward.
+- **Predictive comparison:** Diebold–Mariano on per-day loss differences (HAC bandwidth of at least 5 days), cross-checked by a paired day-block bootstrap.
+- **Economic comparison:** a paired day-block bootstrap of the daily net-P&L difference, with turnover, drawdown, and fill-rate differences reported.
+- **Proposed pass rule (development hypothesis, frozen at Gate 2):** the lower 95% bound of the net-P&L difference is above zero under a stressed-slippage rung, with the same sign in at least 70% of folds and in every volatility tercile.
+
+### Calibration for the PMV 2.0 targets
+
+| Target | Calibration evidence |
+|---|---|
+| First-passage probabilities | Reliability bins; Brier and log loss against a climatological baseline by remaining-time band |
+| Movement distributions | PIT histograms and CRPS |
+| Excursion quantiles | Coverage tests (Kupiec, Christoffersen) |
+| Stage 2 expected P&L | Mincer–Zarnowitz regression of realized on predicted, with block-HAC errors |
+
+### Primary estimand and power (F-07) for PMV 2.0
+
+- **Why F-07 must be re-specified.** Policy 6 defines F-07 against settlement-based loss differences. For PMV 2.0, the primary confirmatory estimand, its `σ_s`, and its ESS ratio must be re-specified before the first protected cycle is registered.
+- **Candidates:**
+  - the per-day net executable round-trip P&L of the single frozen policy (taker-only, at the primary latency rung);
+  - the paired per-day loss of the Stage 1 forecast against B1 ("no change") on the executable label.
+- **Where σ comes from.** Span D data, which is development only (PV-16).
+- **What the holdout can show.** Fills cannot be validated before Phase 12 (PV-6). A PMV 2.0 protected evaluation therefore bounds executable EV, and its evaluation plan says so.
+
+### Historical data under PMV 2.0
+
+- Historical Kalshi data has 1-minute candles with no depth and no intra-minute path, and Kraken has no historical book. So historical data supports only:
+  - feasibility screening, such as the B12 cost-hurdle ceiling;
+  - Model A discovery;
+  - the old-strategy control.
+- Horizons under 60 s cannot be tested historically.
+- `SYNTHETIC_ARCHIVE` minute-grid results are discovery only. They never support an executable-EV claim (see "The split").
+
+### PMV 2.0 strategy strata
+
+Every PMV 2.0 result is reported by:
+- **remaining-time band:** ≤1, 1–2, 2–3, 3–5, 5–10, and more than 10 minutes;
+- **full-range price band** of the side's executable entry: <0.10, 0.10–0.29, 0.30–0.69, 0.70–0.89, 0.90–0.96, ≥0.97;
+- **spread band.**
+
+Decisions inside a settlement averaging window are flagged and reported separately. As before, bands are reporting strata, never entry rules. Sparse cells are reported as sparse, and bands are never chosen after looking.
+
 ## Strategy evaluation strata (owner direction, 2026-10-16)
+
+*Since owner decision PV-2 (2026-10-20) these strata and the tail-calibration criterion apply to the **nested settlement arm and the old-strategy control**. The PMV 2.0 strata are in the section above. The text below is unchanged.*
 
 The strategy objective is in PROJECT_BRIEF.md §3: late-window, high-confidence entries in the final few minutes of a contract. Everything below is a **development hypothesis**. Band edges and thresholds are tested only on development data, and are frozen in the audit-candidate manifest before protected evaluation.
 
@@ -404,7 +511,8 @@ The strategy objective is in PROJECT_BRIEF.md §3: late-window, high-confidence 
 - The exclusion ledger.
 - Deterministic, rebuildable dataset manifests.
 - The observation unit, targets, settlement logic, remaining-time representation, eligibility, and horizons (START_HERE.md Phase 2).
-- The strategy evaluation strata (entry-price and remaining-time bands) and the high-probability-tail calibration reporting above.
+- The strategy evaluation strata (entry-price and remaining-time bands) and the high-probability-tail calibration reporting above, for the settlement arm.
+- The PMV 2.0 executable-price and first-passage labels, per-row purge and embargo, statistical units, the trial budget and configuration ledger, the factorial comparison design, and the PMV 2.0 strata (owner decision PV-7). These need Statistician review and the Independent Statistical Auditor's review of the affected components.
 - The frozen split manifest, purge and embargo.
 - The Development-Validation Discipline design (START_HERE.md).
 - Statistician review, and an Independent Statistical Auditor review where Gate 2 independence requires it. The Statistician co-authored the dependence design here, so the independent audit applies to it.

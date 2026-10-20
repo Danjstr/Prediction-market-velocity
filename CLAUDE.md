@@ -97,21 +97,33 @@ If all Claude accounts and agents disappeared after development, the finished so
   - **GOLD: SHELVED FOR NOW.** Not cancelled, abandoned, or permanently dropped. Existing gold work is preserved, but there is no new gold acquisition, pipeline, feature, or model work during the BTC proof of concept.
   - **FUTURE EXPANSION: SPECIALIST MARKET-SELECTION REVIEW AFTER BTC POC.** Not an automatic move to gold.
 - No sentiment-analysis strategy.
-- Primary research direction: short-horizon velocity and related quantitative market dynamics.
-- Support entering partway through a market window and forecasting only the remaining horizon.
-- Time remaining must be treated as a first-class variable.
-- The strategy is late-window and high-confidence: relatively infrequent opportunities in the final few minutes of a contract, where calibrated model probability materially exceeds the executable, cost-adjusted break-even probability. It forecasts only the remaining final minutes, not the contract from inception. Canonical statement: PROJECT_BRIEF.md §3.
-- Price bands are never sufficient trade criteria. The ~$0.93–$0.97 sweet spot and the ~$0.85 candidate-generation floor describe where opportunities are expected, not when to trade. Entry requires calibrated probability materially above break-even after payout, costs, latency, execution uncertainty, and a safety margin.
-- Every price, time, confidence, and edge threshold is a development hypothesis until it is frozen before protected evaluation. Never hard-code one as an empirically proven truth, and never force the trade distribution into a predetermined shape.
-- High-probability-tail calibration is a core success criterion; AUC or ranking performance alone is not sufficient.
+- Primary research direction: short-horizon velocity and related quantitative market dynamics, including prediction-market and underlying order flow.
+- **PMV 2.0 is the primary objective** (owner decision, 2026-10-20; `docs/decisions/2026-10-20_b12_pmv2_strategy_pivot.md`; canonical statement: PROJECT_BRIEF.md §3).
+  - **Primary question.** Given all information demonstrably available at decision time, what is the probability distribution of future **executable** prediction-market prices over a short horizon (initially ~30, 60, and 120 seconds, as research hypotheses), and can a position be entered and exited with positive expected **net** value?
+  - **Decision set.** The policy compares NO TRADE, ENTER/EXIT before settlement, CONTINUE HOLDING, and HOLD TO SETTLEMENT, subject to risk rules.
+  - **Settlement.** Settlement is no longer the default monetization path, and no position drifts into settlement because an exit failed.
+- The settlement-focused late-window, high-confidence strategy is **superseded as the primary objective, not deleted**. It continues as a nested settlement arm and the old-strategy control.
+  - Its ~$0.93–$0.97 sweet spot, ~$0.85 floor, and high-probability-tail calibration criterion apply to that arm only.
+  - Never cite "one 0.95 loss offsets nineteen wins" as the reason it was superseded. Expected P&L is `p_true − price`. The real weaknesses are tail-calibration precision, volatility and jump misspecification, regime dependence, small effective samples, clustered outcomes, no articulated counterparty-error mechanism, settlement exposure, and cost survival.
+- Two-stage target.
+  - Stage 1 is a policy-independent, calibrated forecast of future executable bid/ask, movement distributions, and first-passage probabilities over a small preregistered barrier grid.
+  - Stage 2 is a deterministic economic simulator that handles exit policies.
+  - Never bake stop or target policies into the learned label.
+- Support entering partway through a market window; time remaining is a first-class variable.
+- Velocity alone is not a signal. Displayed size is not a count of traders. A feature family (factorial A, A+PM, A+BTC, A+PM+BTC) has value only if it adds out-of-sample executable economic value.
+- Price bands are never trade criteria.
+- Every horizon, barrier, price, time, confidence, and edge threshold is a development hypothesis until it is frozen before protected evaluation. Never hard-code one as an empirically proven truth, and never force the trade distribution into a predetermined shape.
+- Calibration of the forecast distributions and first-passage probabilities is a core success criterion, and tail calibration remains one for the settlement arm. AUC or ranking performance alone is not sufficient.
 
 # Prediction Objective
 
 Velocity prediction is intermediate.
 
-The final useful output is:
+The final useful outputs (PMV 2.0) are:
+- the calibrated distribution of future executable prices and first-passage probabilities over short preregistered horizons;
+- the expected **net** value, with uncertainty, of each permitted action, computed by the deterministic simulator.
 
-**P(contract resolves in our favor | information observable at decision time)**
+**P(contract resolves in our favor | information observable at decision time)** remains a required intermediate output. It anchors fair value, scores the settlement arm, and prices failed-exit risk.
 
 No future information may enter features.
 
@@ -128,6 +140,18 @@ A model is only useful if it produces positive expected value after:
 - model uncertainty.
 
 Prefer executable prices over midpoint assumptions where possible.
+
+Until real fills can be measured, baseline economics are **taker only**:
+- latency-shifted executable quotes;
+- fees on both legs where applicable;
+- depth walking where known;
+- stressed slippage.
+
+No edge may rest on assumed maker fills. A protected evaluation of PMV 2.0 can bound executable EV, not confirm it, because real fills are unavailable before Phase 12.
+
+Never canonize an unverified fee formula. No economics claim is made before the authoritative fee schedule is versioned (DR-9).
+
+The commercial measure is net cents per contract × realistically executable contracts per day, with uncertainty intervals and capacity curves. Percentage daily-growth targets are not requirements.
 
 Prefer conservative assumptions.
 
@@ -277,6 +301,17 @@ Research appropriate use of:
 - risk-of-ruin limits.
 
 Hard limits always override model confidence.
+
+A stop price is an attempt to exit, not a loss bound.
+- Every position must fit **both** the stop-plus-stressed-slippage budget and the full-premium (failed-exit) catastrophic budget.
+- No-new-entry and earlier forced-flat cutoffs before close are required.
+- Unintended settlement exposure triggers RED.
+- The empty-bid forced-exit hierarchy is an unresolved owner/risk decision. Never improvise it (PV-18).
+
+Banking (PV-9, PV-10) does not create EV.
+- The owner's L1/L2/L3 levels are ceilings, not real-capital authorization or order sizes.
+- Reserve replenishment is finite. Automatic or unlimited refills are prohibited.
+- Ruin is measured on total strategy equity against the absolute loss budget.
 
 User risk appetite — bankroll definition, starting live capital, maximum acceptable drawdown, risk-of-ruin tolerance, any absolute loss budget, and capital-scaling policy — is a user-approved governance input, never a parameter optimized from historical returns. All six must be approved by Gate 4.5 of START_HERE.md. Undefined values block Gate 4.5 and all live sizing and trading.
 

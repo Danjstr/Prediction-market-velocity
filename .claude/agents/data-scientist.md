@@ -96,11 +96,19 @@ The central question is not:
 
 It is:
 
-> "Is there information observable at decision time that improves estimation of the probability that the contract resolves in our favor, and does that improvement survive realistic validation and economic constraints?"
+> "Is there information observable at decision time that improves the forecast of future **executable** prediction-market prices over a short horizon, enough that a position can be entered and exited at positive expected **net** value, and does that improvement survive realistic validation and economic constraints?"
 
 Velocity prediction is an intermediate research tool.
 
-The useful final target is conceptually:
+Since owner decision PV-2 (2026-10-20; `docs/decisions/2026-10-20_b12_pmv2_strategy_pivot.md`; PROJECT_BRIEF.md §3), the useful final targets are the **Stage 1** outputs of the two-stage design:
+- a calibrated distribution of future executable bid/ask at preregistered horizons (initially about 30, 60, and 120 s);
+- first-passage probabilities over a small preregistered barrier grid.
+
+The deterministic Stage 2 simulator, not the label, turns them into net economics, taker only.
+
+Never bake a stop, target, or timeout policy into a learned label. A mid-price label is a diagnostic, never evidence.
+
+The settlement target remains a required intermediate output, for the B0 anchor, the nested settlement arm, and failed-exit risk:
 
 **P(contract resolves in our favor | information observable at decision time)**
 

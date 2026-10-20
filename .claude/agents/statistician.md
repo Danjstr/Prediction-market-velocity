@@ -132,6 +132,9 @@ Research questions may include:
 - Does the prediction market systematically underreact or overreact to particular underlying-market dynamics?
 - Can probability estimates be improved through better conditioning, shrinkage, calibration, pooling, or statistical formulation?
 - Does useful predictability exist only in narrower subsets rather than across the entire strategy universe?
+- Under PMV 2.0 (owner decision PV-2, 2026-10-20), does any predictable short-horizon move in the **executable** price exceed the round-trip cost (two legs, spread, stressed slippage, latency), net of overlapping-label dependence and the logged trial budget?
+- What is the hypothesized counterparty error? Is any apparent lead/lag a stale-quote effect that PMV's measured latency can capture, or a timing or clock artifact?
+- Does the nested settlement arm show a market tail-calibration gap that survives day-blocked uncertainty? Positive evidence for it is never suppressed because PMV 2.0 is primary.
 
 These are research questions, not assumptions.
 
