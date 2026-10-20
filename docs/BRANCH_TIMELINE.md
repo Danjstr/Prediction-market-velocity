@@ -6,24 +6,30 @@ Old branches keep their original names. Their B-numbers are assigned here only; 
 
 ## CURRENT ACTIVE GROUND-TRUTH BRANCH
 
-**`b11/btc-poc-owner-decisions` (B11)**
+**`b12/btc-kalshi-pilot` (B12)**
 
-- **Designation:** the owner's direction of 2026-10-19, "OWNER REVIEW OF PROPOSED DR-1 TO DR-15 CHANGES + FINAL OWNER DECISIONS + BTC POC SCOPE REVISION" (owner decision DR-23; `docs/decisions/2026-10-19_owner_data_readiness_decisions.md`).
-- **Parent:** B10 `b10/source-reconnaissance`, at its final commit `c0288820748e21f606f7dd258c95d7711b69e15a`. B11 was branched directly from that commit, not from the `main` merge commit `4019a75` (PR #9).
-- **Purpose** (owner, verbatim): "durable owner data-readiness decisions; BTC active proof-of-concept scope; gold shelved for now; market-family-specific model policy; proxy-security compliance; owner-review exposure registration; Kraken timestamp/taker-event correction; P-5 pre-T0-m control; transcript-cleanup owner action." No cloud provisioning in this branch.
-- **Head:** the pushed tip of `origin/b11/btc-poc-owner-decisions`. Verify with `git ls-remote origin refs/heads/b11/btc-poc-owner-decisions`.
-- **Integration:** one pull request into `main` when the owner directs. Merging is the owner's decision, with a normal merge commit, and B11 is not deleted afterwards.
+- **Designation:**
+  - the owner's direction of 2026-10-20, "OWNER DECISION — APPROVE PMV 2.0 WITH REVIEW MODIFICATIONS / BEGIN B12 STRATEGY AMENDMENT + REVISED BTC FEASIBILITY PILOT", which directed "Reuse this branch" (PV-1);
+  - the owner's pre-commit review of 2026-10-20, which said: "APPROVE B12 AS THE ACTIVE NUMBERED BRANCH".
+  - Record: `docs/decisions/2026-10-20_b12_pmv2_strategy_pivot.md`.
+- **Parent:** B11 `b11/btc-poc-owner-decisions`, at its final commit `c986f49227a47b855a547db96e65356f3674a9b8`. B12 was branched directly from that commit on 2026-10-19, not from the `main` merge commit `92e46c1` (PR #11).
+- **Purpose:**
+  - the PMV 2.0 strategy and governance amendment (PV-1 to PV-23);
+  - the revised BTC Kalshi historical feasibility pilot: protocol P1–P16, old-strategy control C1–C3, and stop conditions S-1 to S-6, with offline tooling on synthetic data.
+  - No Kalshi rows fetched, no Kraken acquisition, no capture, no cloud, no paid resources, no `T0`.
+- **Head:** the pushed tip of `origin/b12/btc-kalshi-pilot`, once pushed. Verify with `git ls-remote origin refs/heads/b12/btc-kalshi-pilot`.
+- **Integration:** one pull request into `main` when the owner directs. Merging is the owner's decision, with a normal merge commit, and B12 is not deleted afterwards.
 - **Status:**
-  - Active scope: **ACTIVE POC: BTC; GOLD: SHELVED FOR NOW** (DR-17).
-  - Gate 1 is undecided. Cloud-foundation work is approved (DR-1), but nothing is provisioned. Bulk acquisition waits for the Kalshi pilot gate (DR-2) and Kraken terms classification (DR-3). Live capture is not started (DR-8).
-  - Owner action DR-22 (transcript purge) follows verification of the B11 commit (`docs/owner_actions/README.md` §4).
-  - Until the owner designates a successor, every new development branch (B12) starts from this branch's final tip.
+  - PMV 2.0 is the primary research direction, and the settlement strategy is a nested arm.
+  - The pilot is blocked on AR-B12-1 (Kalshi host route), AR-B12-2 (terms copies), the guard-exception confirmation, and DR-9 (fee schedule).
+  - Owner items: O-PV-1 and O-PV-4 are open; O-PV-2 is partly resolved; O-PV-3 is resolved (324 as an absolute maximum).
+  - Until the owner designates a successor, every new development branch (B13) starts from this branch's final tip.
 
 ## Timeline
 
 | ID | Branch | Parent ID | Head commit | Status | Purpose |
 |---|---|---|---|---|---|
-| B00 | `main` | — | baseline `a07fc29` (Gate 0 PASS at `db09acd`); `main` is now at `4019a75` (B10 merged, PR #9) | Integration branch. Advances only by merged pull request. | Canonical historical baseline: Phase 0 foundation, Gate 0, backup and recovery |
+| B00 | `main` | — | baseline `a07fc29` (Gate 0 PASS at `db09acd`); `main` is now at `92e46c1` (B11 merged, PR #11) | Integration branch. Advances only by merged pull request. | Canonical historical baseline: Phase 0 foundation, Gate 0, backup and recovery |
 | B01 | `docs/activate-isolated-autonomy` (remote only) | B00 | `0dd40ca` | Historical checkpoint. Merged by PR #1 (`4eec20c`) | Activation of the isolated autonomous environment |
 | B02 | `phase1/kalshi-data-foundation` | B01 (branched at `4eec20c`) | `899dae6` | Historical checkpoint. Merged by PR #2 (`856083e`) | Phase 1 batch 1: venue-neutral market-data foundation |
 | B03 | `phase1/kalshi-venue-verification` | B02 (branched at `856083e`) | `4ca18e0` | Historical checkpoint. Merged by PR #3 (`c074e9b`) | Phase 1 batch 2: Kalshi venue verification (documentation) |
@@ -34,7 +40,9 @@ Old branches keep their original names. Their B-numbers are assigned here only; 
 | B08 | `b08/prospective-capture-hardening` | B07 (branched at final `9a6b212`) | `5806d8c` (final) | Historical checkpoint, preserved. Merged by PR #7 (`a6b5411`) | Phase 1 prospective-capture hardening (F-11, F-12/F-27, F-33, F-37/RT-4, book continuity, normalized artifacts), synthetic data only |
 | B09 | `b09/kalshi-source-qualification` | B08 (branched at final `5806d8c`) | `8b4e026` (final) | Historical checkpoint, preserved. Merged by PR #8 (`bbcdd6b`) | Kalshi official historical source qualification and the A-1 to A-6 owner-decision packet; cloud-native data strategy, source inventory, procurement packet; documentation only |
 | B10 | `b10/source-reconnaissance` | B09 (branched at final `8b4e026`) | `c028882` (final) | Historical checkpoint, preserved. Merged by PR #9 (`4019a75`) | Data-source reconnaissance: schema profiles, value matrix, source verdicts, minimum viable source set |
-| B11 | `b11/btc-poc-owner-decisions` | B10 (branched at final `c028882`) | Last recorded: see "B11 commits"; tip = latest pushed commit | **CURRENT ACTIVE GROUND-TRUTH BRANCH** | Owner data-readiness decisions DR-1 to DR-23: BTC active POC, gold shelved for now, market-family model policy, proxy-security compliance, exposure rows X-12 to X-14, Kraken correction, P-5, transcript-purge owner action. Governance only; no cloud provisioning |
+| B11 | `b11/btc-poc-owner-decisions` | B10 (branched at final `c028882`) | `c986f49` (final) | Historical checkpoint, preserved. Merged by PR #11 (`92e46c1`) | Owner data-readiness decisions DR-1 to DR-23: BTC active POC, gold shelved for now, market-family model policy, proxy-security compliance, exposure rows X-12 to X-14, Kraken correction, P-5, transcript-purge owner action. Governance only; no cloud provisioning |
+
+| B12 | `b12/btc-kalshi-pilot` | B11 (branched at final `c986f49`) | Last recorded: see "B12 commits"; tip = latest pushed commit | **CURRENT ACTIVE GROUND-TRUTH BRANCH** | PMV 2.0 strategy amendment (owner decisions PV-1 to PV-23); revised BTC Kalshi historical feasibility pilot (P1–P16, C1–C3, S-1 to S-6) with offline tooling; no observations fetched |
 
 PR numbers come from the merge-commit subjects on `main`.
 
@@ -121,6 +129,29 @@ Listed oldest first, and appended at each timeline update.
 | Commit | Content |
 |---|---|
 | (the commit adding this row) | Owner data-readiness decisions DR-1 to DR-23 recorded; BTC active POC and gold shelved for now (PROJECT_BRIEF, START_HERE, CLAUDE.md); market-family model policy; DR-10/DR-16 proxy-security compliance (egress test, WS and REST recon tools, static guard); exposure rows X-12 to X-14; Kraken timestamp correction; P-5; DR-22 owner action. Its hash is the branch tip; see `git ls-remote` |
+
+### B12 commits
+
+Listed oldest first, and appended at each timeline update.
+
+| Commit | Content |
+|---|---|
+| `f70c45dc6e22473767a4d09e31415cc0f0fd0f91` | Preserve the pre-pivot Kalshi pilot state as delivered on 2026-10-19 (fetch tool, profiler, tests, P1–P9 protocol) |
+| `242a2f831cb8a3202bb8f74cb19bf4b9fd591ab5` | Adopt the PMV 2.0 strategy and governance amendments (owner decisions PV-1 to PV-23 and the pre-commit review) |
+| `cfe42a807e089c6c24a6cf70959e37e98949e13e` | Revise the BTC pilot for PMV 2.0 feasibility (P10–P16a, C1, stop screen, timestamp resolution, labelled fee scenarios) |
+| (the commit adding these rows) | Mark the PMV 2.0 feasibility work active (`docs/phase1.md`, this timeline). Its hash is the branch tip; see `git log` or, once pushed, `git ls-remote` |
+
+## Ancestry verification for B12 (2026-10-19 and 2026-10-20)
+
+- **2026-10-19, at creation** (`research/kalshi/b12_btc_kalshi_pilot.md` §1):
+  - on `b11/btc-poc-owner-decisions`, `git rev-parse HEAD` returned `c986f49227a47b855a547db96e65356f3674a9b8`;
+  - `git ls-remote origin refs/heads/b11/*` returned the same hash, and no `b12/*` branch existed on `origin`;
+  - B12 was created with `git switch -c b12/btc-kalshi-pilot`, and `git merge-base --is-ancestor c986f49 HEAD` returned 0.
+- **2026-10-20, re-verified before the PMV 2.0 work:**
+  - `git rev-parse HEAD` returned `c986f49227a47b855a547db96e65356f3674a9b8` on `b12/btc-kalshi-pilot`;
+  - `git merge-base --is-ancestor c986f49227a47b855a547db96e65356f3674a9b8 HEAD` returned 0;
+  - `git ls-remote origin 'refs/heads/b12/*'` returned nothing;
+  - `origin/main` was `92e46c1`, a merge (PR #11) that contains `c986f49`.
 
 ## Ancestry verification for B11 (2026-10-19)
 

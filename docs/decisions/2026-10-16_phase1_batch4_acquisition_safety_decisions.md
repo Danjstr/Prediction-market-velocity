@@ -189,6 +189,8 @@ The other registration-time items (H-1 conditions, the E-B4-9(a) contamination c
 
 ## Strategy objective (owner direction, 2026-10-16)
 
+*Annotation (2026-10-20). Owner decision PV-2 (`docs/decisions/2026-10-20_b12_pmv2_strategy_pivot.md`) superseded this objective **as the primary objective**. PMV 2.0, short-horizon executable-price round trips, is now canonical in PROJECT_BRIEF.md §3. This objective is not deleted: it continues as the nested settlement arm and the old-strategy control. The "one loss offsets about nineteen wins" reading is not a valid reason for abandoning it (PV-3). The text below is the original record, unchanged.*
+
 In the same ruling the owner directed that the project's main objective, refined in conversation, be recorded in the repository so that it is not lost across sessions. PROJECT_BRIEF.md §3 ("Strategy objective: late-window, high-confidence") is now the canonical statement. START_HERE.md ("Strategy at a Glance") mirrors it, CLAUDE.md (Strategy Scope) carries the invariant, and `docs/phase2.md` ("Strategy evaluation strata") carries the price-band and remaining-time-band evaluation requirement. Every price, time, confidence, and edge threshold in it is a development hypothesis, tested only on development data and frozen before protected evaluation.
 
 ## Not changed by this batch

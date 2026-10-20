@@ -24,7 +24,17 @@ Agents succeed by encoding their work into standalone code, models, tests, confi
 
 # Strategy at a Glance
 
-The canonical statement is PROJECT_BRIEF.md §3 ("Strategy objective: late-window, high-confidence"). In short:
+The canonical statement is PROJECT_BRIEF.md §3 ("Strategy objective: PMV 2.0, short-horizon executable-price round trips"; owner decision 2026-10-20, `docs/decisions/2026-10-20_b12_pmv2_strategy_pivot.md`). In short:
+- **Primary question.** Given all information demonstrably available at decision time, what is the probability distribution of future **executable** prediction-market prices over a short horizon (initially about 30, 60, and 120 seconds, as bounded research hypotheses), and can a position be entered and exited with positive expected **net** value?
+- **Decision set.** NO TRADE, ENTER/EXIT before settlement, CONTINUE HOLDING, and HOLD TO SETTLEMENT, subject to risk rules. Settlement is a benchmark, the old-strategy control, a possible action on evidence, and the residual failure state. It is not the default monetization path.
+- **Two stages.** Stage 1 is a calibrated, policy-independent forecast of future executable bid/ask and first-passage probabilities over a small preregistered barrier grid. Stage 2 is a deterministic economic simulator: taker-only baseline, latency-shifted, both legs' fees, depth walked where known, and stressed slippage.
+- **Inference.** Decision-instant observations are dependence-weighted; validation blocks are calendar days; bootstraps are whole-day blocks; economics use daily net P&L. There are no more than three primary horizons, and the trial budget is finite and preregistered.
+- **Features.** Factorial comparison: A, A+PM, A+BTC, A+PM+BTC. A family earns its place only through out-of-sample executable economic value.
+- **Data.** Historical Kalshi and Kraken data screen feasibility and run the old-strategy control. The first prospective Kalshi + Kraken capture span (Span D) is the critical development dataset: development only, never protected.
+- **Commercial measure.** Net cents per contract × realistically executable contracts per day, with intervals and capacity curves.
+- **Thresholds.** Every horizon, barrier, price, time, confidence, and edge threshold is a development hypothesis, frozen before protected evaluation.
+
+*Superseded as the primary objective on 2026-10-20 and kept as the nested settlement arm (historical text follows):*
 - PMV looks for **relatively infrequent, late-window, high-confidence** opportunities. These are cases where the model's **calibrated** probability materially exceeds the market's **executable, cost-adjusted break-even probability** during the **final few minutes** of a Bitcoin or gold contract on Kalshi or Polymarket.
 - It forecasts only the **remaining final few minutes**, not the whole contract from inception.
 - The preliminary hypothesis puts most viable opportunities near executable prices of about **$0.93–$0.97**, with a thinning tail toward about **$0.85**, a candidate-generation floor and not a trade signal. **Price alone never triggers a trade.** Entry needs calibrated probability materially above break-even after payout, fees, spread, slippage, latency, execution uncertainty, and a safety margin.
@@ -79,11 +89,11 @@ This is the authoritative phase order. Each phase's detailed section below gover
 | Phase | Name | Scope in brief |
 |---|---|---|
 | 0 | Foundation / Governance / Security | Repository controls, reproducibility, environment, tests, secret handling, governance. **Gate 0 passed.** |
-| 1 | Data Feasibility, Historical Acquisition, and Prospective Capture | Verify sources and rights; prefer useful verified historical data for development; begin prospective high-frequency capture in parallel as early as safely practical. Development-visible data can never later become protected holdout. **In progress.** |
-| 2 | Canonical Dataset Engineering and Statistical Design | Raw preservation; normalization; identity resolution; duplicate and dependence analysis; point-in-time metadata; timestamp and availability semantics; target and label construction; feature construction; overlap, purge, and embargo; development-validation design; cycle, split, and protection mechanics; strategy evaluation strata. |
+| 1 | Data Feasibility, Historical Acquisition, and Prospective Capture | Verify sources and rights; prefer useful verified historical data for development; begin prospective high-frequency capture in parallel as early as safely practical. Under PMV 2.0, prospective Kalshi + Kraken capture (Span D, development only) is the critical development dataset. Development-visible data can never later become protected holdout. **In progress.** |
+| 2 | Canonical Dataset Engineering and Statistical Design | Raw preservation; normalization; identity resolution; duplicate and dependence analysis; point-in-time metadata; timestamp and availability semantics; target and label construction, including executable-price and first-passage labels; feature construction; overlap, purge, and embargo; development-validation design and trial budget; cycle, split, and protection mechanics; strategy evaluation strata. |
 | 3 | Baselines | Strong simple and interpretable baselines first. |
 | 4 | Advanced Candidate Models | Sequence and deep-learning models only where development evidence justifies the complexity. |
-| 4.5 | Economics, Calibration, Sizing, Risk, and Tax Economics | Calibration; executable cost-adjusted edge; bankroll, sizing, fractional Kelly; exposure limits; drawdown and loss controls; circuit breakers; PAUSE/KILL; owner-approved risk appetite; tax-classification assumptions and pre-tax / after-tax economic analysis. |
+| 4.5 | Economics, Calibration, Sizing, Risk, and Tax Economics | Calibration; executable cost-adjusted edge and the deterministic round-trip simulator; bankroll, sizing, fractional Kelly; premium-at-risk and stop-risk caps; exit cutoffs; exposure limits; drawdown and loss controls; banking; circuit breakers; PAUSE/KILL; owner-approved risk appetite; tax-classification assumptions and pre-tax / after-tax economic analysis. |
 | 5 | Independent Statistical / Economic / Operational Audit | The auditor actively tries to disprove the edge: calibration, dependence-aware uncertainty, multiple testing, economic assumptions, and the Holdout Evaluation Plan. |
 | 5.5 | Pre-Holdout Implementation Readiness | Production-faithful deterministic implementation, replay, parity, and fault-injection evidence before the holdout is spent. No protected observation is accessed. |
 | 6 | Freeze and Preregistration | Freeze the candidate, implementation identity, dataset, cycle and split definitions, features, calibration, thresholds, strategy, economic (including tax) and risk rules, and evaluation criteria. Opening the holdout still requires explicit owner approval. |
@@ -259,6 +269,15 @@ Before any outcome-dependent inspection, create the cycle_id and record the spli
 
 Begin high-frequency live capture as early as practical, once the raw-data backup and retention policy listed under Required User Governance Inputs is in place and a representative backup and restore smoke test has succeeded.
 
+**PMV 2.0 capture (owner decision PV-16, 2026-10-20).**
+- **Status.** Prospective Kalshi and Kraken capture is the critical PMV 2.0 development dataset:
+  - Kalshi: book snapshots and deltas with sequence information, trades, and lifecycle events;
+  - Kraken: book state with checksum continuity, and trades;
+  - both feeds with PMV receipt timestamps, under one disciplined host clock.
+- **Span D.** The first such capture span is declared **development only, never protected**. Its rows can never be promoted into a protected holdout.
+- **First protected cycle.** It is registered only after Span D has supported target design, latency measurement, fill-model bounds, horizon selection, opportunity definition, and power analysis.
+- **Preconditions.** Capture still needs the DR-8 preconditions, and P-5 completed for the Kalshi and Kraken BTC families **before capture begins** (PV-20).
+
 Reliability review must examine:
 - disconnects;
 - reconnects;
@@ -302,12 +321,14 @@ Define:
 - observation unit;
 - feature lookback windows;
 - prediction horizons;
-- contract outcome targets;
+- executable-price targets: future executable bid/ask and first-passage labels over the preregistered barrier grid, with per-row label intervals that include exit latency (PMV 2.0; `docs/phase2.md`);
+- contract outcome targets, kept for the settlement arm, the B0 anchor, and failed-exit risk;
 - settlement logic;
 - remaining-time representation;
 - eligibility rules;
 - missing-data handling;
-- timestamp alignment.
+- timestamp alignment;
+- the preregistered trial budget and the configuration ledger (PV-7).
 
 Finalize the exact split manifest for the existing cycle, following the split-formation method recorded in Phase 1:
 - reference the existing cycle_id;
@@ -357,10 +378,14 @@ Gate 2 also requires the validation design required under Development-Validation
 Build simple baselines first.
 
 Examples:
-- market-price baseline;
+- market-price baseline: under PMV 2.0, B1 is "no change in the executable price", which implies NO TRADE after costs;
+- B0: BTC-driven fair-value repricing with a lag;
+- a zero-parameter stale-gap rule;
 - persistence/momentum baseline;
 - logistic/statistical models;
 - gradient-boosted trees.
+
+A zero-skill simulator check (random entries must return minus their costs, within noise) precedes any PMV 2.0 baseline result. A simulator that does better fills too optimistically.
 
 Use only the development pool.
 
@@ -372,10 +397,11 @@ Evaluate:
 - log loss;
 - directional metrics where useful;
 - edge versus executable market price;
-- simulated after-cost P&L;
+- simulated after-cost P&L: for PMV 2.0, taker-only, latency-shifted executable net P&L;
 - trade count;
 - performance by horizon;
-- performance by time remaining.
+- performance by time remaining;
+- the factorial feature cells (A, A+PM, A+BTC, A+PM+BTC) on identical opportunity sets with comparable tuning budgets.
 
 **Gate 3:** Do not proceed to expensive neural modeling unless there is credible evidence of incremental signal and plausible after-cost economics.
 
@@ -443,7 +469,25 @@ Using the user-approved risk-appetite values listed under Required User Governan
 - the explicit meaning of automatic exposure reduction and automatic hard halt;
 - manual-control governance: authorized operator roles, precedence over operating states, latching, clearing authority, whether automatic recovery may clear a manual control, restart and reboot behavior, notification and escalation, and audit logging;
 - preliminary circuit-breaker thresholds;
-- deterministic recovery and resume criteria.
+- deterministic recovery and resume criteria;
+- under PMV 2.0 (owner decision PV-17):
+  - the two per-position caps: stop plus stressed slippage within the stop-risk budget, and full premium (failed-exit settlement loss) within the catastrophic position-risk budget;
+  - the no-new-entry cutoff before close and the earlier forced-flat cutoff;
+  - the deterministic exit ladder;
+  - unintended settlement exposure as RED;
+  - breaker inputs for exit-failure rate, fill-ratio drift, stop-slippage drift, latency p99, depth and capacity stress, and fee-schedule change (RED until the fee table is re-versioned);
+- the empty-bid forced-exit hierarchy (owner decision PV-18, open item O-PV-1). If the forced-exit process finds no acceptable executable bid, the deterministic order of preference between progressively more aggressive IOC liquidation and residual, explicitly governed settlement exposure. **Gate 4.5 cannot pass while it is unresolved.** No live system may improvise it;
+- sizing for a non-binary round-trip payoff. Fractional Kelly or another accepted method on a stressed round-trip return distribution that includes stop-gap and failed-exit mass, fed a lower confidence bound on edge. Hard caps bind;
+- the banking policy (PV-9, PV-10). Banking does not create EV:
+  - the owner's L1/L2/L3 levels are ceilings, never order sizes or real-capital authorization;
+  - exposure is at most `min(level allowance, liquidity capacity, exit capacity, risk limit, economic/model sizing limit)`;
+  - reserve replenishment is finite (automatic or unlimited refills are prohibited), and every refill is booked as a realized strategy loss;
+  - sweeps use only realized, reconciled, finalized cash;
+  - the drawdown high-water mark is never reset by a sweep or promotion;
+  - ruin is measured on total strategy equity against the absolute loss budget;
+  - tax reserves are never tradeable reserve capital;
+  - no runtime key holds a transfer permission;
+  - the sweep trigger, cadence, hysteresis, refill count, promotion evidence, and the proposed 2–3× sub-steps are decided on evidence (open item O-PV-2). Promotion weighs measured round-trip capacity at the larger size, not equity alone.
 
 These rules must be quantitative, deterministic, and suitable for standalone implementation without an LLM or agent.
 
@@ -455,7 +499,10 @@ They must be used during development simulations so that reported P&L, drawdown,
 
 The Risk & Performance Engineer is defining policy here, not yet building the full production monitoring and execution implementation.
 
-**Calibration and executable edge.** The policy uses calibrated probabilities, with high-probability-tail calibration evidence over the candidate region (PROJECT_BRIEF.md §3, `docs/phase2.md` "Strategy evaluation strata"), and edge computed against the executable, cost-adjusted break-even probability from the actual entry price and payout structure, never the midpoint.
+**Calibration and executable edge.**
+- **PMV 2.0.** The policy uses calibrated Stage 1 forecasts (executable-price distributions and first-passage probabilities, with calibration evidence by remaining-time and price strata). Expected net value comes from the deterministic Stage 2 simulator: taker only, latency-shifted executable quotes, both legs' fees, depth walked where known, and stressed slippage, never the midpoint.
+- **Settlement arm.** It keeps high-probability-tail calibration evidence over its candidate region and the executable, cost-adjusted break-even probability from the actual entry price and payout structure (PROJECT_BRIEF.md §3, `docs/phase2.md` "Strategy evaluation strata").
+- **Fill-validation limit (PV-6).** Real fills, queue position, adverse selection of resting orders, and PMV's own impact cannot be measured before Phase 12. A PMV 2.0 policy evaluated in Phase 7 therefore **bounds** executable EV; it does not confirm it. No result may rest on assumed maker fills.
 
 **Tax and after-tax economics** (owner direction, 2026-10-16; PROJECT_BRIEF.md §5). Primary: Quant / Business Lead, with the Risk & Performance Engineer.
 - No tax classification is assumed. Prediction-market products are not presumed to be gambling, capital gains, ordinary income, §1256 contracts, or any other fixed category. Classification may depend on the product, venue, jurisdiction, trader or entity status, and the law and regulation in force at the time.
@@ -805,7 +852,7 @@ Freeze:
 - calibration method;
 - entry rules;
 - cost assumptions;
-- execution assumptions;
+- execution assumptions, including, for PMV 2.0, the fill, latency, and slippage model, the horizons, the barrier grid, and the exit policy;
 - tax assumptions, or their explicit designation as sensitivity scenarios;
 - position-sizing rules;
 - risk parameters;
