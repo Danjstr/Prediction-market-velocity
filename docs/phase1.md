@@ -2,15 +2,49 @@
 
 Working record for Phase 1. The authoritative requirements are START_HERE.md (Phase 1, Gate 1, Project-Wide Controls), CLAUDE.md, and PROJECT_BRIEF.md; where this file summarizes them, they win. This is not a gate record and not an owner-decision record.
 
-## Current status and next step (as of 2026-10-19, B11)
+## Current status and next step (as of 2026-10-20, B12)
 
 **Active scope (owner decisions DR-17 to DR-21; PROJECT_BRIEF.md §1 "Active scope"):**
 - **ACTIVE POC: BTC.** Kalshi short-horizon BTC markets, with Kraken XBTUSD/BTCUSD trades as the underlying.
 - **GOLD: SHELVED FOR NOW.** Not cancelled, abandoned, or permanently dropped. Existing gold research is preserved. No new gold acquisition, pipeline, feature, or model work.
 - **FUTURE EXPANSION: SPECIALIST MARKET-SELECTION REVIEW AFTER BTC POC.**
 - **MODEL POLICY: SHARED PLATFORM + MARKET-FAMILY-SPECIFIC MODELS.**
+- **PRIMARY RESEARCH DIRECTION: PMV 2.0** (owner decision, 2026-10-20). PMV forecasts short-horizon executable prices and tests round trips before settlement. The settlement strategy is superseded as primary and kept as a nested arm.
 
-The current active branch is B11, `b11/btc-poc-owner-decisions`. It is a governance-only branch, with no cloud provisioning.
+The current active branch is B12, `b12/btc-kalshi-pilot`, branched from the final B11 tip `c986f49`. The B11 paragraph below is historical.
+
+**B12, 2026-10-20 (PMV 2.0 strategy amendment and revised BTC feasibility pilot).**
+- **Review.** Eight PMV specialists reviewed the owner's PMV 2.0 proposal. All eight returned GO WITH CONDITIONS for a limited, measurement-first feasibility program. Summary: `research/governance/b12_pmv2_specialist_reviews.md`.
+- **Owner approval.** The owner approved PMV 2.0 as the primary research direction, with modifications PV-1 to PV-23 (`docs/decisions/2026-10-20_b12_pmv2_strategy_pivot.md`):
+  - a corrected rationale, so the payoff ratio is not the reason;
+  - hold-to-settlement as a nested arm;
+  - the two-stage target;
+  - a taker-only baseline;
+  - day-block statistical units with a finite trial budget and at most three horizons;
+  - the factorial feature comparison;
+  - the banking baseline L1/L2/L3 as ceilings, with finite refills;
+  - net cents per contract × contracts per day as the commercial measure, replacing any daily-growth target;
+  - prospective capture as the critical development dataset (Span D, development only, never protected);
+  - premium-at-risk and stop-risk caps.
+- **Amended documents.** PROJECT_BRIEF.md, CLAUDE.md, START_HERE.md (phase order unchanged), `docs/phase2.md`, and three agent files. The 2026-10-16 objective is annotated, not deleted.
+- **Pilot.** The B12 Kalshi pilot is re-scoped (`research/kalshi/b12_btc_kalshi_pilot.md`): P1–P9 are kept; P10–P16, lifecycle incidence, the old-strategy control C1–C3, and stop conditions S-1 to S-6 were pre-registered before any Kalshi row was seen. The profiler implements them on synthetic tests.
+- **Not done.** No Kalshi observation, no Kraken acquisition, no capture, no cloud, no paid resource, no `T0`.
+- **Owner pre-commit review (2026-10-20):**
+  - B12 is approved as the active numbered branch, and the four-commit plan is approved.
+  - Fixes applied before commit: C1 uniqueness; observed timestamp resolution; S-1 now means "OWNER NO-GO REVIEW REQUIRED", never an automatic advance. A CLI single-report test was added; the suspected duplicate output was not real.
+- **Owner items:**
+  - O-PV-1 (empty-bid forced exit) stays OPEN until Gate 4.5;
+  - O-PV-2: the banking baseline is kept, the sub-steps are PROPOSED ONLY, and the sweep, refill, and promotion parameters are NOT FROZEN;
+  - O-PV-3: 324 is RESOLVED as an absolute maximum, not a target;
+  - O-PV-4 (cycle deferrals) stays OPEN until the first protected cycle is designed;
+  - still open from before: AR-B12-1, AR-B12-2, the guard-exception confirmation, DR-9, DR-3, the DR-8 capture preconditions, P-5 before capture, and DR-22.
+- **Next:**
+  - the owner reviews the B12 commit set;
+  - the owner resolves AR-B12-1 and AR-B12-2 and supplies the fee schedule;
+  - then the owner-run pilot (§5.1);
+  - then the eight-specialist review of the profile.
+
+**B11, 2026-10-19 (historical).** The active branch was B11, `b11/btc-poc-owner-decisions`. It is a governance-only branch, with no cloud provisioning.
 
 **Owner data-readiness decisions, 2026-10-19 (after B10 merged by PR #9, `4019a75`).** Seven PMV specialists reviewed the obtainable data (one owner-authorized 1,000-row Kraken trade sample, exposure row X-12; Kalshi specifications; gold schema only). All seven returned GO WITH CONDITIONS. The owner then recorded decisions DR-1 to DR-15 (`docs/decisions/2026-10-19_owner_data_readiness_decisions.md`):
 - **Approved:**
